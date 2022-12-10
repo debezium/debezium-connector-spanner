@@ -1,0 +1,35 @@
+## CI for Java for Docker image
+name: CI for Docker image
+on:
+  workflow_dispatch:
+jobs:
+  run_tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v3
+      - name: Checkout the debezium repository
+        uses: actions/checkout@v3
+        with:
+          repository: debezium/debezium
+          path: core
+      - name: Set up JDK
+        uses: actions/setup-java@v1
+        with:
+          java-version: 11
+      - name: Cache Maven packages
+        uses: actions/cache@v1
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+          restore-keys: ${{ runner.os }}-m2
+      - name: Maven build debezium core 
+        run: mvn clean install -f core/pom.xml -pl debezium-bom,debezium-core,debezium-embedded,debezium-storage -am -DskipTests -DskipITs -Dformat.formatter.goal=validate -Dformat.imports.goal=check -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false -Dmaven.wagon.httpconnectionManager.ttlSeconds=120
+      - name: Maven build connector core
+        run: mvn -B clean install
+## Add your DockerHub credantials to Aithub Actions        
+        ##  secrets.DOCKER_USERNAME = username
+        ##  secrets.DOCKER_PASSWORD = usertoken
+      - name: Docker push
+        run : mvn docker:push -Ddocker.username=${{ secrets.DOCKER_USERNAME }} -Ddocker.password=${{ secrets.DOCKER_PASSWORD }}
+

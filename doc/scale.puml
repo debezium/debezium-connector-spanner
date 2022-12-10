@@ -1,0 +1,99 @@
+@startuml "connector"
+title High level connector tasks asynchronous intercommunication's
+hide unlinked
+
+queue "Heartbeat Topic" as ht #RosyBrown
+box Tasks #WhiteSmoke
+participant Task1 as t1 #LimeGreen
+participant Leader as l #SkyBlue
+participant Task2 as t2 #MediumAquaMarine
+end box
+queue "Sync Topic" as st #LightCoral
+
+activate ht #RosyBrown
+activate st #LightCoral
+activate t1 #LimeGreen
+activate t2 #MediumAquaMarine
+
+group Task initialization steps
+    t1 -[#LimeGreen]> t1 : prepare to work, generate synthetic taskID
+    t1 -[#LimeGreen]> st : connect to topic, read last N messages
+    st -[#LightCoral]-> t1: echo last N messages
+    alt Sync Topic is empty
+        t1 -[#LimeGreen]> t1 : create empty state, state cache, initial epoch should be null
+    else Messages present in the topic
+        t1 -[#LimeGreen]> t1: build initial state cache using existing messages from\n\
+        the latest epoch (null epoch ignored), create empty state
+    end
+    t1 -[#LimeGreen]> ht : connect heartbeat topic to initiate Rebalance event
+end
+
+loop
+    ht -[#RosyBrown]> t2 : Rebalance
+    ht -[#RosyBrown]> t1 : Rebalance [leader, taskCount]
+    == partition sharing disabled until new epoch message ==
+    t1 -[#LimeGreen]> l : create leader, share state with it
+    activate l #SkyBlue
+    t1 -[#LimeGreen]> st : taskID[1] + current state
+    t2 -[#MediumAquaMarine]> st : taskID[2] + current state
+    loop Until unique taskID responses < taskCount
+        st -[#LightCoral]-> t1 : echo last msg
+        st -[#LightCoral]-> t2 : echo last msg
+        st -[#LightCoral]-> l : echo last msg
+        st -[#LightCoral]-> t1 : echo last msg
+        st -[#LightCoral]-> t2 : echo last msg
+        st -[#LightCoral]-> l : echo last msg
+        l -[#SkyBlue]> l : count unique taskID responses
+        t1 -[#LimeGreen]> st : state updates
+        t2 -[#MediumAquamarine]> st : state updates
+        st -[#LightCoral]-> t1 : echo last msg
+        st -[#LightCoral]-> t2 : echo last msg
+        st -[#LightCoral]-> l : echo last msg
+    end
+    alt Clean start
+        l -[#SkyBlue]> l : read initial partition list
+    else Restarted/Tasks disconnected/New tasks connected
+        l -[#SkyBlue]> l : calculate "ownerless" partitions for sharing
+    end
+    l -[#SkyBlue]-> t1: leader thread is done, update state with provided list of "ownerless" \
+    partitions
+    deactivate l
+    t1 -[#LimeGreen]> t1 : self state updates
+    t1 -[#LimeGreen]> st: start new epoch,\n\
+    share "ownerless" partitions(if any) to alive tasks,\n\
+    remove died task states for internal state and for a new epoch message
+    == partition sharing enabled ==
+    st -[#LightCoral]-> t1 : echo last msg
+    st -[#LightCoral]-> t2 : echo last msg
+    loop
+        t1 -[#LimeGreen]> t1 : continue/start read own partitions
+        t2 -[#MediumAquamarine]> t2 : continue/start read own partitions
+        alt t2 become underloaded
+            t1 -[#LimeGreen]> st : t1 share partitions with t2
+            st -[#LightCoral]-> t1 : echo last msg
+            st -[#LightCoral]-> t2 : echo last msg
+            t2 -[#MediumAquaMarine]> st : t2 accepts shared partitions
+            st -[#LightCoral]-> t1 : echo last msg
+            st -[#LightCoral]-> t2 : echo last msg
+            t1 -[#LimeGreen]> t1 : delete share section items for owned partitions
+        else t1 become underloaded
+            t2 -[#MediumAquaMarine]> st : t2 share partitions with t1
+            st -[#LightCoral]-> t2 : echo last msg
+            st -[#LightCoral]-> t1 : echo last msg
+            t1 -[#LimeGreen]> st : t1 accepts shared partitions
+            st -[#LightCoral]-> t1 : echo last msg
+            st -[#LightCoral]-> t2 : echo last msg
+            t2 -[#MediumAquamarine]> t2 : delete share section items for owned partitions
+        else task status changed for t1
+            t1 -[#LimeGreen]> st : t1 sync status msg on partition event
+            st -[#LightCoral]-> t1 : echo last msg
+            st -[#LightCoral]-> t2 : echo last msg
+        else task status changed for t2
+            t2 -[#MediumAquaMarine]> st : t2 sync status msg on partition event
+            st -[#LightCoral]-> t1 : echo last msg
+            st -[#LightCoral]-> t2 : echo last msg
+        end
+        t1 -[#LimeGreen]> t1 : continue read own partitions
+        t2 -[#MediumAquamarine]> t2 : continue read own partitions
+    end
+    @enduml
