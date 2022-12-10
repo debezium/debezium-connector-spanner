@@ -49,7 +49,6 @@ class ConnectionValidatorTest {
         ConfigurationValidator.ValidationContext validationContext = new ConfigurationValidator.ValidationContext(configuration, configValueMap);
 
         ConnectionValidator connectionValidator = spy(ConnectionValidator.withContext(validationContext));
-        // doNothing().when(connectionValidator).tryConnectByCredentialsJsonPath();
 
         connectionValidator.validate();
         Assertions.assertEquals(isSuccess, connectionValidator.isSuccess());
