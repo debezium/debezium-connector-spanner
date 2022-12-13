@@ -5,21 +5,20 @@
  */
 package io.debezium.connector.spanner.context.source;
 
-import java.util.Collection;
-import java.util.function.Supplier;
-
-import org.apache.kafka.connect.source.SourceTask;
-
 import io.debezium.connector.common.CdcSourceTaskContext;
 import io.debezium.connector.spanner.SpannerConnectorConfig;
 import io.debezium.spi.schema.DataCollectionId;
+import java.util.Collection;
+import java.util.function.Supplier;
+import org.apache.kafka.connect.source.SourceTask;
 
 /**
- * Contains contextual information and objects scoped to the lifecycle of Debezium's {@link SourceTask} implementations.
- * Extends {@code CdcSourceTaskContext}.
+ * Contains contextual information and objects scoped to the lifecycle of Debezium's {@link
+ * SourceTask} implementations. Extends {@code CdcSourceTaskContext}
  */
 public class SpannerSourceTaskContext extends CdcSourceTaskContext {
-    public SpannerSourceTaskContext(SpannerConnectorConfig config, Supplier<Collection<? extends DataCollectionId>> supplier) {
-        super(config.getContextName(), config.getConnectorName(), config.getTaskId(), supplier);
-    }
+  public SpannerSourceTaskContext(
+      SpannerConnectorConfig config, Supplier<Collection<? extends DataCollectionId>> supplier) {
+    super(config.getContextName(), config.getConnectorName(), config.getTaskId(), supplier);
+  }
 }
