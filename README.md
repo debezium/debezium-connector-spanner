@@ -1,6 +1,6 @@
-![Integration Tests](https://github.com/span-connector/debezium.connector.spanner/actions/workflows/ci-tests.yml/badge.svg)
-![Build Core](https://github.com/span-connector/debezium.connector.spanner/actions/workflows/ci-core.yml/badge.svg)
-![Docker image](https://github.com/span-connector/debezium.connector.spanner/actions/workflows/ci-docker-image.yml/badge.svg)
+![Integration Tests](https://github.com/debezium/debezium-connector-spanner/actions/workflows/ci-tests.yml/badge.svg)
+![Build Core](https://github.com/debezium/debezium-connector-spanner/actions/workflows/ci-core.yml/badge.svg)
+![Docker image](https://github.com/debezium/debezium-connector-spanner/actions/workflows/ci-docker-image.yml/badge.svg)
 
 ## Debezium connector spanner
 
