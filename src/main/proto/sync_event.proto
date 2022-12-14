@@ -1,0 +1,54 @@
+syntax = "proto3";
+package io.debezium.connector.spanner.scale.proto;
+
+option java_package = "io.debezium.connector.spanner.kafka.event.proto";
+option java_outer_classname = "SyncEventProtos";
+
+message SyncEvent {
+  string taskUid = 2;
+  string consumerId = 3;
+  int64 messageTimestamp = 4;
+  int64 rebalanceGenerationId = 5;
+  MessageType messageType = 6;
+  int64 epochOffset = 7;
+  repeated TaskState taskStates = 8;
+}
+
+enum MessageType {
+  REGULAR = 0;
+  NEW_EPOCH = 1;
+  UPDATE_EPOCH = 2;
+  REBALANCE_ANSWER = 3;
+}
+
+message TaskState {
+  string taskUid = 1;
+  string consumerId = 2;
+  int64 rebalanceGenerationId = 3;
+  int64 stateTimestamp = 4;
+
+  repeated PartitionState partitions = 5;
+  repeated PartitionState sharedPartitions = 6;
+}
+
+message PartitionState {
+  string token = 1;
+  string startTimestamp = 2;
+  string endTimestamp = 3;
+
+  State state = 4;
+
+  repeated string parents = 5;
+  string assigneeTaskUid = 6;
+
+  string finishedTimestamp = 7;
+}
+
+enum State {
+    CREATED = 0;
+    READY_FOR_STREAMING = 1;
+    SCHEDULED = 2;
+    RUNNING = 3;
+    FINISHED = 4;
+    REMOVED = 5;
+};
