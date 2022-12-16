@@ -19,8 +19,8 @@ import io.debezium.pipeline.txmetadata.TransactionContext;
 import io.debezium.spi.schema.DataCollectionId;
 
 /**
- * Implementation of {@code OffsetContext} Updates offset from {@code DataChangeEvent}, {@code
- * HeartbeatEvent}, {@code ChildPartitionsEvent} events
+ * Implementation of {@code OffsetContext}.
+ * Updates offset from {@code DataChangeEvent}, {@code HeartbeatEvent}, {@code ChildPartitionsEvent} events
  */
 public class SpannerOffsetContext implements OffsetContext {
 
@@ -29,17 +29,13 @@ public class SpannerOffsetContext implements OffsetContext {
 
     private final PartitionOffset partitionOffset;
 
-    public SpannerOffsetContext(
-                                SourceInfo sourceInfo,
-                                PartitionOffset partitionOffset,
-                                TransactionContext transactionContext) {
+    public SpannerOffsetContext(SourceInfo sourceInfo, PartitionOffset partitionOffset, TransactionContext transactionContext) {
         this.sourceInfo = sourceInfo;
         this.partitionOffset = partitionOffset;
         this.transactionContext = transactionContext;
     }
 
-    public SpannerOffsetContext(
-                                PartitionOffset partitionOffset, TransactionContext transactionContext) {
+    public SpannerOffsetContext(PartitionOffset partitionOffset, TransactionContext transactionContext) {
         this.sourceInfo = null;
         this.partitionOffset = partitionOffset;
         this.transactionContext = transactionContext;

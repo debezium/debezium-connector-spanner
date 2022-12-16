@@ -19,7 +19,10 @@ import java.util.HashMap;
 import java.util.function.Consumer;
 
 import org.apache.kafka.connect.data.ConnectSchema;
+import org.apache.kafka.connect.data.Field;
 import org.apache.kafka.connect.data.Schema;
+import org.apache.kafka.connect.data.Struct;
+import org.apache.kafka.connect.header.Header;
 import org.apache.kafka.connect.header.Headers;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.junit.jupiter.api.Test;
@@ -52,10 +55,30 @@ class MetricsEventPublisherTest {
         MetricsEventPublisher metricsEventPublisher = spy(new MetricsEventPublisher());
         HashMap<String, Object> sourcePartition = new HashMap<>();
         HashMap<String, Object> sourceOffset = new HashMap<>();
-        SourceRecord sourceRecord = new SourceRecord(sourcePartition, sourceOffset, "Topic",
-                new ConnectSchema(Schema.Type.INT8), "Value");
+
+        Struct struct = mock(Struct.class);
+        Schema schema = mock(Schema.class);
+        Field field = mock(Field.class);
+        Headers headers = mock(Headers.class);
+        Header header = mock(Header.class);
+        Header headerUid = mock(Header.class);
+
+        SourceRecord sourceRecord = spy(new SourceRecord(sourcePartition, sourceOffset, "Topic",
+                new ConnectSchema(Schema.Type.INT8), "Value"));
+
+        doReturn(struct).when(sourceRecord).value();
+        doReturn(headers).when(sourceRecord).headers();
+        doReturn(header).when(headers).lastWithName(anyString());
+        doReturn(1001L).when(header).value();
+        doReturn(schema).when(struct).schema();
+        doReturn(field).when(schema).field(anyString());
+        doReturn(struct).when(struct).getStruct(anyString());
+
+        doReturn(headerUid).when(headers).lastWithName("spannerDataChangeRecordUid");
+        doReturn("spannerDataChangeRecordUid").when(headerUid).value();
+
         metricsEventPublisher.logLatency(sourceRecord);
-        verify(metricsEventPublisher, times(0)).publishMetricEvent(any());
+        verify(metricsEventPublisher, times(1)).publishMetricEvent(any());
     }
 
     @Test

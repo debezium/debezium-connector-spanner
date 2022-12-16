@@ -21,13 +21,11 @@ import com.google.cloud.Timestamp;
 
 import io.debezium.connector.spanner.SpannerConnectorConfig;
 import io.debezium.connector.spanner.SpannerErrorHandler;
+import io.debezium.connector.spanner.db.model.InitialPartition;
 import io.debezium.connector.spanner.kafka.internal.model.PartitionState;
 import io.debezium.connector.spanner.kafka.internal.model.PartitionStateEnum;
 
-/**
- * Calculates watermark based on offsets
- * of all partitions
- */
+/** Calculates watermark based on offsets of all partitions */
 public class LowWatermarkCalculator {
     private static final Logger LOGGER = LoggerFactory.getLogger(LowWatermarkCalculator.class);
     private static final long OFFSET_MONITORING_LAG_MAX_MS = 60_000;
@@ -37,7 +35,8 @@ public class LowWatermarkCalculator {
 
     private final PartitionOffsetProvider partitionOffsetProvider;
 
-    public LowWatermarkCalculator(SpannerConnectorConfig spannerConnectorConfig,
+    public LowWatermarkCalculator(
+                                  SpannerConnectorConfig spannerConnectorConfig,
                                   TaskSyncContextHolder taskSyncContextHolder,
                                   PartitionOffsetProvider partitionOffsetProvider) {
         this.taskSyncContextHolder = taskSyncContextHolder;
@@ -55,13 +54,15 @@ public class LowWatermarkCalculator {
 
         Map<String, List<PartitionState>> partitionsMap = taskSyncContext.getAllTaskStates().values().stream()
                 .flatMap(taskState -> taskState.getPartitions().stream())
-                .filter(partitionState -> !partitionState.getState().equals(PartitionStateEnum.FINISHED) &&
-                        !partitionState.getState().equals(PartitionStateEnum.REMOVED))
+                .filter(
+                        partitionState -> !partitionState.getState().equals(PartitionStateEnum.FINISHED)
+                                && !partitionState.getState().equals(PartitionStateEnum.REMOVED))
                 .collect(Collectors.groupingBy(PartitionState::getToken));
 
         Set<String> duplicatesInPartitions = checkDuplication(partitionsMap);
         if (!duplicatesInPartitions.isEmpty()) {
-            LOGGER.warn("calculateLowWatermark: found duplication in partitionsMap: {}", duplicatesInPartitions);
+            LOGGER.warn(
+                    "calculateLowWatermark: found duplication in partitionsMap: {}", duplicatesInPartitions);
             return null;
         }
 
@@ -76,7 +77,9 @@ public class LowWatermarkCalculator {
 
         Set<String> duplicatesInSharedPartitions = checkDuplication(sharedPartitionsMap);
         if (!duplicatesInSharedPartitions.isEmpty()) {
-            LOGGER.warn("calculateLowWatermark: found duplication in sharedPartitionsMap: {}", duplicatesInSharedPartitions);
+            LOGGER.warn(
+                    "calculateLowWatermark: found duplication in sharedPartitionsMap: {}",
+                    duplicatesInSharedPartitions);
             return null;
         }
 
@@ -90,6 +93,23 @@ public class LowWatermarkCalculator {
 
         allPartitions.putAll(sharedPartitions);
 
+        if (allPartitions.containsKey(InitialPartition.PARTITION_TOKEN)) {
+            final long now = new Date().getTime();
+            long lag = now
+                    - allPartitions
+                            .get(InitialPartition.PARTITION_TOKEN)
+                            .getStartTimestamp()
+                            .toDate()
+                            .getTime();
+            if (lag > OFFSET_MONITORING_LAG_MAX_MS) {
+                LOGGER.warn(
+                        "Partition has a very old start timestamp, lag: {}, token: {}",
+                        lag,
+                        InitialPartition.PARTITION_TOKEN);
+            }
+            return allPartitions.get(InitialPartition.PARTITION_TOKEN).getStartTimestamp();
+        }
+
         Map<String, Timestamp> offsets;
 
         try {
@@ -97,31 +117,40 @@ public class LowWatermarkCalculator {
         }
         catch (ConnectException e) {
             if (e.getCause() != null && e.getCause() instanceof InterruptedException) {
-                LOGGER.info("Kafka connect offsetStorageReader is interrupting... Thread interrupted: {}", Thread.currentThread().isInterrupted());
+                LOGGER.info(
+                        "Kafka connect offsetStorageReader is interrupting... Thread interrupted: {}",
+                        Thread.currentThread().isInterrupted());
             }
             else {
-                LOGGER.warn("Kafka connect offsetStorageReader cannot return offsets. Thread interrupted: {}. {}", Thread.currentThread().isInterrupted(),
+                LOGGER.warn(
+                        "Kafka connect offsetStorageReader cannot return offsets. Thread interrupted: {}. {}",
+                        Thread.currentThread().isInterrupted(),
                         SpannerErrorHandler.getStackTrace(e));
             }
             return null;
         }
         catch (RuntimeException e) {
-            LOGGER.warn("Kafka connect offsetStorageReader cannot return offsets {}", SpannerErrorHandler.getStackTrace(e));
+            LOGGER.warn(
+                    "Kafka connect offsetStorageReader cannot return offsets {}",
+                    SpannerErrorHandler.getStackTrace(e));
             return null;
         }
 
         monitorOffsets(offsets);
 
-        return allPartitions.values().stream().map(partitionState -> {
-            Timestamp timestamp = offsets.get(partitionState.getToken());
-            if (timestamp != null) {
-                return timestamp;
-            }
-            if (partitionState.getStartTimestamp() != null) {
-                return partitionState.getStartTimestamp();
-            }
-            throw new IllegalStateException("lastCommitTimestamp or startTimestamp are not specified or offsets are empty");
-        })
+        return allPartitions.values().stream()
+                .map(
+                        partitionState -> {
+                            Timestamp timestamp = offsets.get(partitionState.getToken());
+                            if (timestamp != null) {
+                                return timestamp;
+                            }
+                            if (partitionState.getStartTimestamp() != null) {
+                                return partitionState.getStartTimestamp();
+                            }
+                            throw new IllegalStateException(
+                                    "lastCommitTimestamp or startTimestamp are not specified or offsets are empty");
+                        })
                 .min(Timestamp::compareTo)
                 .orElse(spannerConnectorConfig.startTime());
     }
@@ -132,22 +161,25 @@ public class LowWatermarkCalculator {
         }
         final long now = new Date().getTime();
 
-        offsets.entrySet().forEach(e -> {
-            Timestamp timestamp = e.getValue();
-            if (timestamp != null) {
-                String token = e.getKey();
-                long lag = now - timestamp.toDate().getTime();
-                if (lag > OFFSET_MONITORING_LAG_MAX_MS) {
-                    LOGGER.warn("Partition has a very old offset, lag: {}, token: {}", lag, token);
-                }
-            }
-        });
+        offsets
+                .entrySet()
+                .forEach(
+                        e -> {
+                            Timestamp timestamp = e.getValue();
+                            if (timestamp != null) {
+                                String token = e.getKey();
+                                long lag = now - timestamp.toDate().getTime();
+                                if (lag > OFFSET_MONITORING_LAG_MAX_MS) {
+                                    LOGGER.warn("Partition has a very old offset, lag: {}, token: {}", lag, token);
+                                }
+                            }
+                        });
     }
 
     private Set<String> checkDuplication(Map<String, List<PartitionState>> map) {
-        return map.entrySet()
-                .stream().filter(entry -> entry.getValue().size() > 1)
-                .map(Map.Entry::getKey).collect(Collectors.toUnmodifiableSet());
+        return map.entrySet().stream()
+                .filter(entry -> entry.getValue().size() > 1)
+                .map(Map.Entry::getKey)
+                .collect(Collectors.toUnmodifiableSet());
     }
-
 }

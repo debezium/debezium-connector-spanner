@@ -8,12 +8,14 @@ package io.debezium.connector.spanner.task;
 import static org.slf4j.LoggerFactory.getLogger;
 
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Consumer;
 
 import org.slf4j.Logger;
 
-import com.google.cloud.Timestamp;
-
+import io.debezium.connector.spanner.SpannerConnectorConfig;
 import io.debezium.connector.spanner.db.stream.ChangeStream;
+import io.debezium.connector.spanner.exception.SpannerConnectorException;
 import io.debezium.connector.spanner.kafka.internal.TaskSyncPublisher;
 import io.debezium.connector.spanner.task.operation.CheckPartitionDuplicationOperation;
 import io.debezium.connector.spanner.task.operation.ChildPartitionOperation;
@@ -48,20 +50,25 @@ public class TaskStateChangeEventHandler {
     private final PartitionFactory partitionFactory;
 
     private final Runnable finishingHandler;
-    private final Timestamp endTime;
+    private final SpannerConnectorConfig connectorConfig;
+    private final Consumer<RuntimeException> errorHandler;
+
+    private final AtomicLong failOverloadedTaskTimer = new AtomicLong(System.currentTimeMillis());
 
     public TaskStateChangeEventHandler(TaskSyncContextHolder taskSyncContextHolder,
                                        TaskSyncPublisher taskSyncPublisher,
                                        ChangeStream changeStream,
                                        PartitionFactory partitionFactory,
                                        Runnable finishingHandler,
-                                       Timestamp endTime) {
+                                       SpannerConnectorConfig connectorConfig,
+                                       Consumer<RuntimeException> errorHandler) {
         this.taskSyncContextHolder = taskSyncContextHolder;
         this.taskSyncPublisher = taskSyncPublisher;
         this.partitionFactory = partitionFactory;
         this.changeStream = changeStream;
         this.finishingHandler = finishingHandler;
-        this.endTime = endTime;
+        this.connectorConfig = connectorConfig;
+        this.errorHandler = errorHandler;
     }
 
     public void processEvent(TaskStateChangeEvent syncEvent) throws InterruptedException {
@@ -75,6 +82,7 @@ public class TaskStateChangeEventHandler {
         }
         else if (syncEvent instanceof SyncEvent) {
             processSyncEvent();
+
         }
         else {
             throw new IllegalStateException("Unknown event");
@@ -99,17 +107,48 @@ public class TaskStateChangeEventHandler {
     }
 
     private void processSyncEvent() throws InterruptedException {
-        performOperation(
+        TaskSyncContext taskSyncContext = performOperation(
                 new ClearSharedPartitionOperation(),
                 new TakeSharedPartitionOperation(),
                 new CheckPartitionDuplicationOperation(changeStream),
                 new FindPartitionForStreamingOperation(),
                 new TakePartitionForStreamingOperation(changeStream, partitionFactory),
                 new RemoveFinishedPartitionOperation(),
-                new ConnectorEndDetectionOperation(finishingHandler, endTime));
+                new ConnectorEndDetectionOperation(finishingHandler, connectorConfig.endTime()));
+
+        failOverloadedTaskByTimer(taskSyncContext);
     }
 
-    private void performOperation(Operation... operations) throws InterruptedException {
+    private void failOverloadedTaskByTimer(TaskSyncContext taskSyncContext) {
+        if (!connectorConfig.failOverloadedTask()) {
+            return;
+        }
+        synchronized (this) {
+            this.failOverloadedTaskTimer.getAndUpdate(start -> {
+                long now = System.currentTimeMillis();
+
+                if (start + connectorConfig.failOverloadedTaskInterval() < now) {
+                    checkToFailOverloadedTask(taskSyncContext);
+                    return now;
+                }
+
+                return start;
+            });
+        }
+    }
+
+    private synchronized void checkToFailOverloadedTask(TaskSyncContext taskSyncContext) {
+        long currentTaskPartitions = TaskStateUtil.numOwnedAndAssignedPartitions(taskSyncContext);
+        long totalPartitions = TaskStateUtil.totalInProgressPartitions(taskSyncContext);
+
+        if (currentTaskPartitions > connectorConfig.getDesiredPartitionsTasks()
+                && currentTaskPartitions > 2 * (totalPartitions / (taskSyncContext.getTaskStates().size() + 1))) {
+            errorHandler.accept(new SpannerConnectorException(
+                    String.format("Task is overloaded by assignments: %d of total: %d", currentTaskPartitions, totalPartitions)));
+        }
+    }
+
+    private TaskSyncContext performOperation(Operation... operations) throws InterruptedException {
         AtomicBoolean publishTaskSyncEvent = new AtomicBoolean(false);
 
         taskSyncContextHolder.lock();
@@ -138,6 +177,8 @@ public class TaskStateChangeEventHandler {
             LOGGER.debug("Task {} - send sync event", taskSyncContext.getTaskUid());
             taskSyncPublisher.send(taskSyncContext.buildTaskSyncEvent());
         }
+
+        return taskSyncContext;
     }
 
 }

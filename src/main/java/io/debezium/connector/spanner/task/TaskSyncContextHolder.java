@@ -21,7 +21,7 @@ import io.debezium.connector.spanner.metrics.event.TaskSyncContextMetricEvent;
 import io.debezium.connector.spanner.task.utils.TimeoutMeter;
 
 /**
- * Holds the current state of connector's task.
+ * Holds the current state of the connector's task.
  * Publishes metric events, when state is changed.
  */
 public class TaskSyncContextHolder {

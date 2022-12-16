@@ -58,7 +58,7 @@ public class PartitionStatusUpdateOperation implements Operation {
                 })
                 .collect(Collectors.toList());
 
-        LOGGER.debug("Task updated status for partition, taskUid: {}, partition: {}, status: {}",
+        LOGGER.info("Task updated status for partition, taskUid: {}, partition: {}, status: {}",
                 taskSyncContext.getTaskUid(), token, partitionStateEnum);
 
         return taskSyncContext.toBuilder()

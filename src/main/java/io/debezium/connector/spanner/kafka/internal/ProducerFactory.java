@@ -11,6 +11,7 @@ import java.util.Properties;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.serialization.ByteArraySerializer;
+import org.apache.kafka.common.serialization.StringSerializer;
 
 import io.debezium.connector.spanner.SpannerConnectorConfig;
 
@@ -28,7 +29,7 @@ public class ProducerFactory<K, V> {
     public KafkaProducer<K, V> createProducer() {
         Properties properties = config.kafkaProps(
                 Map.of(
-                        ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, ByteArraySerializer.class.getName(),
+                        ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName(),
                         ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, ByteArraySerializer.class.getName(),
                         ProducerConfig.ACKS_CONFIG, "1",
                         ProducerConfig.REQUEST_TIMEOUT_MS_CONFIG, String.valueOf(config.syncRequestTimeout()),

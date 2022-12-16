@@ -89,6 +89,7 @@ public class SyncEventFromProtoMapper {
                 partitionState.getAssigneeTaskUid(),
                 partitionState.getFinishedTimestamp() != null && !partitionState.getFinishedTimestamp().isEmpty()
                         ? Timestamp.parseTimestamp(partitionState.getFinishedTimestamp())
-                        : null);
+                        : null,
+                partitionState.getOriginParent());
     }
 }

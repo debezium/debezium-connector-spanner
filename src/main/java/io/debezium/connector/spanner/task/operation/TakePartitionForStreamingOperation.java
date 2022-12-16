@@ -89,7 +89,10 @@ public class TakePartitionForStreamingOperation implements Operation {
 
         List<PartitionState> partitions = taskSyncContext.getCurrentTaskState().getPartitions().stream()
                 .map(partitionState -> {
-                    if (isStreamingPartition(taskSyncContext.getTaskStates().values(), partitionState.getToken())) {
+                    if (isPartitionStreamingAlready(taskSyncContext.getTaskStates().values(), partitionState.getToken())
+                            && partitionState.getState().equals(PartitionStateEnum.READY_FOR_STREAMING)) {
+                        LOGGER.info("Removing streaming partition {} with state {} since partition is already streaming", partitionState.getToken(),
+                                partitionState.getState());
                         return null;
                     }
                     return partitionState;
@@ -102,7 +105,16 @@ public class TakePartitionForStreamingOperation implements Operation {
                 .build();
     }
 
-    private boolean isStreamingPartition(Collection<TaskState> taskStates, String token) {
+    private boolean isPartitionStreamingAlready(Collection<TaskState> taskStates, String token) {
+        return taskStates.stream().flatMap(taskState -> taskState.getPartitions().stream())
+                .filter(partitionState -> partitionState.getToken().equals(token))
+                .anyMatch(partitionState -> partitionState.getState().equals(PartitionStateEnum.SCHEDULED)
+                        || partitionState.getState().equals(PartitionStateEnum.RUNNING)
+                        || partitionState.getState().equals(PartitionStateEnum.FINISHED)
+                        || partitionState.getState().equals(PartitionStateEnum.REMOVED));
+    }
+
+    private boolean isPartition(Collection<TaskState> taskStates, String token) {
         return taskStates.stream().flatMap(taskState -> taskState.getPartitions().stream())
                 .filter(partitionState -> partitionState.getToken().equals(token))
                 .anyMatch(partitionState -> partitionState.getState().equals(PartitionStateEnum.SCHEDULED)

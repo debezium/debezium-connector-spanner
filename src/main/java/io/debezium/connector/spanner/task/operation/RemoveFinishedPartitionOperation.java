@@ -8,7 +8,6 @@ package io.debezium.connector.spanner.task.operation;
 import static org.slf4j.LoggerFactory.getLogger;
 
 import java.time.Duration;
-import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -17,19 +16,18 @@ import java.util.stream.Stream;
 
 import org.slf4j.Logger;
 
+import com.google.cloud.Timestamp;
+
 import io.debezium.connector.spanner.kafka.internal.model.PartitionState;
 import io.debezium.connector.spanner.kafka.internal.model.PartitionStateEnum;
 import io.debezium.connector.spanner.kafka.internal.model.TaskState;
 import io.debezium.connector.spanner.task.TaskSyncContext;
 
-/**
- * Remove finished partition from the task state,
- * as it is not needed anymore
- */
+/** Remove finished partition from the task state, as it is not needed anymore */
 public class RemoveFinishedPartitionOperation implements Operation {
     private static final Logger LOGGER = getLogger(RemoveFinishedPartitionOperation.class);
 
-    private static final Duration DELETION_DELAY = Duration.ofMinutes(10);
+    private static final Duration DELETION_DELAY = Duration.ofMinutes(60);
 
     private boolean isRequiredPublishSyncEvent = false;
 
@@ -38,16 +36,41 @@ public class RemoveFinishedPartitionOperation implements Operation {
         TaskState taskState = taskSyncContext.getCurrentTaskState();
 
         List<PartitionState> partitions = taskState.getPartitions().stream()
-                .map(partitionState -> {
-                    if (partitionState.getState().equals(PartitionStateEnum.FINISHED)
-                            && isChildrenFinished(taskSyncContext, partitionState.getToken())
-                            && partitionState.getFinishedTimestamp().toSqlTimestamp().toInstant()
-                                    .plus(DELETION_DELAY).isAfter(Instant.now())) {
-                        LOGGER.debug("Partition {} will be removed from task state", partitionState.getToken());
-                        return null;
-                    }
-                    return partitionState;
-                })
+                .map(
+                        partitionState -> {
+                            if (partitionState.getState().equals(PartitionStateEnum.FINISHED)
+                                    && allChildrenFinishedAndAtLeastOnePresent(
+                                            taskSyncContext, partitionState.getToken())) {
+
+                                if (partitionState.getFinishedTimestamp() == null) {
+                                    throw new IllegalStateException(
+                                            "FinishedTimestamp must be specified for finished partitions");
+                                }
+
+                                Timestamp deletionTime = Timestamp.ofTimeSecondsAndNanos(
+                                        partitionState.getFinishedTimestamp().getSeconds()
+                                                + DELETION_DELAY.getSeconds(),
+                                        0);
+                                Timestamp currentTime = Timestamp.now();
+                                if (deletionTime.compareTo(currentTime) < 0) {
+                                    LOGGER.info(
+                                            "Partition {} will be removed from the task with finished timestamp {},"
+                                                    + " deletion timestamp {} and current time {}",
+                                            partitionState,
+                                            partitionState.getFinishedTimestamp(),
+                                            deletionTime,
+                                            currentTime);
+                                    return null;
+                                }
+                                LOGGER.info(
+                                        "Partition {} will not be removed from the task since deletion timestamp"
+                                                + " {}, finished timestamp {} is less than now {}",
+                                        deletionTime,
+                                        partitionState.getFinishedTimestamp(),
+                                        currentTime);
+                            }
+                            return partitionState;
+                        })
                 .filter(Objects::nonNull)
                 .collect(Collectors.toList());
 
@@ -60,11 +83,16 @@ public class RemoveFinishedPartitionOperation implements Operation {
                 .build();
     }
 
-    private boolean isChildrenFinished(TaskSyncContext taskSyncContext, String token) {
+    private static boolean allChildrenFinishedAndAtLeastOnePresent(
+                                                                   TaskSyncContext taskSyncContext, String token) {
         List<PartitionState> allPartitionStates = Stream.concat(
-                Stream.concat(taskSyncContext.getTaskStates().values().stream().flatMap(taskState -> taskState.getPartitions().stream()),
+                Stream.concat(
+                        taskSyncContext.getTaskStates().values().stream()
+                                .flatMap(taskState -> taskState.getPartitions().stream()),
                         taskSyncContext.getCurrentTaskState().getPartitions().stream()),
-                Stream.concat(taskSyncContext.getTaskStates().values().stream().flatMap(taskState -> taskState.getSharedPartitions().stream()),
+                Stream.concat(
+                        taskSyncContext.getTaskStates().values().stream()
+                                .flatMap(taskState -> taskState.getSharedPartitions().stream()),
                         taskSyncContext.getCurrentTaskState().getSharedPartitions().stream()))
                 .collect(Collectors.toList());
 
@@ -73,12 +101,16 @@ public class RemoveFinishedPartitionOperation implements Operation {
                 .map(PartitionState::getToken)
                 .collect(Collectors.toSet());
 
-        return children.stream().allMatch(childToken -> {
-            return allPartitionStates.stream()
-                    .filter(partitionState -> childToken.equals(partitionState.getToken()))
-                    .allMatch(partitionState -> PartitionStateEnum.FINISHED.equals(partitionState.getState())
-                            || PartitionStateEnum.REMOVED.equals(partitionState.getState()));
-        });
+        return !children.isEmpty()
+                && children.stream()
+                        .allMatch(
+                                childToken -> {
+                                    return allPartitionStates.stream()
+                                            .filter(partitionState -> childToken.equals(partitionState.getToken()))
+                                            .allMatch(
+                                                    partitionState -> PartitionStateEnum.FINISHED.equals(partitionState.getState())
+                                                            || PartitionStateEnum.REMOVED.equals(partitionState.getState()));
+                                });
     }
 
     @Override
@@ -90,5 +122,4 @@ public class RemoveFinishedPartitionOperation implements Operation {
     public TaskSyncContext doOperation(TaskSyncContext taskSyncContext) {
         return removeFinishedPartitions(taskSyncContext);
     }
-
 }

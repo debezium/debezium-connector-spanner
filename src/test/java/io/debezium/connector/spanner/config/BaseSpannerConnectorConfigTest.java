@@ -32,7 +32,7 @@ class BaseSpannerConnectorConfigTest {
     void testConfigDef() {
         ConfigDef actualConfigDefResult = BaseSpannerConnectorConfig.configDef();
         Map<String, ConfigDef.ConfigKey> configKeysResult = actualConfigDefResult.configKeys();
-        assertEquals(42, configKeysResult.size());
+        assertEquals(51, configKeysResult.size());
         List<String> groupsResult = actualConfigDefResult.groups();
         assertEquals(3, groupsResult.size());
         assertEquals("Spanner", groupsResult.get(0));
@@ -201,6 +201,15 @@ class BaseSpannerConnectorConfigTest {
         when(configuration.asProperties()).thenReturn(new Properties());
         assertNull(new SpannerConnectorConfig(configuration).changeStreamName());
     }
+    //
+    // @Test
+    // void testStartTime() {
+    // Configuration configuration = mock(Configuration.class);
+    // when(configuration.getString((Field) any())).thenReturn("String");
+    // when(configuration.asProperties()).thenReturn(new Properties());
+    // Timestamp timestamp = new SpannerConnectorConfig(configuration).startTime();
+    // assertTrue(Timestamp.now().getNanos() >= timestamp.getNanos());
+    // }
 
     @Test
     void testEndTime() {
@@ -271,8 +280,7 @@ class BaseSpannerConnectorConfigTest {
         when(configuration.getString((Field) any())).thenReturn("String");
         when(configuration.getString(anyString())).thenReturn("String");
         when(configuration.asProperties()).thenReturn(new Properties());
-        assertEquals(
-                "_rebalancing_topic_spanner_connector_null",
+        assertEquals("_rebalancing_topic_spanner_connector_null",
                 new SpannerConnectorConfig(configuration).rebalancingTopic());
     }
 
@@ -327,9 +335,7 @@ class BaseSpannerConnectorConfigTest {
         when(configuration.getString((Field) any())).thenReturn("String");
         when(configuration.getString(anyString())).thenReturn("String");
         when(configuration.asProperties()).thenReturn(new Properties());
-        assertEquals(
-                "_sync_topic_spanner_connector_null",
-                new SpannerConnectorConfig(configuration).taskSyncTopic());
+        assertEquals("_sync_topic_spanner_connector_null", new SpannerConnectorConfig(configuration).taskSyncTopic());
     }
 
     @Test

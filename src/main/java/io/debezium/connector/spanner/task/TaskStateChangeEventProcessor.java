@@ -5,16 +5,21 @@
  */
 package io.debezium.connector.spanner.task;
 
+import static java.util.stream.Collectors.toList;
 import static org.slf4j.LoggerFactory.getLogger;
 
+import java.util.List;
+import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.function.Consumer;
 
 import org.slf4j.Logger;
 
+import io.debezium.connector.spanner.db.model.Partition;
 import io.debezium.connector.spanner.metrics.MetricsEventPublisher;
 import io.debezium.connector.spanner.metrics.event.TaskStateChangeQueueUpdateMetricEvent;
+import io.debezium.connector.spanner.task.state.NewPartitionsEvent;
 import io.debezium.connector.spanner.task.state.TaskStateChangeEvent;
 
 /**
@@ -105,9 +110,26 @@ public class TaskStateChangeEventProcessor {
         }
     }
 
-    public void processEvent(TaskStateChangeEvent event) {
-        queue.add(event);
+    public void processEvent(TaskStateChangeEvent event) throws InterruptedException {
+        if (event instanceof NewPartitionsEvent) {
+            NewPartitionsEvent newPartitionsEvent = (NewPartitionsEvent) event;
+
+            List<Partition> filteredPartitions = removeAlreadyExistingPartitions(newPartitionsEvent.getPartitions());
+            if (!filteredPartitions.isEmpty()) {
+                queue.put(new NewPartitionsEvent(filteredPartitions));
+            }
+        }
+        else {
+            queue.put(event);
+        }
         metricsEventPublisher.publishMetricEvent(new TaskStateChangeQueueUpdateMetricEvent(queue.remainingCapacity()));
+    }
+
+    private List<Partition> removeAlreadyExistingPartitions(List<Partition> partitions) {
+        Set<String> existingPartitions = TaskStateUtil.allPartitionTokens(taskSyncContextHolder.get());
+        return partitions.stream()
+                .filter(p -> !existingPartitions.contains(p.getToken()))
+                .collect(toList());
     }
 
 }

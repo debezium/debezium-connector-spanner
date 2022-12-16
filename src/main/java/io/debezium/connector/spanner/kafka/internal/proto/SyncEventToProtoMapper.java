@@ -7,14 +7,10 @@ package io.debezium.connector.spanner.kafka.internal.proto;
 
 import static java.util.stream.Collectors.toList;
 
-import java.util.HashSet;
 import java.util.List;
-
-import com.google.cloud.Timestamp;
 
 import io.debezium.connector.spanner.kafka.event.proto.SyncEventProtos;
 import io.debezium.connector.spanner.kafka.internal.model.PartitionState;
-import io.debezium.connector.spanner.kafka.internal.model.PartitionStateEnum;
 import io.debezium.connector.spanner.kafka.internal.model.TaskSyncEvent;
 
 /**
@@ -62,20 +58,6 @@ public class SyncEventToProtoMapper {
                 .build();
     }
 
-    private static PartitionState mapPartition(SyncEventProtos.PartitionState partitionState) {
-        return PartitionState.builder()
-                .token(partitionState.getToken())
-                .assigneeTaskUid(partitionState.getAssigneeTaskUid())
-                .startTimestamp(Timestamp.parseTimestamp(partitionState.getStartTimestamp()))
-                .endTimestamp(
-                        partitionState.getEndTimestamp() != null && !partitionState.getEndTimestamp().isEmpty()
-                                ? Timestamp.parseTimestamp(partitionState.getEndTimestamp())
-                                : null)
-                .parents(new HashSet<>(partitionState.getParentsList()))
-                .state(PartitionStateEnum.valueOf(partitionState.getState().name()))
-                .build();
-    }
-
     private static SyncEventProtos.PartitionState mapPartition(PartitionState partitionState) {
         SyncEventProtos.PartitionState.Builder builder = SyncEventProtos.PartitionState.newBuilder()
                 .setToken(partitionState.getToken())
@@ -84,8 +66,16 @@ public class SyncEventToProtoMapper {
                 .setState(SyncEventProtos.State.forNumber(partitionState.getState().ordinal()))
                 .setAssigneeTaskUid(partitionState.getAssigneeTaskUid());
 
+        if (partitionState.getOriginParent() != null) {
+            builder.setOriginParent(partitionState.getOriginParent());
+        }
+
         if (partitionState.getEndTimestamp() != null) {
             builder.setEndTimestamp(partitionState.getEndTimestamp().toString());
+        }
+
+        if (partitionState.getFinishedTimestamp() != null) {
+            builder.setFinishedTimestamp(partitionState.getFinishedTimestamp().toString());
         }
 
         return builder.build();

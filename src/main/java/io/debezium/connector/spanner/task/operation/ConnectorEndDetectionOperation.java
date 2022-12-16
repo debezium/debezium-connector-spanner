@@ -5,17 +5,12 @@
  */
 package io.debezium.connector.spanner.task.operation;
 
-import java.util.Set;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.google.cloud.Timestamp;
 
-import io.debezium.connector.spanner.kafka.internal.model.PartitionState;
-import io.debezium.connector.spanner.kafka.internal.model.PartitionStateEnum;
+import io.debezium.connector.spanner.task.TaskStateUtil;
 import io.debezium.connector.spanner.task.TaskSyncContext;
 
 /**
@@ -46,26 +41,15 @@ public class ConnectorEndDetectionOperation implements Operation {
         if (endTime == null || taskSyncContext.isFinished()) {
             return taskSyncContext;
         }
-        Set<String> tokens = getAllActivePartitions(taskSyncContext);
         if (Timestamp.now().toSqlTimestamp().after(endTime.toSqlTimestamp())) {
-            if (tokens.isEmpty()) {
+            if (TaskStateUtil.totalInProgressPartitions(taskSyncContext) == 0
+                    && TaskStateUtil.totalFinishedPartitions(taskSyncContext) > 0) {
                 finishingWorkHandler.run();
                 LOGGER.info("Connector finished work, end time reached");
                 isRequiredPublishSyncEvent = true;
                 return taskSyncContext.toBuilder().finished(true).build();
             }
-            LOGGER.warn("End time reached, but partitions are processing: {}", tokens);
-
         }
         return taskSyncContext;
-    }
-
-    private Set<String> getAllActivePartitions(TaskSyncContext taskSyncContext) {
-        return taskSyncContext.getAllTaskStates().values().stream()
-                .flatMap(taskState -> Stream.concat(taskState.getPartitions().stream(), taskState.getSharedPartitions().stream()))
-                .filter(partitionState -> !partitionState.getState().equals(PartitionStateEnum.FINISHED)
-                        && !partitionState.getState().equals(PartitionStateEnum.REMOVED))
-                .map(PartitionState::getToken)
-                .collect(Collectors.toSet());
     }
 }

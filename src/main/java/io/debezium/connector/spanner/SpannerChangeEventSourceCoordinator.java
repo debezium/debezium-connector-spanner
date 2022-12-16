@@ -36,7 +36,7 @@ public class SpannerChangeEventSourceCoordinator extends ChangeEventSourceCoordi
                 changeEventSourceMetricsFactory, eventDispatcher, schema);
     }
 
-    public void commitRecords(List<SourceRecord> recordList) {
+    public void commitRecords(List<SourceRecord> recordList) throws InterruptedException {
         if (this.streamingSource instanceof CommittingRecordsStreamingChangeEventSource) {
             SpannerStreamingChangeEventSource streamingChangeEventSource = (SpannerStreamingChangeEventSource) this.streamingSource;
             streamingChangeEventSource.commitRecords(recordList);

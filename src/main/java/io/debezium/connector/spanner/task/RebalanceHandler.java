@@ -18,7 +18,7 @@ import io.debezium.connector.spanner.task.leader.LeaderAction;
 import io.debezium.connector.spanner.task.leader.LowWatermarkStampPublisher;
 
 /**
- * Provides a logic for processing Rebalance Event.
+ * Provides a logic for processing Rebalance Events.
  * If current task become a leader - starts {@link LeaderAction}
  */
 public class RebalanceHandler {

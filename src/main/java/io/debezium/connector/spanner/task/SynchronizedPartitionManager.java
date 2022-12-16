@@ -6,7 +6,6 @@
 package io.debezium.connector.spanner.task;
 
 import java.util.List;
-import java.util.function.Consumer;
 
 import io.debezium.connector.spanner.PartitionManager;
 import io.debezium.connector.spanner.db.model.Partition;
@@ -14,6 +13,7 @@ import io.debezium.connector.spanner.kafka.internal.model.PartitionStateEnum;
 import io.debezium.connector.spanner.task.state.NewPartitionsEvent;
 import io.debezium.connector.spanner.task.state.PartitionStatusUpdateEvent;
 import io.debezium.connector.spanner.task.state.TaskStateChangeEvent;
+import io.debezium.function.BlockingConsumer;
 
 /**
  * This class produces events depending on the type of record received from the change
@@ -25,32 +25,32 @@ import io.debezium.connector.spanner.task.state.TaskStateChangeEvent;
  */
 public class SynchronizedPartitionManager implements PartitionManager {
 
-    private final Consumer<TaskStateChangeEvent> syncEventPublisher;
+    private final BlockingConsumer<TaskStateChangeEvent> syncEventPublisher;
 
-    public SynchronizedPartitionManager(Consumer<TaskStateChangeEvent> syncEventPublisher) {
+    public SynchronizedPartitionManager(BlockingConsumer<TaskStateChangeEvent> syncEventPublisher) {
         this.syncEventPublisher = syncEventPublisher;
     }
 
     @Override
-    public void newChildPartitions(List<Partition> partitions) {
+    public void newChildPartitions(List<Partition> partitions) throws InterruptedException {
 
         syncEventPublisher.accept(new NewPartitionsEvent(partitions));
     }
 
     @Override
-    public void updateToFinished(String token) {
+    public void updateToFinished(String token) throws InterruptedException {
 
         syncEventPublisher.accept(new PartitionStatusUpdateEvent(token, PartitionStateEnum.FINISHED));
     }
 
     @Override
-    public void updateToRunning(String token) {
+    public void updateToRunning(String token) throws InterruptedException {
 
         syncEventPublisher.accept(new PartitionStatusUpdateEvent(token, PartitionStateEnum.RUNNING));
     }
 
     @Override
-    public void updateToReadyForStreaming(String token) {
+    public void updateToReadyForStreaming(String token) throws InterruptedException {
         syncEventPublisher.accept(new PartitionStatusUpdateEvent(token, PartitionStateEnum.READY_FOR_STREAMING));
     }
 

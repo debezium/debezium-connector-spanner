@@ -39,7 +39,7 @@ class SpannerChangeStreamServiceTest {
                 new ChangeStreamRecordMapper(), Duration.ofMillis(1000), metricsEventPublisher);
         HashSet<String> parentTokens = new HashSet<>();
         Timestamp startTimestamp = Timestamp.ofTimeMicroseconds(1L);
-        Partition partition = new Partition("token", parentTokens, startTimestamp, Timestamp.ofTimeMicroseconds(1L));
+        Partition partition = new Partition("token", parentTokens, startTimestamp, Timestamp.ofTimeMicroseconds(1L), "originParent");
 
         ChangeStreamEventConsumer changeStreamEventConsumer = mock(ChangeStreamEventConsumer.class);
         PartitionEventListener partitionEventListener = mock(PartitionEventListener.class);

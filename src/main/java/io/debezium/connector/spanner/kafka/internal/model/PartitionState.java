@@ -24,9 +24,12 @@ public class PartitionState implements Comparable<PartitionState> {
 
     private final Timestamp finishedTimestamp;
 
+    private final String originParent;
+
     public PartitionState(final String token, final Timestamp startTimestamp,
                           final Timestamp endTimestamp, final PartitionStateEnum state,
-                          final Set<String> parents, final String assigneeTaskUid, final Timestamp finishedTimestamp) {
+                          final Set<String> parents, final String assigneeTaskUid, final Timestamp finishedTimestamp,
+                          final String originParent) {
         this.token = token;
         this.startTimestamp = startTimestamp;
         this.endTimestamp = endTimestamp;
@@ -34,6 +37,7 @@ public class PartitionState implements Comparable<PartitionState> {
         this.parents = parents;
         this.assigneeTaskUid = assigneeTaskUid;
         this.finishedTimestamp = finishedTimestamp;
+        this.originParent = originParent;
     }
 
     public static class PartitionStateBuilder {
@@ -51,6 +55,8 @@ public class PartitionState implements Comparable<PartitionState> {
         private String assigneeTaskUid;
 
         private Timestamp finishedTimestamp;
+
+        private String originParent;
 
         PartitionStateBuilder() {
         }
@@ -90,10 +96,15 @@ public class PartitionState implements Comparable<PartitionState> {
             return this;
         }
 
+        public PartitionState.PartitionStateBuilder originParent(final String originParent) {
+            this.originParent = originParent;
+            return this;
+        }
+
         public PartitionState build() {
             return new PartitionState(this.token, this.startTimestamp,
                     this.endTimestamp, this.state, this.parents,
-                    this.assigneeTaskUid, this.finishedTimestamp);
+                    this.assigneeTaskUid, this.finishedTimestamp, this.originParent);
         }
 
     }
@@ -110,7 +121,8 @@ public class PartitionState implements Comparable<PartitionState> {
                 .state(this.state)
                 .parents(this.parents)
                 .assigneeTaskUid(this.assigneeTaskUid)
-                .finishedTimestamp(this.finishedTimestamp);
+                .finishedTimestamp(this.finishedTimestamp)
+                .originParent(this.originParent);
     }
 
     public String getToken() {
@@ -139,6 +151,10 @@ public class PartitionState implements Comparable<PartitionState> {
 
     public Timestamp getFinishedTimestamp() {
         return finishedTimestamp;
+    }
+
+    public String getOriginParent() {
+        return originParent;
     }
 
     @Override
@@ -176,6 +192,7 @@ public class PartitionState implements Comparable<PartitionState> {
                 ", parents=" + parents +
                 ", assigneeTaskUid='" + assigneeTaskUid + '\'' +
                 ", finishedTimestamp=" + finishedTimestamp +
+                ", originParent='" + originParent + '\'' +
                 '}';
     }
 }

@@ -20,12 +20,15 @@ public class Partition {
     private final Timestamp startTimestamp;
     private final Timestamp endTimestamp;
 
+    private final String originPartitionToken;
+
     public Partition(String partitionToken, Set<String> parentTokens, Timestamp startTimestamp,
-                     Timestamp endTimestamp) {
+                     Timestamp endTimestamp, String originPartitionToken) {
         this.partitionToken = partitionToken;
         this.parentTokens = parentTokens;
         this.startTimestamp = startTimestamp;
         this.endTimestamp = endTimestamp;
+        this.originPartitionToken = originPartitionToken;
     }
 
     public static Builder builder() {
@@ -48,6 +51,10 @@ public class Partition {
         return endTimestamp;
     }
 
+    public String getOriginPartitionToken() {
+        return originPartitionToken;
+    }
+
     public Builder toBuilder() {
         return new Builder(this);
     }
@@ -55,10 +62,11 @@ public class Partition {
     @Override
     public String toString() {
         return "Partition{" +
-                "token='" + partitionToken + '\'' +
+                "partitionToken='" + partitionToken + '\'' +
                 ", parentTokens=" + parentTokens +
                 ", startTimestamp=" + startTimestamp +
                 ", endTimestamp=" + endTimestamp +
+                ", originPartitionToken='" + originPartitionToken + '\'' +
                 '}';
     }
 
@@ -69,6 +77,8 @@ public class Partition {
         private Timestamp startTimestamp;
         private Timestamp endTimestamp;
 
+        private String originPartitionToken;
+
         public Builder() {
         }
 
@@ -76,6 +86,7 @@ public class Partition {
             this.partitionToken = partition.partitionToken;
             this.startTimestamp = partition.startTimestamp;
             this.endTimestamp = partition.endTimestamp;
+            this.originPartitionToken = partition.originPartitionToken;
         }
 
         public Builder token(String partitionToken) {
@@ -98,6 +109,11 @@ public class Partition {
             return this;
         }
 
+        public Builder originPartitionToken(String originPartitionToken) {
+            this.originPartitionToken = originPartitionToken;
+            return this;
+        }
+
         public Partition build() {
             Preconditions.checkState(partitionToken != null, "partitionToken");
             Preconditions.checkState(parentTokens != null, "parentTokens");
@@ -107,7 +123,8 @@ public class Partition {
                     partitionToken,
                     parentTokens,
                     startTimestamp,
-                    endTimestamp);
+                    endTimestamp,
+                    originPartitionToken);
         }
     }
 }

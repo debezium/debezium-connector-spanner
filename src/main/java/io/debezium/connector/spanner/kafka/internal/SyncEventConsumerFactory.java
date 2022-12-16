@@ -12,6 +12,7 @@ import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.common.serialization.ByteArrayDeserializer;
+import org.apache.kafka.common.serialization.StringDeserializer;
 
 import io.debezium.connector.spanner.SpannerConnectorConfig;
 
@@ -41,7 +42,7 @@ public class SyncEventConsumerFactory<K, V> {
 
         final Properties props = config.kafkaProps(
                 Map.of(ConsumerConfig.GROUP_ID_CONFIG, consumerGroup,
-                        ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, ByteArrayDeserializer.class.getName(),
+                        ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName(),
                         ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, ByteArrayDeserializer.class.getName(),
                         ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest",
                         ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, autoCommitEnabled));

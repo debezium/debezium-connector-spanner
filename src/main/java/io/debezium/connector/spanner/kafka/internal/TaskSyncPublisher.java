@@ -69,7 +69,7 @@ public class TaskSyncPublisher {
 
         SyncEventProtos.SyncEvent protoEvent = SyncEventToProtoMapper.mapToProto(taskSyncEvent);
 
-        ProducerRecord<String, byte[]> record = new ProducerRecord<>(topic, protoEvent.toByteArray());
+        ProducerRecord<String, byte[]> record = new ProducerRecord<>(topic, taskSyncEvent.getTaskUid(), protoEvent.toByteArray());
         try {
             producer.send(record).get();
             producer.flush();

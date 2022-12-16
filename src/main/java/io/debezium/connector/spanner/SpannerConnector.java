@@ -24,7 +24,7 @@ import io.debezium.config.CommonConnectorConfig;
 import io.debezium.config.Configuration;
 import io.debezium.connector.spanner.config.validation.ConfigurationValidator;
 import io.debezium.connector.spanner.kafka.KafkaAdminClientFactory;
-import io.debezium.connector.spanner.kafka.internal.KafkaRebalanceTopicAdminService;
+import io.debezium.connector.spanner.kafka.internal.KafkaInternalTopicAdminService;
 import io.debezium.connector.spanner.task.LoggerUtils;
 import io.debezium.connector.spanner.task.scaler.TaskScalerMonitor;
 import io.debezium.connector.spanner.task.scaler.TaskScalerMonitorFactory;
@@ -56,7 +56,7 @@ public class SpannerConnector extends SourceConnector {
 
         final SpannerConnectorConfig config = new SpannerConnectorConfig(Configuration.from(props));
 
-        createRebalanceTopic(config);
+        createInternalTopics(config);
 
         TaskScalerMonitorFactory scalerFactory = new TaskScalerMonitorFactory(config, context, this::onError);
 
@@ -115,10 +115,11 @@ public class SpannerConnector extends SourceConnector {
     }
 
     @VisibleForTesting
-    void createRebalanceTopic(SpannerConnectorConfig config) {
+    void createInternalTopics(SpannerConnectorConfig config) {
         KafkaAdminClientFactory adminClientFactory = new KafkaAdminClientFactory(config);
-        final KafkaRebalanceTopicAdminService rebalanceTopicAdminService = new KafkaRebalanceTopicAdminService(adminClientFactory.getAdminClient(), config);
+        final KafkaInternalTopicAdminService rebalanceTopicAdminService = new KafkaInternalTopicAdminService(adminClientFactory.getAdminClient(), config);
         rebalanceTopicAdminService.createAdjustRebalanceTopic();
+        rebalanceTopicAdminService.createVerifySyncTopic();
         adminClientFactory.close();
     }
 

@@ -42,6 +42,8 @@ message PartitionState {
   string assigneeTaskUid = 6;
 
   string finishedTimestamp = 7;
+
+  string originParent = 8;
 }
 
 enum State {

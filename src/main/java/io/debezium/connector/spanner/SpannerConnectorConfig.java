@@ -185,6 +185,10 @@ public class SpannerConnectorConfig extends BaseSpannerConnectorConfig {
         return getConfig().getInteger(REBALANCING_COMMIT_OFFSETS_TIMEOUT);
     }
 
+    public int rebalancingCommitOffsetsInterval() {
+        return getConfig().getInteger(REBALANCING_COMMIT_OFFSETS_INTERVAL_MS);
+    }
+
     public Duration rebalancingTaskWaitingTimeout() {
         return getConfig().getDuration(REBALANCING_TASK_WAITING_TIMEOUT, ChronoUnit.MILLIS);
     }
@@ -197,6 +201,14 @@ public class SpannerConnectorConfig extends BaseSpannerConnectorConfig {
         return getConfig().getInteger(SYNC_POLL_DURATION);
     }
 
+    public int syncCommitOffsetsTimeout() {
+        return getConfig().getInteger(SYNC_COMMIT_OFFSETS_TIMEOUT);
+    }
+
+    public int syncCommitOffsetsInterval() {
+        return getConfig().getInteger(SYNC_COMMIT_OFFSETS_INTERVAL_MS);
+    }
+
     public int syncRequestTimeout() {
         return getConfig().getInteger(SYNC_REQUEST_TIMEOUT);
     }
@@ -207,6 +219,22 @@ public class SpannerConnectorConfig extends BaseSpannerConnectorConfig {
 
     public String taskSyncTopic() {
         return getConfig().getString(SYNC_TOPIC) + getConnectorName();
+    }
+
+    public String syncCleanupPolicy() {
+        return getConfig().getString(SYNC_CLEANUP_POLICY);
+    }
+
+    public int syncRetentionMs() {
+        return getConfig().getInteger(SYNC_RETENTION_MS);
+    }
+
+    public int syncSegmentMs() {
+        return getConfig().getInteger(SYNC_SEGMENT_MS);
+    }
+
+    public String syncMinCleanableDirtyRatio() {
+        return getConfig().getString(SYNC_MIN_CLEANABLE_DIRTY_RATIO);
     }
 
     public int getMaxTasks() {
@@ -249,5 +277,13 @@ public class SpannerConnectorConfig extends BaseSpannerConnectorConfig {
 
     public Duration percentageMetricsClearInterval() {
         return getConfig().getDuration(PERCENTAGE_METRICS_CLEAR_INTERVAL, ChronoUnit.MILLIS);
+    }
+
+    public boolean failOverloadedTask() {
+        return getConfig().getBoolean(TASKS_FAIL_OVERLOADED);
+    }
+
+    public long failOverloadedTaskInterval() {
+        return getConfig().getLong(TASKS_FAIL_OVERLOADED_CHECK_INTERVAL);
     }
 }

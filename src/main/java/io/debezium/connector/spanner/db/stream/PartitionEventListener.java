@@ -11,11 +11,11 @@ import io.debezium.connector.spanner.db.model.Partition;
  * A listener for the various state querying partition. Used in {@link ChangeStream}
  */
 public interface PartitionEventListener {
-    void onRun(Partition partition);
+    void onRun(Partition partition) throws InterruptedException;
 
     void onFinish(Partition partition);
 
-    void onException(Partition partition, Exception ex);
+    void onException(Partition partition, Exception ex) throws InterruptedException;
 
-    boolean onStuckPartition(String token);
+    boolean onStuckPartition(String token) throws InterruptedException;
 }

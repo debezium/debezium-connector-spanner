@@ -8,6 +8,7 @@ package io.debezium.connector.spanner.processor;
 import static org.slf4j.LoggerFactory.getLogger;
 
 import java.time.Instant;
+import java.util.UUID;
 
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
@@ -129,7 +130,7 @@ public class SpannerEventDispatcher extends EventDispatcher<SpannerPartition, Ta
                 dataCollectionSchema.getEnvelopeSchema().schema(),
                 envelope,
                 null,
-                null);
+                SourceRecordUtils.from("watermark-" + UUID.randomUUID()));
     }
 
     @VisibleForTesting

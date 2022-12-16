@@ -13,7 +13,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.function.Consumer;
 import java.util.stream.Stream;
 
 import org.slf4j.Logger;
@@ -33,6 +32,7 @@ import io.debezium.connector.spanner.task.TaskSyncContextHolder;
 import io.debezium.connector.spanner.task.state.NewPartitionsEvent;
 import io.debezium.connector.spanner.task.state.TaskStateChangeEvent;
 import io.debezium.connector.spanner.task.utils.TimeoutMeter;
+import io.debezium.function.BlockingConsumer;
 import io.debezium.pipeline.ErrorHandler;
 
 /**
@@ -53,7 +53,7 @@ public class LeaderService {
     private final Timestamp startTime;
     private final Timestamp endTime;
 
-    private final Consumer<TaskStateChangeEvent> eventConsumer;
+    private final BlockingConsumer<TaskStateChangeEvent> eventConsumer;
     private final ErrorHandler errorHandler;
 
     private final MetricsEventPublisher metricsEventPublisher;
@@ -62,7 +62,7 @@ public class LeaderService {
 
     public LeaderService(TaskSyncContextHolder taskSyncContextHolder,
                          SpannerConnectorConfig spannerConnectorConfig,
-                         Consumer<TaskStateChangeEvent> eventConsumer,
+                         BlockingConsumer<TaskStateChangeEvent> eventConsumer,
                          ErrorHandler errorHandler,
                          PartitionFactory partitionFactory,
                          MetricsEventPublisher metricsEventPublisher) {
@@ -139,7 +139,7 @@ public class LeaderService {
         return consumerToTaskMap;
     }
 
-    public void newParentPartition() {
+    public void newParentPartition() throws InterruptedException {
 
         Partition partition = partitionFactory.initPartition(startTime, endTime);
 

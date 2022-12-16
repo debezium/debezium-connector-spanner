@@ -5,8 +5,9 @@
  */
 package io.debezium.connector.spanner.task.scaler;
 
+import static io.debezium.connector.spanner.task.TaskStateUtil.inProgressPartitionState;
+
 import io.debezium.connector.spanner.kafka.internal.model.PartitionState;
-import io.debezium.connector.spanner.kafka.internal.model.PartitionStateEnum;
 import io.debezium.connector.spanner.kafka.internal.model.TaskState;
 import io.debezium.connector.spanner.kafka.internal.model.TaskSyncEvent;
 
@@ -64,9 +65,5 @@ public class TaskScalerUtil {
                 .anyMatch(p -> inProgressPartitionState(p.getState()));
 
         return !hasInProgressPartition;
-    }
-
-    private static boolean inProgressPartitionState(PartitionStateEnum state) {
-        return state != PartitionStateEnum.FINISHED && state != PartitionStateEnum.REMOVED;
     }
 }

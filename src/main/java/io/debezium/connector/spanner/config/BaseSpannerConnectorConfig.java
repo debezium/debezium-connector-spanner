@@ -55,9 +55,17 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
     private static final String CONNECTOR_SPANNER_REBALANCING_TOPIC_PROPERTY_NAME = "connector.spanner.rebalancing.topic";
     private static final String CONNECTOR_SPANNER_REBALANCING_POLL_DURATION_PROPERTY_NAME = "connector.spanner.rebalancing.poll.duration";
     private static final String CONNECTOR_SPANNER_REBALANCING_COMMIT_OFFSETS_TIMEOUT_PROPERTY_NAME = "connector.spanner.rebalancing.commit.offsets.timeout";
+    private static final String CONNECTOR_SPANNER_REBALANCING_COMMIT_OFFSET_INTERVAL_MS_PROPERTY_NAME = "connector.spanner.rebalancing.commit.offset.interval.ms";
     private static final String CONNECTOR_SPANNER_SYNC_POLL_DURATION_PROPERTY_NAME = "connector.spanner.sync.poll.duration";
     private static final String CONNECTOR_SPANNER_SYNC_REQUEST_TIMEOUT_PROPERTY_NAME = "connector.spanner.sync.request.timeout.ms";
     private static final String CONNECTOR_SPANNER_SYNC_DELIVERY_TIMEOUT_PROPERTY_NAME = "connector.spanner.sync.delivery.timeout.ms";
+    private static final String CONNECTOR_SPANNER_SYNC_COMMIT_OFFSETS_TIMEOUT_PROPERTY_NAME = "connector.spanner.sync.commit.offsets.timeout";
+    private static final String CONNECTOR_SPANNER_SYNC_COMMIT_OFFSET_INTERVAL_MS_PROPERTY_NAME = "connector.spanner.sync.commit.offset.interval.ms";
+
+    private static final String CONNECTOR_SPANNER_SYNC_CLEANUP_POLICY_PROPERTY_NAME = "connector.spanner.sync.cleanup.policy";
+    private static final String CONNECTOR_SPANNER_SYNC_RETENTION_MS_PROPERTY_NAME = "connector.spanner.sync.retention.ms";
+    private static final String CONNECTOR_SPANNER_SYNC_SEGMENT_MS_POLICY_PROPERTY_NAME = "connector.spanner.sync.segment.ms";
+    private static final String CONNECTOR_SPANNER_SYNC_MIN_CLEANABLE_DIRTY_RATIO_PROPERTY_NAME = "connector.spanner.sync.min.cleanable.dirty.ratio";
     private static final String CONNECTOR_SPANNER_SYNC_KAFKA_BOOTSTRAP_SERVERS_PROPERTY_NAME = "connector.spanner.sync.kafka.bootstrap.servers";
 
     private static final String CONNECTOR_SPANNER_PARTITION_FINISHING_AFTER_COMMIT_PROPERTY_NAME = "connector.spanner.partition.finishing.afterCommit";
@@ -82,6 +90,8 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
     public static final String KAFKA_INTERNAL_CLIENT_CONFIG_PREFIX = "kafka.internal.client.";
 
     private static final String PERCENTAGE_METRICS_CLEAR_INTERVAL_PROPERTY_NAME = "connector.spanner.metrics.percentage.clear.interval";
+    private static final String TASKS_FAIL_OVERLOADED_PROPERTY_NAME = "tasks.fail.overloaded";
+    private static final String TASKS_FAIL_OVERLOADED_CHECK_INTERVAL_PROPERTY_NAME = "tasks.fail.overloaded.check.interval";
 
     protected static final Field LOW_WATERMARK_ENABLED_FIELD = Field.create(LOW_WATERMARK_ENABLED)
             .withDisplayName(LOW_WATERMARK_ENABLED)
@@ -223,7 +233,7 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
             .withWidth(Width.SHORT)
             .withImportance(Importance.LOW)
             .withDescription("Maximum missed heartbeats to identify that partition gets stuck")
-            .withDefault(5000)
+            .withDefault(10)
             .withValidation(Field::isNonNegativeInteger);
 
     private static final Field VALUE_CAPTURE_MODE = Field.create(VALUE_CAPTURE_MODE_PROPERTY_NAME)
@@ -301,6 +311,16 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
             .withDescription("Connector sync topic poll duration"
                     + ", default 500 ms");
 
+    protected static final Field SYNC_COMMIT_OFFSETS_TIMEOUT = Field.create(CONNECTOR_SPANNER_SYNC_COMMIT_OFFSETS_TIMEOUT_PROPERTY_NAME)
+            .withDisplayName("Sync Topic Commit Offsets Timeout")
+            .withType(Type.INT)
+            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR, 28))
+            .withWidth(Width.SHORT)
+            .withImportance(Importance.LOW)
+            .withDefault(5000)
+            .withDescription("Connector sync topic commit offsets timeout"
+                    + ", default 5000 ms");
+
     protected static final Field SYNC_KAFKA_BOOTSTRAP_SERVERS = Field.create(CONNECTOR_SPANNER_SYNC_KAFKA_BOOTSTRAP_SERVERS_PROPERTY_NAME)
             .withDisplayName("Sync Kafka Bootstrap Servers")
             .withType(Type.STRING)
@@ -328,6 +348,80 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
             .withDefault(15000)
             .withDescription("Connector Sync topic property: delivery.timeout.ms"
                     + ", default 15000 ms");
+
+    protected static final Field SYNC_CLEANUP_POLICY = Field.create(CONNECTOR_SPANNER_SYNC_CLEANUP_POLICY_PROPERTY_NAME)
+            .withDisplayName("Sync Topic property: cleanup.policy")
+            .withType(Type.STRING)
+            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR, 33))
+            .withWidth(Width.MEDIUM)
+            .withImportance(Importance.LOW)
+            .withDefault("delete")
+            .withDescription("Sync Topic property: cleanup.policy, default: delete");
+
+    protected static final Field SYNC_RETENTION_MS = Field.create(CONNECTOR_SPANNER_SYNC_RETENTION_MS_PROPERTY_NAME)
+            .withDisplayName("Sync Topic property: retention.ms")
+            .withType(Type.INT)
+            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR, 34))
+            .withWidth(Width.MEDIUM)
+            .withImportance(Importance.LOW)
+            .withDefault(86400000)
+            .withDescription("Sync Topic property: retention.ms, default: 86400000 (24h)");
+
+    protected static final Field SYNC_SEGMENT_MS = Field.create(CONNECTOR_SPANNER_SYNC_SEGMENT_MS_POLICY_PROPERTY_NAME)
+            .withDisplayName("Sync Topic property: segment.ms")
+            .withType(Type.INT)
+            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR, 35))
+            .withWidth(Width.MEDIUM)
+            .withImportance(Importance.LOW)
+            .withDefault(43200000)
+            .withDescription("Sync Topic property: segment.ms, default: 43200000 (12h)");
+
+    protected static final Field SYNC_MIN_CLEANABLE_DIRTY_RATIO = Field.create(CONNECTOR_SPANNER_SYNC_MIN_CLEANABLE_DIRTY_RATIO_PROPERTY_NAME)
+            .withDisplayName("Sync Topic property: min.cleanable.dirty.ratio")
+            .withType(Type.STRING)
+            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR, 36))
+            .withWidth(Width.MEDIUM)
+            .withImportance(Importance.LOW)
+            .withDefault("0.1")
+            .withDescription("Sync Topic property: min.cleanable.dirty.ratio, default: 0.1");
+
+    protected static final Field SYNC_COMMIT_OFFSETS_INTERVAL_MS = Field.create(CONNECTOR_SPANNER_SYNC_COMMIT_OFFSET_INTERVAL_MS_PROPERTY_NAME)
+            .withDisplayName("Sync Topic Commit Offsets Interval")
+            .withType(Type.INT)
+            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR, 37))
+            .withWidth(Width.SHORT)
+            .withImportance(Importance.LOW)
+            .withDefault(60_000)
+            .withDescription("Connector sync topic commit offsets interval"
+                    + ", default 60000 ms");
+
+    protected static final Field REBALANCING_COMMIT_OFFSETS_INTERVAL_MS = Field.create(CONNECTOR_SPANNER_REBALANCING_COMMIT_OFFSET_INTERVAL_MS_PROPERTY_NAME)
+            .withDisplayName("Rebalancing Topic Commit Offsets Interval")
+            .withType(Type.INT)
+            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR, 38))
+            .withWidth(Width.SHORT)
+            .withImportance(Importance.LOW)
+            .withDefault(60_000)
+            .withDescription("Connector rebalancing topic commit offsets interval"
+                    + ", default 60000 ms");
+
+    protected static final Field TASKS_FAIL_OVERLOADED = Field.create(TASKS_FAIL_OVERLOADED_PROPERTY_NAME)
+            .withDisplayName("Fail Overloaded Task")
+            .withType(Type.BOOLEAN)
+            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR, 39))
+            .withWidth(Width.SHORT)
+            .withImportance(Importance.LOW)
+            .withDefault(false)
+            .withDescription("Task will be failed, if it is overloaded by partitions");
+
+    protected static final Field TASKS_FAIL_OVERLOADED_CHECK_INTERVAL = Field.create(TASKS_FAIL_OVERLOADED_CHECK_INTERVAL_PROPERTY_NAME)
+            .withDisplayName("Check Interval for \"Fail Overloaded Task\"")
+            .withType(Type.LONG)
+            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR, 40))
+            .withWidth(Width.SHORT)
+            .withImportance(Importance.LOW)
+            .withDefault(5000)
+            .withDescription("Interval in milliseconds to check whether the task is overloaded by partitions");
 
     protected static final Field MAX_TASKS = Field.create(MAX_TASKS_PROPERTY_NAME)
             .withDisplayName("Max Tasks")
@@ -437,6 +531,7 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
                     REBALANCING_TOPIC,
                     REBALANCING_POLL_DURATION,
                     REBALANCING_COMMIT_OFFSETS_TIMEOUT,
+                    REBALANCING_COMMIT_OFFSETS_INTERVAL_MS,
                     REBALANCING_TASK_WAITING_TIMEOUT,
                     SYNC_EVENT_PUBLISH_WAITING_TIMEOUT,
                     CONNECTOR_SPANNER_PARTITION_FINISHING_AFTER_COMMIT_FIELD,
@@ -445,11 +540,20 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
                     SYNC_TOPIC,
                     SYNC_KAFKA_BOOTSTRAP_SERVERS,
                     SYNC_POLL_DURATION,
+                    SYNC_COMMIT_OFFSETS_TIMEOUT,
+                    SYNC_COMMIT_OFFSETS_INTERVAL_MS,
                     SYNC_REQUEST_TIMEOUT,
                     SYNC_DELIVERY_TIMEOUT,
+                    SYNC_CLEANUP_POLICY,
+                    SYNC_RETENTION_MS,
+                    SYNC_SEGMENT_MS,
+                    SYNC_MIN_CLEANABLE_DIRTY_RATIO,
+
                     MAX_TASKS,
                     MIN_TASKS,
                     DESIRED_PARTITIONS_TASKS,
+                    TASKS_FAIL_OVERLOADED,
+                    TASKS_FAIL_OVERLOADED_CHECK_INTERVAL,
                     SCALER_MONITOR_ENABLED,
                     LOGGING_JSON_ENABLED)
             .events(TABLE_EXCLUDE_LIST,
