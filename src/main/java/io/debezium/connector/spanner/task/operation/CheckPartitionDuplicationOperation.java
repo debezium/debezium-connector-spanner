@@ -21,7 +21,7 @@ import io.debezium.connector.spanner.db.stream.ChangeStream;
 import io.debezium.connector.spanner.kafka.internal.model.PartitionState;
 import io.debezium.connector.spanner.kafka.internal.model.PartitionStateEnum;
 import io.debezium.connector.spanner.kafka.internal.model.TaskState;
-import io.debezium.connector.spanner.task.TaskConflictResolver;
+import io.debezium.connector.spanner.task.ConflictResolver;
 import io.debezium.connector.spanner.task.TaskSyncContext;
 
 /**
@@ -91,7 +91,7 @@ public class CheckPartitionDuplicationOperation implements Operation {
                         || PartitionStateEnum.SCHEDULED.equals(entry.getValue().getState()))
                 .map(Map.Entry::getKey).collect(Collectors.toSet());
 
-        return !TaskConflictResolver.hasPriority(currentTaskUid, tasks);
+        return !ConflictResolver.hasPriority(currentTaskUid, tasks);
     }
 
     private TaskSyncContext stopStreaming(TaskSyncContext taskSyncContext, PartitionState state) {

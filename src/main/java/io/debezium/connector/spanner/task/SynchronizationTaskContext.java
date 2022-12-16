@@ -141,7 +141,7 @@ public class SynchronizationTaskContext {
                 connectorConfig.rebalancingTaskWaitingTimeout(), rebalancingConsumerFactory, this::onError);
 
         this.taskStateChangeEventHandler = new TaskStateChangeEventHandler(taskSyncContextHolder, taskSyncPublisher,
-                changeStream, partitionFactory, this::onFinish, connectorConfig.endTime());
+                changeStream, partitionFactory, this::onFinish, connectorConfig, this::onError);
 
         this.rebalanceHandler = new RebalanceHandler(taskSyncContextHolder, taskSyncPublisher,
                 leaderAction, lowWatermarkStampPublisher);
@@ -219,7 +219,7 @@ public class SynchronizationTaskContext {
 
     }
 
-    public void publishEvent(TaskStateChangeEvent event) {
+    public void publishEvent(TaskStateChangeEvent event) throws InterruptedException {
         LoggerUtils.debug(LOGGER, "publishEvent: type: {}, event: {}", event.getClass().getSimpleName(), event);
 
         this.taskStateChangeEventProcessor.processEvent(event);

@@ -13,7 +13,9 @@ import org.slf4j.LoggerFactory;
 import io.debezium.connector.spanner.db.model.schema.Column;
 import io.debezium.connector.spanner.db.model.schema.TableSchema;
 
-/** Validates incoming row against stored schema */
+/**
+ * Validates incoming row against stored schema
+ */
 public class SchemaValidator {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(SchemaValidator.class);
@@ -21,8 +23,7 @@ public class SchemaValidator {
     private SchemaValidator() {
     }
 
-    public static boolean validate(
-                                   TableSchema schemaTable, TableSchema watchedTable, List<Column> rowType) {
+    public static boolean validate(TableSchema schemaTable, TableSchema watchedTable, List<Column> rowType) {
 
         final String tableName = schemaTable.getName();
 
@@ -45,10 +46,18 @@ public class SchemaValidator {
                 throw new IllegalStateException(columnName + " primary key data is incorrect in registry");
             }
 
+            /*
+             * if (schemaColumn.getOrdinalPosition() != column.getOrdinalPosition()) {
+             * LOGGER.warn("{} ordinal position is incorrect in registry", columnName);
+             * return false;
+             * }
+             */
+
             if (!schemaColumn.getType().equals(column.getType())) {
                 LOGGER.warn("{} type is incorrect in registry", columnName);
                 return false;
             }
+
         }
         return true;
     }

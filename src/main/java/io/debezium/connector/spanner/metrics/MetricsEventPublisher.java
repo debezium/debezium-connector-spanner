@@ -50,43 +50,43 @@ public class MetricsEventPublisher {
         }
 
         Long totalLatency = LatencyCalculator.getTotalLatency(sourceRecord);
-        if (totalLatency != null && totalLatency > 1000) {
-            LOGGER.warn("Published very high total latency for source record {}", sourceRecord);
+        if (totalLatency != null && totalLatency > 300000) {
+            LOGGER.debug("Published very high total latency for source record {}:{}", sourceRecord, totalLatency);
         }
 
         Long readToEmitLatency = LatencyCalculator.getReadToEmitLatency(sourceRecord);
-        if (readToEmitLatency != null && readToEmitLatency > 1000) {
-            LOGGER.warn("Published very high readToEmit latency for source record {}", sourceRecord);
+        if (readToEmitLatency != null && readToEmitLatency > 300000) {
+            LOGGER.debug("Published very high readToEmit latency for source record {}:{}", sourceRecord, readToEmitLatency);
         }
 
         Long spannerLatency = LatencyCalculator.getSpannerLatency(sourceRecord);
-        if (spannerLatency != null && spannerLatency > 1000) {
-            LOGGER.warn("Published very high spannerLatnency latency for source record {}", sourceRecord);
+        if (spannerLatency != null && spannerLatency > 300000) {
+            LOGGER.debug("Published very high spannerLatnency latency for source record {}:{}", sourceRecord, spannerLatency);
         }
 
         Long commitToEmitLatency = LatencyCalculator.getCommitToEmitLatency(sourceRecord);
-        if (commitToEmitLatency != null && commitToEmitLatency > 1000) {
-            LOGGER.warn("Published very high spannerLatnency latency for source record {}", sourceRecord);
+        if (commitToEmitLatency != null && commitToEmitLatency > 300000) {
+            LOGGER.debug("Published very high spannerLatnency latency for source record {}:{}", sourceRecord, commitToEmitLatency);
         }
 
         Long commitToPublishLatency = LatencyCalculator.getCommitToPublishLatency(sourceRecord);
-        if (commitToPublishLatency != null && commitToPublishLatency > 1000) {
-            LOGGER.warn("Published very high commitToPublishLatency latency for source record {}", sourceRecord);
+        if (commitToPublishLatency != null && commitToPublishLatency > 300000) {
+            LOGGER.debug("Published very high commitToPublishLatency latency for source record {}:{}", sourceRecord, commitToPublishLatency);
         }
 
         Long emitToPublishLatency = LatencyCalculator.getEmitToPublishLatency(sourceRecord);
-        if (emitToPublishLatency != null && emitToPublishLatency > 1000) {
-            LOGGER.warn("Published very high emitToPublishLatency latency for source record {}", sourceRecord);
+        if (emitToPublishLatency != null && emitToPublishLatency > 300000) {
+            LOGGER.debug("Published very high emitToPublishLatency latency for source record {}:{}", sourceRecord, emitToPublishLatency);
         }
 
         Long ownConnectorLatency = LatencyCalculator.getOwnConnectorLatency(sourceRecord);
-        if (ownConnectorLatency != null && ownConnectorLatency > 1000) {
-            LOGGER.warn("Published very high ownConnectorLatency latency for source record {}", sourceRecord);
+        if (ownConnectorLatency != null && ownConnectorLatency > 300000) {
+            LOGGER.debug("Published very high ownConnectorLatency latency for source record {}:{}", sourceRecord, ownConnectorLatency);
         }
 
         Long lowWatermarkLag = LatencyCalculator.getLowWatermarkLag(sourceRecord);
-        if (lowWatermarkLag != null && lowWatermarkLag > 1000) {
-            LOGGER.warn("Published very high lowWatermarkLag latency for source record {}", sourceRecord);
+        if (lowWatermarkLag != null && lowWatermarkLag > 300000) {
+            LOGGER.debug("Published very high lowWatermarkLag latency for source record {}:{}", sourceRecord, lowWatermarkLag);
         }
 
         this.publishMetricEvent(new LatencyMetricEvent(totalLatency, readToEmitLatency, spannerLatency,

@@ -23,7 +23,7 @@ class OutOfRangeChangeStreamExceptionTest {
     void testConstructor() {
         HashSet<String> parentTokens = new HashSet<>();
         Timestamp startTimestamp = Timestamp.ofTimeMicroseconds(1L);
-        Partition partition = new Partition("partitionToken", parentTokens, startTimestamp, Timestamp.ofTimeMicroseconds(1L));
+        Partition partition = new Partition("partitionToken", parentTokens, startTimestamp, Timestamp.ofTimeMicroseconds(1L), "originParent");
 
         assertSame(partition,
                 new OutOfRangeChangeStreamException(partition, mock(SpannerException.class)).getPartition());

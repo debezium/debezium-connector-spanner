@@ -62,6 +62,7 @@ class BufferedPublisherTest {
         BufferedPublisher<Integer> pub = new BufferedPublisher<>("pub-1", 5,
                 publishImmediately,
                 onPublish
+                        // .andThen(System.out::println)
                         .andThen(result::add));
 
         pub.start();
@@ -77,6 +78,7 @@ class BufferedPublisherTest {
         }
         pub.close();
 
+        // System.out.println("published: " + result.size());
         assertThat(result)
                 .containsAll(required) // no missed required elements
                 .hasSizeGreaterThan(required.size()) // not only required elements

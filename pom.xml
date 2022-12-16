@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <parent>
         <groupId>io.debezium</groupId>
         <artifactId>debezium-parent</artifactId>
@@ -499,31 +500,14 @@
                         <version>${jacoco.version}</version>
                         <configuration>
                             <excludes>
+                                <exclude>io/debezium/connector/spanner/context/offset/SpannerOffsetContext.class</exclude>
                                 <exclude>io/debezium/connector/spanner/db/model/schema/ColumnType.class</exclude>
+                                <exclude>io/debezium/connector/spanner/db/model/StreamEventMetadata.class</exclude>
                                 <exclude>io/debezium/connector/spanner/db/stream/PartitionEventListener.class</exclude>
-                                <exclude>io/debezium/connector/spanner/db/model/SpannerChangeEventSourceCoordinator.class</exclude>
-                                <exclude>io/debezium/connector/spanner/db/model/SpannerChangeEventSourceCoordinator.SpannerChangeEventSourceCoordinator.class</exclude>
-                                <exclude>io/debezium/connector/spanner/db/model/SpannerConnectorTask.class</exclude>
-                                <exclude>io/debezium/connector/spanner/db/model/SpannerErrorHandler.class</exclude>
-                                <exclude>io/debezium/connector/spanner/db/model/SpannerBaseSourceTask.class</exclude>
-                                <exclude>io/debezium/connector/spanner/db/model/FinishingPartitionManager.class</exclude>
-                                <exclude>io/debezium/connector/spanner/db/model/SpannerSourceInfoStructMaker.class</exclude>
-                                <exclude>io/debezium/connector/spanner/db/model/ChildPartition.class</exclude>
-                                <exclude>io/debezium/connector/spanner/db/model/Partition.class</exclude>
-                                <exclude>io/debezium/connector/spanner/db/model/StreamEventMetadata.class</exclude>
-                                <exclude>io/debezium/connector/spanner/db/model/Mod.class</exclude>
-                                <exclude>io/debezium/connector/spanner/db/model/StreamEventMetadata.class</exclude>
-                                <exclude>io/debezium/connector/spanner/db/model/ChildPartition.class</exclude>
-                                <exclude>io/debezium/connector/spanner/db/model/Partition.class</exclude>
-                                <exclude>io/debezium/connector/spanner/db/model/StreamEventMetadata.class</exclude>
-                                <exclude>io/debezium/connector/spanner/db/model/Mod.class</exclude>
-                                <exclude>io/debezium/connector/spanner/db/model/StreamEventMetadata.class</exclude>
-                                <exclude>io/debezium/connector/spanner/metrics/latency/LatencyCalculator.class</exclude>
-                                <exclude>io/debezium/connector/spanner/metrics/latency/QuantileMeter.class</exclude>
+                                <exclude>io/debezium/connector/spanner/db/stream/SpannerChangeStreamService.class</exclude>
                                 <exclude>io/debezium/connector/spanner/metrics/SpannerMeter.class</exclude>
-                                <exclude>io/debezium/connector/spanner/metrics/MetricsEventPublisher.class</exclude>
                                 <exclude>io/debezium/connector/spanner/metrics/jmx/SpannerMetricsMXBean.class</exclude>
-                                <exclude>io/debezium/connector/spanner/metrics/jmx/SpannerSnapshotChangeEventSourceMetrics.class</exclude>
+                                <exclude>io/debezium/connector/spanner/metrics/jmx/SpannerSnapshotChangeEventSourceMetricsStub.class</exclude>
                                 <exclude>io/debezium/connector/spanner/metrics/jmx/SpannerStreamingChangeEventSourceMetrics.class</exclude>
                                 <exclude>io/debezium/connector/spanner/schema/mapper/ColumnTypeSchemaMapper.class</exclude>
                                 <exclude>io/debezium/connector/spanner/schema/KafkaSpannerTableSchemaFactory.class</exclude>
@@ -540,7 +524,6 @@
                                 <exclude>io/debezium/connector/spanner/db/model/event/**</exclude>
                                 <exclude>io/debezium/connector/spanner/db/dao/**</exclude>
                                 <exclude>io/debezium/connector/spanner/db/metadata/**</exclude>
-                                <exclude>io/debezium/connector/spanner/db/stream/**</exclude>
                                 <exclude>io/debezium/connector/spanner/db/model/schema/**</exclude>
                                 <exclude>io/debezium/connector/spanner/kafka/internal/proto</exclude>
                                 <exclude>io/debezium/connector/spanner/kafka/internal/proto/**</exclude>

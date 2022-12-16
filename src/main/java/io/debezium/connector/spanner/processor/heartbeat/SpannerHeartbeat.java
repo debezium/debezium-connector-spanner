@@ -40,12 +40,12 @@ public class SpannerHeartbeat implements Heartbeat {
         this.topicName = topicName;
 
         keySchema = SchemaBuilder.struct()
-                .name(schemaNameAdjuster.adjust("com.google.spanner.connector.PartitionTokenKey"))
+                .name(schemaNameAdjuster.adjust("io.debezium.connector.spanner.processor.heartbeat.PartitionTokenKey"))
                 .field(PARTITION_TOKEN_KEY, Schema.STRING_SCHEMA)
                 .build();
 
         valueSchema = SchemaBuilder.struct()
-                .name(schemaNameAdjuster.adjust("com.google.spanner.connector.Heartbeat"))
+                .name(schemaNameAdjuster.adjust("io.debezium.connector.spanner.processor.heartbeat.SpannerHeartbeat"))
                 .field(AbstractSourceInfo.TIMESTAMP_KEY, Schema.INT64_SCHEMA)
                 .build();
     }

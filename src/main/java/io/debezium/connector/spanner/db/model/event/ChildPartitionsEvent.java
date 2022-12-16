@@ -12,8 +12,11 @@ import com.google.cloud.Timestamp;
 import io.debezium.connector.spanner.db.model.ChildPartition;
 import io.debezium.connector.spanner.db.model.StreamEventMetadata;
 
-/** Specific DTO for Spanner Change Stream Child event */
+/**
+ * Specific DTO for Spanner Change Stream Child event
+ */
 public class ChildPartitionsEvent implements ChangeStreamEvent {
+
     private final Timestamp startTimestamp;
 
     private final String recordSequence;
@@ -23,11 +26,11 @@ public class ChildPartitionsEvent implements ChangeStreamEvent {
     /**
      * Constructs a child partitions record containing one or more child partitions.
      *
-     * @param startTimestamp the timestamp which this partition started being valid in Cloud Spanner
-     * @param recordSequence the order within a partition and a transaction in which the record was
-     *     put to the stream
+     * @param startTimestamp  the timestamp which this partition started being valid in Cloud Spanner
+     * @param recordSequence  the order within a partition and a transaction in which the record was
+     *                        put to the stream
      * @param childPartitions child partition tokens emitted within this record
-     * @param metadata connector execution metadata for the given record
+     * @param metadata        connector execution metadata for the given record
      */
     public ChildPartitionsEvent(
                                 Timestamp startTimestamp,
@@ -41,7 +44,7 @@ public class ChildPartitionsEvent implements ChangeStreamEvent {
     }
 
     /**
-     * Returns the timestamp that which this partition started being valid in Cloud Spanner. The
+     * Returns the start timestamp of the child partition. The
      * caller must use this time as the change stream query start timestamp for the new partitions.
      *
      * @return the start timestamp of the partition
@@ -66,7 +69,7 @@ public class ChildPartitionsEvent implements ChangeStreamEvent {
     /**
      * Indicates the order in which a record was put to the stream. Is unique and increasing within a
      * partition. It is relative to the scope of partition, commit timestamp, and
-     * server_transaction_id. It is useful for readers downstream to dedup any duplicate records that
+     * server_transaction_id. It is useful for readers downstream to deduplicate any records that
      * were read/recorded.
      *
      * @return record sequence of the record

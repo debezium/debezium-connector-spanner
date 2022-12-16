@@ -21,7 +21,7 @@ jobs:
       - name: Set up JDK
         uses: actions/setup-java@v1
         with:
-          java-version: 11
+          java-version: 17
         ## Add Gcp credentials by service accaunt (.json)
       - id: 'auth'
         name: 'Authenticate to Google Cloud'

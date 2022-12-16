@@ -28,22 +28,24 @@ import io.debezium.connector.spanner.kafka.internal.model.SyncEventMetadata;
 import io.debezium.connector.spanner.kafka.internal.model.TaskSyncEvent;
 import io.debezium.connector.spanner.kafka.internal.proto.SyncEventFromProtoMapper;
 
-/**
- * Consumes messages from the Sync Topic
- */
+/** Consumes messages from the Sync Topic */
 public class TaskSyncEventListener {
     private static final Logger LOGGER = getLogger(TaskSyncEventListener.class);
     private final String consumerGroup;
     private final String topic;
     private final boolean seekBackToPreviousEpoch;
     private final Duration pollDuration;
+    private final Duration commitOffsetsTimeout;
+    private final long commitOffsetsInterval;
     private final SyncEventConsumerFactory<String, byte[]> consumerFactory;
     private final List<BlockingBiConsumer<TaskSyncEvent, SyncEventMetadata>> eventConsumers = new ArrayList<>();
     private final java.util.function.Consumer<RuntimeException> errorHandler;
 
     private volatile Thread thread;
 
-    public TaskSyncEventListener(String consumerGroup, String topic,
+    public TaskSyncEventListener(
+                                 String consumerGroup,
+                                 String topic,
                                  SyncEventConsumerFactory<String, byte[]> consumerFactory,
                                  boolean seekBackToPreviousEpoch,
                                  java.util.function.Consumer<RuntimeException> errorHandler) {
@@ -52,6 +54,8 @@ public class TaskSyncEventListener {
         this.topic = topic;
         this.seekBackToPreviousEpoch = seekBackToPreviousEpoch;
         this.pollDuration = Duration.ofMillis(consumerFactory.getConfig().syncPollDuration());
+        this.commitOffsetsTimeout = Duration.ofMillis(consumerFactory.getConfig().syncCommitOffsetsTimeout());
+        this.commitOffsetsInterval = consumerFactory.getConfig().syncCommitOffsetsInterval();
         this.consumerFactory = consumerFactory;
         this.errorHandler = errorHandler;
     }
@@ -83,7 +87,8 @@ public class TaskSyncEventListener {
             if (endOffset == startOffset) {
                 LOGGER.debug("listen: Sync topic is empty, so initial sync is finished");
                 for (BlockingBiConsumer<TaskSyncEvent, SyncEventMetadata> eventConsumer : eventConsumers) {
-                    eventConsumer.accept(null, SyncEventMetadata.builder().canInitiateRebalancing(true).build());
+                    eventConsumer.accept(
+                            null, SyncEventMetadata.builder().canInitiateRebalancing(true).build());
                 }
             }
             else {
@@ -96,7 +101,8 @@ public class TaskSyncEventListener {
                     throw new InterruptedException();
                 }
                 catch (Exception e) {
-                    errorHandler.accept(new SpannerConnectorException("Error during seek back the Sync Topic", e));
+                    errorHandler.accept(
+                            new SpannerConnectorException("Error during seek back the Sync Topic", e));
                     return;
                 }
             }
@@ -107,39 +113,49 @@ public class TaskSyncEventListener {
             throw ex;
         }
 
-        thread = new Thread(() -> {
-            try {
-                while (!Thread.currentThread().isInterrupted()) {
+        thread = new Thread(
+                () -> {
                     try {
-                        poll(consumer, endOffset);
-                    }
-                    catch (org.apache.kafka.common.errors.InterruptException | InterruptedException ex) {
-                        return;
-                    }
-                    catch (Exception e) {
-                        errorHandler.accept(new SpannerConnectorException("Error during poll from the Sync Topic", e));
-                        return;
-                    }
-                }
+                        long commitOffsetStart = System.currentTimeMillis();
+                        while (!Thread.currentThread().isInterrupted()) {
+                            try {
+                                poll(consumer, endOffset);
+                                if (!consumerFactory.isAutoCommitEnabled()
+                                        && commitOffsetStart + commitOffsetsInterval < System.currentTimeMillis()) {
 
-            }
-            finally {
-                shutdownConsumer(consumer);
-            }
-        }, "SpannerConnector-TaskSyncEventListener");
+                                    consumer.commitSync(commitOffsetsTimeout);
+                                    commitOffsetStart = System.currentTimeMillis();
+                                }
+                            }
+                            catch (org.apache.kafka.common.errors.InterruptException
+                                    | InterruptedException ex) {
+                                return;
+                            }
+                            catch (Exception e) {
+                                errorHandler.accept(
+                                        new SpannerConnectorException("Error during poll from the Sync Topic", e));
+                                return;
+                            }
+                        }
+
+                    }
+                    finally {
+                        shutdownConsumer(consumer);
+                    }
+                },
+                "SpannerConnector-TaskSyncEventListener");
 
         thread.start();
     }
 
-    private void poll(Consumer<String, byte[]> consumer,
-                      long endOffset)
+    private int poll(Consumer<String, byte[]> consumer, long endOffset)
             throws InvalidProtocolBufferException, InterruptedException {
 
         ConsumerRecords<String, byte[]> records = consumer.poll(pollDuration);
         LOGGER.trace("listen: poll messages count: {}", records.count());
 
         if (records.isEmpty()) {
-            return;
+            return 0;
         }
 
         for (ConsumerRecord<String, byte[]> record : records) {
@@ -148,20 +164,21 @@ public class TaskSyncEventListener {
             debug(LOGGER, "Receive SyncEvent from Kafka topic: {}", taskSyncEvent);
 
             for (BlockingBiConsumer<TaskSyncEvent, SyncEventMetadata> eventConsumer : eventConsumers) {
-                eventConsumer.accept(taskSyncEvent, SyncEventMetadata.builder()
-                        .offset(record.offset())
-                        // Once we have consumed all the messages present in the sync topic at the
-                        // start of the connector, we can then connect to the rebalance topic.
-                        .canInitiateRebalancing(record.offset() >= endOffset - 1)
-                        .build());
+                eventConsumer.accept(
+                        taskSyncEvent,
+                        SyncEventMetadata.builder()
+                                .offset(record.offset())
+                                // Once we have consumed all the messages present in the sync topic at the
+                                // start of the connector, we can then connect to the rebalance topic.
+                                .canInitiateRebalancing(record.offset() >= endOffset - 1)
+                                .build());
             }
         }
-
+        return records.count();
     }
 
-    private void seekBackToPreviousEpoch(Consumer<String, byte[]> consumer,
-                                         TopicPartition topicPartition,
-                                         long beginOffset)
+    private void seekBackToPreviousEpoch(
+                                         Consumer<String, byte[]> consumer, TopicPartition topicPartition, long beginOffset)
             throws InvalidProtocolBufferException {
         if (!seekBackToPreviousEpoch) {
             return;
@@ -183,8 +200,10 @@ public class TaskSyncEventListener {
         consumer.seek(topicPartition, startOffset);
     }
 
-    private TaskSyncEvent parseSyncEvent(ConsumerRecord<String, byte[]> record) throws InvalidProtocolBufferException {
-        return SyncEventFromProtoMapper.mapFromProto(SyncEventProtos.SyncEvent.parseFrom(record.value()));
+    private TaskSyncEvent parseSyncEvent(ConsumerRecord<String, byte[]> record)
+            throws InvalidProtocolBufferException {
+        return SyncEventFromProtoMapper.mapFromProto(
+                SyncEventProtos.SyncEvent.parseFrom(record.value()));
     }
 
     private void shutdownConsumer(Consumer<String, byte[]> consumer) {

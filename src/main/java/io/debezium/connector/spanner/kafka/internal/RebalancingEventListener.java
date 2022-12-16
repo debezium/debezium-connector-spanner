@@ -36,6 +36,7 @@ public class RebalancingEventListener {
     private final String topic;
     private final Duration pollDuration;
     private final Duration commitOffsetsTimeout;
+    private final long commitOffsetsInterval;
     private final RebalancingConsumerFactory<?, ?> consumerFactory;
     private final java.util.function.Consumer<RuntimeException> errorHandler;
     private volatile Consumer<?, ?> consumer;
@@ -59,6 +60,7 @@ public class RebalancingEventListener {
         this.topic = topic;
         this.pollDuration = Duration.ofMillis(consumerFactory.getConfig().rebalancingPollDuration());
         this.commitOffsetsTimeout = Duration.ofMillis(consumerFactory.getConfig().rebalancingCommitOffsetsTimeout());
+        this.commitOffsetsInterval = consumerFactory.getConfig().rebalancingCommitOffsetsInterval();
         this.consumerFactory = consumerFactory;
         this.errorHandler = errorHandler;
         this.resettableDelayedAction = new ResettableDelayedAction("rebalance-delayed-action", rebalancingTaskWaitingTimeout);
@@ -101,10 +103,15 @@ public class RebalancingEventListener {
 
         thread = new Thread(() -> {
             try {
+                long commitOffsetStart = System.currentTimeMillis();
                 while (!Thread.currentThread().isInterrupted()) {
                     try {
                         consumer.poll(pollDuration);
-                        consumer.commitSync(commitOffsetsTimeout);
+
+                        if (commitOffsetStart + commitOffsetsInterval < System.currentTimeMillis()) {
+                            consumer.commitSync(commitOffsetsTimeout);
+                            commitOffsetStart = System.currentTimeMillis();
+                        }
                     }
                     catch (org.apache.kafka.common.errors.InterruptException e) {
                         return;

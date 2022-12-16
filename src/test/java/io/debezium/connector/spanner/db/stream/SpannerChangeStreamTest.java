@@ -138,7 +138,7 @@ class SpannerChangeStreamTest {
 
         HashSet<String> parentTokens = new HashSet<>();
         Timestamp startTimestamp = Timestamp.ofTimeMicroseconds(1L);
-        Partition partition = new Partition("partitionToken", parentTokens, startTimestamp, Timestamp.ofTimeMicroseconds(1L));
+        Partition partition = new Partition("partitionToken", parentTokens, startTimestamp, Timestamp.ofTimeMicroseconds(1L), "originParent");
 
         SpannerChangeStream spannerChangeStream = new SpannerChangeStream(streamService, metricsEventPublisher, Duration.ofSeconds(60), 3);
 

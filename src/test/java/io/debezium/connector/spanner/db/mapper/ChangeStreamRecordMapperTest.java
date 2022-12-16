@@ -47,7 +47,7 @@ class ChangeStreamRecordMapperTest {
         ChangeStreamRecordMapper changeStreamRecordMapper = new ChangeStreamRecordMapper();
         HashSet<String> parentTokens = new HashSet<>();
         Timestamp startTimestamp = Timestamp.ofTimeMicroseconds(1L);
-        Partition partition = new Partition("token", parentTokens, startTimestamp, Timestamp.ofTimeMicroseconds(1L));
+        Partition partition = new Partition("token", parentTokens, startTimestamp, Timestamp.ofTimeMicroseconds(1L), "originPartition");
 
         Struct struct = mock(Struct.class);
         when(struct.getStructList(anyInt())).thenReturn(new ArrayList<>());
@@ -62,7 +62,7 @@ class ChangeStreamRecordMapperTest {
         ChangeStreamRecordMapper changeStreamRecordMapper = new ChangeStreamRecordMapper();
         HashSet<String> parentTokens = new HashSet<>();
         Timestamp startTimestamp = Timestamp.ofTimeMicroseconds(1L);
-        Partition partition = new Partition("token", parentTokens, startTimestamp, Timestamp.ofTimeMicroseconds(1L));
+        Partition partition = new Partition("token", parentTokens, startTimestamp, Timestamp.ofTimeMicroseconds(1L), "originPartition");
 
         Struct struct = mock(Struct.class);
         when(struct.getStructList(any())).thenReturn(new ArrayList<>());
@@ -84,7 +84,7 @@ class ChangeStreamRecordMapperTest {
         ChangeStreamRecordMapper changeStreamRecordMapper = new ChangeStreamRecordMapper();
         HashSet<String> parentTokens = new HashSet<>();
         Timestamp startTimestamp = Timestamp.ofTimeMicroseconds(1L);
-        Partition partition = new Partition("token", parentTokens, startTimestamp, Timestamp.ofTimeMicroseconds(1L));
+        Partition partition = new Partition("token", parentTokens, startTimestamp, Timestamp.ofTimeMicroseconds(1L), "originPartition");
 
         Struct struct1 = mock(Struct.class);
         when(struct1.getStructList(any())).thenReturn(new ArrayList<>());
@@ -111,7 +111,7 @@ class ChangeStreamRecordMapperTest {
         ChangeStreamRecordMapper changeStreamRecordMapper = new ChangeStreamRecordMapper();
         HashSet<String> parentTokens = new HashSet<>();
         Timestamp startTimestamp = Timestamp.ofTimeMicroseconds(1L);
-        Partition partition = new Partition("token", parentTokens, startTimestamp, Timestamp.ofTimeMicroseconds(1L));
+        Partition partition = new Partition("token", parentTokens, startTimestamp, Timestamp.ofTimeMicroseconds(1L), "originPartition");
 
         Struct struct1 = mock(Struct.class);
         when(struct1.getStructList(any())).thenReturn(new ArrayList<>());
@@ -140,7 +140,7 @@ class ChangeStreamRecordMapperTest {
         ChangeStreamRecordMapper changeStreamRecordMapper = new ChangeStreamRecordMapper();
         HashSet<String> parentTokens = new HashSet<>();
         Timestamp startTimestamp = Timestamp.ofTimeMicroseconds(1L);
-        Partition partition = new Partition("String", parentTokens, startTimestamp, Timestamp.ofTimeMicroseconds(1L));
+        Partition partition = new Partition("String", parentTokens, startTimestamp, Timestamp.ofTimeMicroseconds(1L), "originPartition");
 
         Struct struct = mock(Struct.class);
         when(struct.getStructList(anyInt())).thenReturn(new ArrayList<>());
@@ -154,7 +154,7 @@ class ChangeStreamRecordMapperTest {
         ChangeStreamRecordMapper changeStreamRecordMapper = new ChangeStreamRecordMapper();
         HashSet<String> parentTokens = new HashSet<>();
         Timestamp startTimestamp = Timestamp.ofTimeMicroseconds(1L);
-        Partition partition = new Partition("String", parentTokens, startTimestamp, Timestamp.ofTimeMicroseconds(1L));
+        Partition partition = new Partition("String", parentTokens, startTimestamp, Timestamp.ofTimeMicroseconds(1L), "originPartition");
 
         Struct struct = mock(Struct.class);
         when(struct.getStructList(any())).thenReturn(new ArrayList<>());
@@ -174,7 +174,7 @@ class ChangeStreamRecordMapperTest {
         ChangeStreamRecordMapper changeStreamRecordMapper = new ChangeStreamRecordMapper();
         HashSet<String> parentTokens = new HashSet<>();
         Timestamp startTimestamp = Timestamp.ofTimeMicroseconds(1L);
-        Partition partition = new Partition("String", parentTokens, startTimestamp, Timestamp.ofTimeMicroseconds(1L));
+        Partition partition = new Partition("String", parentTokens, startTimestamp, Timestamp.ofTimeMicroseconds(1L), "originPartition");
 
         Struct struct = mock(Struct.class);
         when(struct.getStructList(any())).thenReturn(new ArrayList<>());
@@ -198,7 +198,7 @@ class ChangeStreamRecordMapperTest {
         ChangeStreamRecordMapper changeStreamRecordMapper = new ChangeStreamRecordMapper();
         HashSet<String> parentTokens = new HashSet<>();
         Timestamp startTimestamp = Timestamp.ofTimeMicroseconds(1L);
-        Partition partition = new Partition("String", parentTokens, startTimestamp, Timestamp.ofTimeMicroseconds(1L));
+        Partition partition = new Partition("String", parentTokens, startTimestamp, Timestamp.ofTimeMicroseconds(1L), "originPartition");
 
         Struct struct = mock(Struct.class);
         when(struct.getStructList(any())).thenReturn(new ArrayList<>());
@@ -224,7 +224,7 @@ class ChangeStreamRecordMapperTest {
         ChangeStreamRecordMapper changeStreamRecordMapper = new ChangeStreamRecordMapper();
         HashSet<String> parentTokens = new HashSet<>();
         Timestamp startTimestamp = Timestamp.ofTimeMicroseconds(1L);
-        Partition partition = new Partition("String", parentTokens, startTimestamp, Timestamp.ofTimeMicroseconds(1L));
+        Partition partition = new Partition("String", parentTokens, startTimestamp, Timestamp.ofTimeMicroseconds(1L), "originPartition");
 
         Struct struct = mock(Struct.class);
         when(struct.getStructList(any())).thenReturn(new ArrayList<>());
@@ -237,7 +237,7 @@ class ChangeStreamRecordMapperTest {
         ChangeStreamRecordMapper changeStreamRecordMapper = new ChangeStreamRecordMapper();
         HashSet<String> parentTokens = new HashSet<>();
         Timestamp startTimestamp = Timestamp.ofTimeMicroseconds(1L);
-        Partition partition = new Partition("String", parentTokens, startTimestamp, Timestamp.ofTimeMicroseconds(1L));
+        Partition partition = new Partition("String", parentTokens, startTimestamp, Timestamp.ofTimeMicroseconds(1L), "originPartition");
 
         Struct struct = mock(Struct.class);
         when(struct.getStructList(any())).thenThrow(new IllegalArgumentException());
@@ -333,7 +333,7 @@ class ChangeStreamRecordMapperTest {
         ChangeStreamRecordMapper changeStreamRecordMapper = new ChangeStreamRecordMapper();
         HashSet<String> parentTokens = new HashSet<>();
         Timestamp startTimestamp = Timestamp.ofTimeMicroseconds(1L);
-        Partition partition = new Partition("String", parentTokens, startTimestamp, Timestamp.ofTimeMicroseconds(1L));
+        Partition partition = new Partition("String", parentTokens, startTimestamp, Timestamp.ofTimeMicroseconds(1L), "originPartition");
 
         Struct struct = mock(Struct.class);
         when(struct.getBoolean(any())).thenReturn(true);
@@ -357,7 +357,7 @@ class ChangeStreamRecordMapperTest {
         ChangeStreamRecordMapper changeStreamRecordMapper = new ChangeStreamRecordMapper();
         HashSet<String> parentTokens = new HashSet<>();
         Timestamp startTimestamp = Timestamp.ofTimeMicroseconds(1L);
-        Partition partition = new Partition("String", parentTokens, startTimestamp, Timestamp.ofTimeMicroseconds(1L));
+        Partition partition = new Partition("String", parentTokens, startTimestamp, Timestamp.ofTimeMicroseconds(1L), "originPartition");
 
         Struct struct = mock(Struct.class);
         when(struct.getColumnType(any())).thenReturn(Type.bool());
@@ -384,7 +384,7 @@ class ChangeStreamRecordMapperTest {
         HashSet<String> parentTokens = new HashSet<>();
         Timestamp ofTimeMicrosecondsResult = Timestamp.ofTimeMicroseconds(1L);
         Partition partition = new Partition("String", parentTokens, ofTimeMicrosecondsResult,
-                Timestamp.ofTimeMicroseconds(1L));
+                Timestamp.ofTimeMicroseconds(1L), "originPartition");
 
         Struct struct = mock(Struct.class);
         when(struct.getTimestamp(any())).thenReturn(Timestamp.ofTimeMicroseconds(1L));
@@ -425,7 +425,7 @@ class ChangeStreamRecordMapperTest {
         ChangeStreamRecordMapper changeStreamRecordMapper = new ChangeStreamRecordMapper();
         HashSet<String> parentTokens = new HashSet<>();
         Timestamp startTimestamp = Timestamp.ofTimeMicroseconds(1L);
-        Partition partition = new Partition("String", parentTokens, startTimestamp, Timestamp.ofTimeMicroseconds(1L));
+        Partition partition = new Partition("String", parentTokens, startTimestamp, Timestamp.ofTimeMicroseconds(1L), "originPartition");
 
         Struct struct = mock(Struct.class);
         when(struct.getTimestamp(any())).thenReturn(Timestamp.ofTimeMicroseconds(1L));
@@ -453,7 +453,7 @@ class ChangeStreamRecordMapperTest {
         HashSet<String> parentTokens = new HashSet<>();
         Timestamp ofTimeMicrosecondsResult = Timestamp.ofTimeMicroseconds(1L);
         Partition partition = new Partition("String", parentTokens, ofTimeMicrosecondsResult,
-                Timestamp.ofTimeMicroseconds(1L));
+                Timestamp.ofTimeMicroseconds(1L), "originPartition");
 
         Struct struct = mock(Struct.class);
         when(struct.getTimestamp(any())).thenReturn(Timestamp.ofTimeMicroseconds(1L));
@@ -500,7 +500,7 @@ class ChangeStreamRecordMapperTest {
         ChangeStreamRecordMapper changeStreamRecordMapper = new ChangeStreamRecordMapper();
         HashSet<String> parentTokens = new HashSet<>();
         Timestamp startTimestamp = Timestamp.ofTimeMicroseconds(1L);
-        Partition partition = new Partition("String", parentTokens, startTimestamp, Timestamp.ofTimeMicroseconds(1L));
+        Partition partition = new Partition("String", parentTokens, startTimestamp, Timestamp.ofTimeMicroseconds(1L), "originPartition");
 
         Struct struct = mock(Struct.class);
         when(struct.getTimestamp(any())).thenReturn(Timestamp.ofTimeMicroseconds(1L));
@@ -532,7 +532,7 @@ class ChangeStreamRecordMapperTest {
         HashSet<String> parentTokens = new HashSet<>();
         Timestamp ofTimeMicrosecondsResult = Timestamp.ofTimeMicroseconds(1L);
         Partition partition = new Partition("String", parentTokens, ofTimeMicrosecondsResult,
-                Timestamp.ofTimeMicroseconds(1L));
+                Timestamp.ofTimeMicroseconds(1L), "originPartition");
 
         Struct struct = mock(Struct.class);
         when(struct.getString(any())).thenReturn("String");
@@ -596,7 +596,7 @@ class ChangeStreamRecordMapperTest {
         HashSet<String> parentTokens = new HashSet<>();
         Timestamp ofTimeMicrosecondsResult = Timestamp.ofTimeMicroseconds(1L);
         Partition partition = new Partition("Parent0", parentTokens, ofTimeMicrosecondsResult,
-                Timestamp.ofTimeMicroseconds(1L));
+                Timestamp.ofTimeMicroseconds(1L), "originPartition");
 
         Struct struct = mock(Struct.class);
         when(struct.getString(any())).thenReturn("String");
@@ -657,7 +657,7 @@ class ChangeStreamRecordMapperTest {
         HashSet<String> parentTokens = new HashSet<>();
         Timestamp ofTimeMicrosecondsResult = Timestamp.ofTimeMicroseconds(1L);
         Partition partition = new Partition("String", parentTokens, ofTimeMicrosecondsResult,
-                Timestamp.ofTimeMicroseconds(1L));
+                Timestamp.ofTimeMicroseconds(1L), "originPartition");
 
         Struct struct = mock(Struct.class);
         when(struct.getString(any())).thenReturn("String");
@@ -818,7 +818,7 @@ class ChangeStreamRecordMapperTest {
         HashSet<String> parentTokens = new HashSet<>();
         Timestamp ofTimeMicrosecondsResult = Timestamp.ofTimeMicroseconds(1L);
         Partition partition = new Partition("String", parentTokens, ofTimeMicrosecondsResult,
-                Timestamp.ofTimeMicroseconds(1L));
+                Timestamp.ofTimeMicroseconds(1L), "originPartition");
 
         Timestamp recordTimestamp = Timestamp.ofTimeMicroseconds(1L);
         ChangeStreamResultSetMetadata changeStreamResultSetMetadata = mock(ChangeStreamResultSetMetadata.class);

@@ -42,7 +42,7 @@ class SpannerConnectorTest {
     @Test
     void testStart() {
         SpannerConnector spannerConnector = spy(new SpannerConnector());
-        doNothing().when(spannerConnector).createRebalanceTopic(any());
+        doNothing().when(spannerConnector).createInternalTopics(any());
         Map<String, String> props = new HashMap<>();
         props.put("name", "connector");
         spannerConnector.start(props);
@@ -52,7 +52,7 @@ class SpannerConnectorTest {
     @Test
     void testStop() {
         SpannerConnector spannerConnector = spy(new SpannerConnector());
-        doNothing().when(spannerConnector).createRebalanceTopic(any());
+        doNothing().when(spannerConnector).createInternalTopics(any());
         Map<String, String> props = new HashMap<>();
         props.put("name", "connector");
         spannerConnector.start(props);
@@ -63,7 +63,7 @@ class SpannerConnectorTest {
     @Test
     void testTaskConfigs() {
         SpannerConnector spannerConnector = spy(new SpannerConnector());
-        doNothing().when(spannerConnector).createRebalanceTopic(any());
+        doNothing().when(spannerConnector).createInternalTopics(any());
         Map<String, String> props = new HashMap<>();
         props.put("name", "connector");
         spannerConnector.start(props);
@@ -132,7 +132,7 @@ class SpannerConnectorTest {
     void testConfig() {
         ConfigDef actualConfigResult = new SpannerConnector().config();
         Map<String, ConfigDef.ConfigKey> configKeysResult = actualConfigResult.configKeys();
-        assertEquals(42, configKeysResult.size());
+        assertEquals(51, configKeysResult.size());
         List<String> groupsResult = actualConfigResult.groups();
         assertEquals(3, groupsResult.size());
         assertEquals("Spanner", groupsResult.get(0));

@@ -15,6 +15,6 @@ import io.debezium.pipeline.spi.Partition;
 public interface CommittingRecordsStreamingChangeEventSource<P extends Partition, O extends OffsetContext>
         extends io.debezium.pipeline.source.spi.StreamingChangeEventSource<P, O> {
 
-    default void commitRecords(List<SourceRecord> recordList) {
+    default void commitRecords(List<SourceRecord> recordList) throws InterruptedException {
     }
 }

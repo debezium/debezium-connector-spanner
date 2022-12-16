@@ -42,7 +42,10 @@ public class LatencyCalculator {
             return null;
         }
 
-        long readAtTimestamp = source.getInt64(SourceInfo.READ_AT_TIMESTAMP_KEY);
+        Long readAtTimestamp = source.getInt64(SourceInfo.READ_AT_TIMESTAMP_KEY);
+        if (readAtTimestamp == null) {
+            return null;
+        }
 
         long pollAtTimestamp = SourceRecordUtils.extractPollTimestamp(record);
 
@@ -55,7 +58,10 @@ public class LatencyCalculator {
             return null;
         }
 
-        long readAtTimestamp = source.getInt64(SourceInfo.READ_AT_TIMESTAMP_KEY);
+        Long readAtTimestamp = source.getInt64(SourceInfo.READ_AT_TIMESTAMP_KEY);
+        if (readAtTimestamp == null) {
+            return null;
+        }
 
         long commitTimestamp = source.getInt64(SourceInfo.TIMESTAMP_KEY);
 
@@ -70,7 +76,10 @@ public class LatencyCalculator {
 
         long commitTimestamp = source.getInt64(SourceInfo.TIMESTAMP_KEY);
 
-        long emitAtTimestamp = SourceRecordUtils.extractEmitTimestamp(record);
+        Long emitAtTimestamp = SourceRecordUtils.extractEmitTimestamp(record);
+        if (emitAtTimestamp == null) {
+            return null;
+        }
 
         return emitAtTimestamp - commitTimestamp;
     }
@@ -101,7 +110,10 @@ public class LatencyCalculator {
         if (source == null || publishAtTimestamp == null) {
             return null;
         }
-        long emitAtTimestamp = SourceRecordUtils.extractEmitTimestamp(record);
+        Long emitAtTimestamp = SourceRecordUtils.extractEmitTimestamp(record);
+        if (emitAtTimestamp == null) {
+            return null;
+        }
 
         return publishAtTimestamp - emitAtTimestamp;
     }
@@ -112,9 +124,15 @@ public class LatencyCalculator {
             return null;
         }
 
-        long readAtTimestamp = source.getInt64(SourceInfo.READ_AT_TIMESTAMP_KEY);
+        Long readAtTimestamp = source.getInt64(SourceInfo.READ_AT_TIMESTAMP_KEY);
+        if (readAtTimestamp == null) {
+            return null;
+        }
 
-        long emitAtTimestamp = SourceRecordUtils.extractEmitTimestamp(record);
+        Long emitAtTimestamp = SourceRecordUtils.extractEmitTimestamp(record);
+        if (emitAtTimestamp == null) {
+            return null;
+        }
 
         return emitAtTimestamp - readAtTimestamp;
     }

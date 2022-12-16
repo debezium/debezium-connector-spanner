@@ -9,7 +9,6 @@ import static org.slf4j.LoggerFactory.getLogger;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.function.Consumer;
 
 import org.slf4j.Logger;
 
@@ -21,6 +20,7 @@ import io.debezium.connector.spanner.kafka.internal.model.TaskState;
 import io.debezium.connector.spanner.kafka.internal.model.TaskSyncEvent;
 import io.debezium.connector.spanner.task.state.SyncEvent;
 import io.debezium.connector.spanner.task.state.TaskStateChangeEvent;
+import io.debezium.function.BlockingConsumer;
 
 /**
  * Provides a logic for processing Sync Events of different types:
@@ -33,10 +33,10 @@ public class SyncEventHandler {
 
     private final TaskSyncPublisher taskSyncPublisher;
 
-    private final Consumer<TaskStateChangeEvent> eventConsumer;
+    private final BlockingConsumer<TaskStateChangeEvent> eventConsumer;
 
     public SyncEventHandler(TaskSyncContextHolder taskSyncContextHolder, TaskSyncPublisher taskSyncPublisher,
-                            Consumer<TaskStateChangeEvent> eventConsumer) {
+                            BlockingConsumer<TaskStateChangeEvent> eventConsumer) {
         this.taskSyncContextHolder = taskSyncContextHolder;
         this.taskSyncPublisher = taskSyncPublisher;
         this.eventConsumer = eventConsumer;
@@ -142,7 +142,7 @@ public class SyncEventHandler {
 
     }
 
-    public void process(TaskSyncEvent inSync, SyncEventMetadata metadata) {
+    public void process(TaskSyncEvent inSync, SyncEventMetadata metadata) throws InterruptedException {
         if (inSync == null) {
             return;
         }

@@ -19,7 +19,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
-import java.util.function.Consumer;
 
 import org.apache.kafka.connect.data.ConnectSchema;
 import org.apache.kafka.connect.data.Schema;
@@ -55,6 +54,7 @@ import io.debezium.connector.spanner.schema.KafkaSpannerSchema;
 import io.debezium.connector.spanner.schema.KafkaSpannerTableSchemaFactory;
 import io.debezium.connector.spanner.task.SynchronizedPartitionManager;
 import io.debezium.connector.spanner.task.state.TaskStateChangeEvent;
+import io.debezium.function.BlockingConsumer;
 import io.debezium.heartbeat.HeartbeatFactory;
 import io.debezium.pipeline.ChangeEventSourceCoordinator;
 import io.debezium.pipeline.DataChangeEvent;
@@ -132,7 +132,7 @@ class SpannerStreamingChangeEventSourceTest {
 
         MetricsEventPublisher metricsEventPublisher = new MetricsEventPublisher();
         SynchronizedPartitionManager partitionManager = new SynchronizedPartitionManager(
-                (Consumer<TaskStateChangeEvent>) mock(Consumer.class));
+                (BlockingConsumer<TaskStateChangeEvent>) mock(BlockingConsumer.class));
         SpannerStreamingChangeEventSource spannerStreamingChangeEventSource = new SpannerStreamingChangeEventSource(
                 errorHandler, null, eventQueue, metricsEventPublisher, partitionManager, new SchemaRegistry("Stream Name",
                         new SchemaDao(mock(DatabaseClient.class)), mock(Runnable.class)),
@@ -248,7 +248,7 @@ class SpannerStreamingChangeEventSourceTest {
 
         MetricsEventPublisher metricsEventPublisher = new MetricsEventPublisher();
         SynchronizedPartitionManager partitionManager = new SynchronizedPartitionManager(
-                (Consumer<TaskStateChangeEvent>) mock(Consumer.class));
+                (BlockingConsumer<TaskStateChangeEvent>) mock(BlockingConsumer.class));
 
         doNothing().when(schemaRegistryDatabaseClient).checkSchema(any(), any(), any());
 
@@ -267,7 +267,7 @@ class SpannerStreamingChangeEventSourceTest {
 
     @Test
     void testCommitOffset() {
-        SynchronizedPartitionManager partitionManager = spy(new SynchronizedPartitionManager((Consumer<TaskStateChangeEvent>) mock(Consumer.class)));
+        SynchronizedPartitionManager partitionManager = spy(new SynchronizedPartitionManager((BlockingConsumer<TaskStateChangeEvent>) mock(BlockingConsumer.class)));
 
         SpannerStreamingChangeEventSource spannerStreamingChangeEventSource = new SpannerStreamingChangeEventSource(
                 null, null, null, null, partitionManager, new SchemaRegistry(
@@ -280,8 +280,8 @@ class SpannerStreamingChangeEventSourceTest {
     }
 
     @Test
-    void testCommitRecords() {
-        SynchronizedPartitionManager partitionManager = new SynchronizedPartitionManager((Consumer<TaskStateChangeEvent>) mock(Consumer.class));
+    void testCommitRecords() throws InterruptedException {
+        SynchronizedPartitionManager partitionManager = new SynchronizedPartitionManager((BlockingConsumer<TaskStateChangeEvent>) mock(BlockingConsumer.class));
 
         SpannerStreamingChangeEventSource spannerStreamingChangeEventSource = new SpannerStreamingChangeEventSource(
                 null, null, null, null, partitionManager, new SchemaRegistry(
@@ -298,6 +298,9 @@ class SpannerStreamingChangeEventSourceTest {
         when(headers.lastWithName(anyString())).thenReturn(header);
         when(sourceRecord2.headers()).thenReturn(headers);
         spannerStreamingChangeEventSource.commitRecords(List.of(sourceRecord1, sourceRecord2));
+
+        verify(sourceRecord1, times(2)).sourcePartition();
+        verify(sourceRecord1, times(2)).headers();
 
         verify(sourceRecord2, times(2)).sourcePartition();
         verify(sourceRecord2, times(2)).headers();

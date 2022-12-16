@@ -134,7 +134,12 @@ public class SpannerChangeStream implements ChangeStream {
                     return;
                 }
 
-                partitionEventListener.onException(partition, ex);
+                try {
+                    partitionEventListener.onException(partition, ex);
+                }
+                catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
             }
         });
 
@@ -153,7 +158,7 @@ public class SpannerChangeStream implements ChangeStream {
     }
 
     @VisibleForTesting
-    void onStuckPartition(String token) {
+    void onStuckPartition(String token) throws InterruptedException {
         LOGGER.warn("Partition {} is stuck", token);
         this.partitionThreadPool.stop(token);
         if (this.partitionEventListener.onStuckPartition(token)) {

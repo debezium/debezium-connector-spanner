@@ -14,12 +14,12 @@ import io.debezium.connector.spanner.db.model.Partition;
  */
 public interface PartitionManager {
 
-    void newChildPartitions(List<Partition> partitions);
+    void newChildPartitions(List<Partition> partitions) throws InterruptedException;
 
-    void updateToFinished(String token);
+    void updateToFinished(String token) throws InterruptedException;
 
-    void updateToRunning(String token);
+    void updateToRunning(String token) throws InterruptedException;
 
-    void updateToReadyForStreaming(String token);
+    void updateToReadyForStreaming(String token) throws InterruptedException;
 
 }

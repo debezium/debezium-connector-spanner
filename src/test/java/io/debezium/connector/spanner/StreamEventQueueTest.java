@@ -34,7 +34,8 @@ class StreamEventQueueTest {
         HashSet<String> parentTokens = new HashSet<>();
         Timestamp startTimestamp = Timestamp.ofTimeMicroseconds(1L);
 
-        FinishPartitionEvent partitionEvent = new FinishPartitionEvent(new Partition("token", parentTokens, startTimestamp, Timestamp.ofTimeMicroseconds(1L)));
+        FinishPartitionEvent partitionEvent = new FinishPartitionEvent(
+                new Partition("token", parentTokens, startTimestamp, Timestamp.ofTimeMicroseconds(1L), "parentToken"));
         streamEventQueue.put(partitionEvent);
         ChangeStreamEvent takeEvent = streamEventQueue.take();
         assertSame(partitionEvent, takeEvent);

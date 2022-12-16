@@ -32,7 +32,7 @@ class StartEndTimeValidatorTest {
                         true),
                 Arguments.of(
                         Configuration.from(Map.of(
-                                "gcp.spanner.start.time", Instant.ofEpochMilli(Instant.now().toEpochMilli() + 10001).toString(),
+                                "gcp.spanner.start.time", Instant.ofEpochMilli(Instant.now().toEpochMilli() + 100001).toString(),
                                 "gcp.spanner.end.time", Instant.ofEpochMilli(Instant.now().toEpochMilli() + 10000).toString())),
                         false));
     }

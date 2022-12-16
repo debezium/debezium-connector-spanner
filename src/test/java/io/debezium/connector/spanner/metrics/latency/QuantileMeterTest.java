@@ -35,7 +35,9 @@ class QuantileMeterTest {
 
     @Test
     void testGetValueAtQuantile() {
-        assertEquals(null, (new QuantileMeter(Duration.ofSeconds(10), (Consumer<Throwable>) mock(Consumer.class))).getValueAtQuantile(10.0d));
+        QuantileMeter quantileMeter = new QuantileMeter(
+                Duration.ofSeconds(10), (Consumer<Throwable>) mock(Consumer.class));
+        assertEquals(null, quantileMeter.getValueAtQuantile(10.0d));
     }
 
     @Test

@@ -48,9 +48,7 @@ import io.debezium.schema.DefaultTopicNamingStrategy;
 import io.debezium.spi.topic.TopicNamingStrategy;
 import io.debezium.util.SchemaNameAdjuster;
 
-/**
- * Spanner implementation for Debezium's CDC SourceTask
- */
+/** Spanner implementation for Debezium's CDC SourceTask */
 public class SpannerConnectorTask extends SpannerBaseSourceTask {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(SpannerConnectorTask.class);
@@ -86,8 +84,7 @@ public class SpannerConnectorTask extends SpannerBaseSourceTask {
 
         final DaoFactory daoFactory = new DaoFactory(databaseClientFactory);
 
-        final SpannerSourceTaskContext taskContext = new SpannerSourceTaskContext(connectorConfig,
-                () -> spannerMeter.getCapturedTables());
+        final SpannerSourceTaskContext taskContext = new SpannerSourceTaskContext(connectorConfig, () -> spannerMeter.getCapturedTables());
 
         queue = new ChangeEventQueue.Builder<DataChangeEvent>()
                 .pollInterval(connectorConfig.getPollInterval())
@@ -99,8 +96,8 @@ public class SpannerConnectorTask extends SpannerBaseSourceTask {
 
         final SpannerErrorHandler errorHandler = new SpannerErrorHandler(this, queue);
 
-        this.spannerMeter = new SpannerMeter(this, connectorConfig, errorHandler,
-                () -> lowWatermarkHolder.getLowWatermark());
+        this.spannerMeter = new SpannerMeter(
+                this, connectorConfig, errorHandler, () -> lowWatermarkHolder.getLowWatermark());
 
         final SchemaNameAdjuster schemaNameAdjuster = connectorConfig.schemaNameAdjustmentMode().createAdjuster();
 
@@ -110,25 +107,36 @@ public class SpannerConnectorTask extends SpannerBaseSourceTask {
 
         final TopicNamingStrategy topicNamingStrategy = DefaultTopicNamingStrategy.create(connectorConfig);
 
-        final SchemaRegistry schemaRegistry = new SchemaRegistry(connectorConfig.changeStreamName(),
-                daoFactory.getSchemaDao(), () -> schema.resetCache());
+        final SchemaRegistry schemaRegistry = new SchemaRegistry(
+                connectorConfig.changeStreamName(),
+                daoFactory.getSchemaDao(),
+                () -> schema.resetCache());
 
-        final KafkaSpannerTableSchemaFactory tableSchemaFactory = new KafkaSpannerTableSchemaFactory(topicNamingStrategy, schemaNameAdjuster,
-                schemaRegistry, connectorConfig.getSourceInfoStructMaker().schema());
+        final KafkaSpannerTableSchemaFactory tableSchemaFactory = new KafkaSpannerTableSchemaFactory(
+                topicNamingStrategy,
+                schemaNameAdjuster,
+                schemaRegistry,
+                connectorConfig.getSourceInfoStructMaker().schema());
 
         schema = new KafkaSpannerSchema(tableSchemaFactory);
 
         final SpannerHeartbeatFactory spannerHeartbeatFactory = new SpannerHeartbeatFactory(connectorConfig, topicNamingStrategy, schemaNameAdjuster);
 
-        final PartitionOffsetProvider partitionOffsetProvider = new PartitionOffsetProvider(this.context.offsetStorageReader(), spannerMeter.getMetricsEventPublisher());
+        final PartitionOffsetProvider partitionOffsetProvider = new PartitionOffsetProvider(
+                this.context.offsetStorageReader(), spannerMeter.getMetricsEventPublisher());
 
-        final SynchronizedPartitionManager partitionManager = new SynchronizedPartitionManager(event -> this.synchronizationTaskContext.publishEvent(event));
+        final SynchronizedPartitionManager partitionManager = new SynchronizedPartitionManager(
+                event -> this.synchronizationTaskContext.publishEvent(event));
 
-        final SpannerChangeStreamFactory spannerChangeStreamFactory = new SpannerChangeStreamFactory(daoFactory,
-                spannerMeter.getMetricsEventPublisher());
+        final SpannerChangeStreamFactory spannerChangeStreamFactory = new SpannerChangeStreamFactory(
+                daoFactory,
+                spannerMeter.getMetricsEventPublisher(),
+                connectorConfig.getConnectorName());
 
-        this.changeStream = spannerChangeStreamFactory.getStream(connectorConfig.changeStreamName(),
-                connectorConfig.getHeartbeatInterval(), connectorConfig.getMaxMissedHeartbeats());
+        this.changeStream = spannerChangeStreamFactory.getStream(
+                connectorConfig.changeStreamName(),
+                connectorConfig.getHeartbeatInterval(),
+                connectorConfig.getMaxMissedHeartbeats());
 
         this.lowWatermarkHolder = new LowWatermarkHolder();
 
@@ -152,12 +160,28 @@ public class SpannerConnectorTask extends SpannerBaseSourceTask {
                 sourceInfoFactory,
                 kafkaPartitionInfoProvider);
 
-        this.synchronizationTaskContext = new SynchronizationTaskContext(this, connectorConfig, errorHandler,
-                partitionOffsetProvider, changeStream, dispatcher, adminClientFactory,
-                schemaRegistry, this::finish, spannerMeter.getMetricsEventPublisher(), lowWatermarkHolder);
+        this.synchronizationTaskContext = new SynchronizationTaskContext(
+                this,
+                connectorConfig,
+                errorHandler,
+                partitionOffsetProvider,
+                changeStream,
+                dispatcher,
+                adminClientFactory,
+                schemaRegistry,
+                this::finish,
+                spannerMeter.getMetricsEventPublisher(),
+                lowWatermarkHolder);
 
-        final SpannerChangeEventSourceFactory changeEventSourceFactory = new SpannerChangeEventSourceFactory(connectorConfig, dispatcher, errorHandler,
-                schemaRegistry, spannerMeter, changeStream, sourceInfoFactory, partitionManager);
+        final SpannerChangeEventSourceFactory changeEventSourceFactory = new SpannerChangeEventSourceFactory(
+                connectorConfig,
+                dispatcher,
+                errorHandler,
+                schemaRegistry,
+                spannerMeter,
+                changeStream,
+                sourceInfoFactory,
+                partitionManager);
 
         this.coordinator = new SpannerChangeEventSourceCoordinator(
                 getInitialOffsets(),
@@ -235,11 +259,11 @@ public class SpannerConnectorTask extends SpannerBaseSourceTask {
     }
 
     public void restart() {
-        this.queue.producerException(new RetriableException("Task " + this.taskUid + " will be restarted"));
+        this.queue.producerException(
+                new RetriableException("Task " + this.taskUid + " will be restarted"));
     }
 
     public String getTaskUid() {
         return taskUid;
     }
-
 }

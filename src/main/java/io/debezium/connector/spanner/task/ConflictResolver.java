@@ -15,9 +15,9 @@ import java.util.stream.Stream;
  * This class introduces the algorithm to understand,
  * who should be the owner of the partition.
  */
-public class TaskConflictResolver {
+public class ConflictResolver {
 
-    private TaskConflictResolver() {
+    private ConflictResolver() {
     }
 
     public static boolean hasPriority(String testedTaskUid, Set<String> taskUids) {
@@ -25,7 +25,11 @@ public class TaskConflictResolver {
         return testedTaskUid.equals(taskUid);
     }
 
-    public static String getPriorityTask(Set<String> taskUids) {
-        return taskUids.stream().min(String::compareTo).get();
+    public static String getPriorityPartition(Set<String> tokens) {
+        return getPriorityString(tokens);
+    }
+
+    private static String getPriorityString(Set<String> strings) {
+        return strings.stream().min(String::compareTo).get();
     }
 }

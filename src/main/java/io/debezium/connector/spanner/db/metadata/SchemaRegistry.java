@@ -104,6 +104,11 @@ public class SchemaRegistry {
         this.timestamp = updatedTimestamp;
         this.changeStream = schemaDao.getStream(timestamp, streamName);
 
+        if (this.changeStream == null) {
+            throw new IllegalStateException("Change stream doesn't exist at timestamp: "
+                    + streamName + ", " + timestamp);
+        }
+
         SpannerSchema newSchema;
         if (this.changeStream.isWatchedAllTables()) {
             newSchema = schemaDao.getSchema(timestamp);

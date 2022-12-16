@@ -19,10 +19,12 @@ import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import io.debezium.connector.spanner.db.model.InitialPartition;
 import io.debezium.connector.spanner.db.model.Partition;
 import io.debezium.connector.spanner.kafka.internal.model.PartitionState;
 import io.debezium.connector.spanner.kafka.internal.model.PartitionStateEnum;
 import io.debezium.connector.spanner.kafka.internal.model.TaskState;
+import io.debezium.connector.spanner.task.ConflictResolver;
 import io.debezium.connector.spanner.task.TaskSyncContext;
 
 /**
@@ -44,6 +46,16 @@ public class ChildPartitionOperation implements Operation {
         for (Partition newPartition : newPartitions) {
             TaskState taskState = taskSyncContext.getCurrentTaskState();
 
+            if (!InitialPartition.isInitialPartition(newPartition.getToken())) {
+                String priorityParentPartition = ConflictResolver.getPriorityPartition(newPartition.getParentTokens());
+
+                if (!priorityParentPartition.equals(newPartition.getOriginPartitionToken())) {
+                    LOGGER.warn("Partition {} ignored. Will be streamed on task with parent partition {}",
+                            newPartition.getToken(), priorityParentPartition);
+                    continue;
+                }
+            }
+
             List<PartitionState> partitions = new ArrayList<>(taskState.getPartitions());
             List<PartitionState> sharedPartitions = new ArrayList<>(taskState.getSharedPartitions());
 
@@ -63,6 +75,7 @@ public class ChildPartitionOperation implements Operation {
                     .assigneeTaskUid(taskUid)
                     .state(PartitionStateEnum.CREATED)
                     .parents(newPartition.getParentTokens())
+                    .originParent(newPartition.getOriginPartitionToken())
                     .build();
 
             if (taskSyncContext.getTaskUid().equals(taskUid)) {
@@ -84,25 +97,30 @@ public class ChildPartitionOperation implements Operation {
     }
 
     private boolean existPartition(TaskSyncContext taskSyncContext, String token) {
-        Set<String> tokens = new HashSet<>();
+        boolean found = taskSyncContext.getCurrentTaskState().getPartitions().stream()
+                .anyMatch(partition -> token.equals(partition.getToken()));
+        if (found) {
+            return true;
+        }
 
-        tokens.addAll(taskSyncContext.getCurrentTaskState().getPartitions().stream()
-                .map(PartitionState::getToken)
-                .collect(Collectors.toSet()));
+        found = taskSyncContext.getCurrentTaskState().getSharedPartitions().stream()
+                .anyMatch(partition -> token.equals(partition.getToken()));
+        if (found) {
+            return true;
+        }
 
-        tokens.addAll(taskSyncContext.getCurrentTaskState().getSharedPartitions().stream()
-                .map(PartitionState::getToken)
-                .collect(Collectors.toSet()));
+        found = taskSyncContext.getTaskStates().values().stream()
+                .flatMap(taskState -> taskState.getPartitions().stream())
+                .anyMatch(partition -> token.equals(partition.getToken()));
+        if (found) {
+            return true;
+        }
 
-        tokens.addAll(taskSyncContext.getTaskStates().values().stream()
-                .flatMap(taskState -> taskState.getPartitions().stream()).map(PartitionState::getToken)
-                .collect(Collectors.toSet()));
+        found = taskSyncContext.getTaskStates().values().stream()
+                .flatMap(taskState -> taskState.getSharedPartitions().stream())
+                .anyMatch(partition -> token.equals(partition.getToken()));
 
-        tokens.addAll(taskSyncContext.getTaskStates().values().stream()
-                .flatMap(taskState -> taskState.getSharedPartitions().stream()).map(PartitionState::getToken)
-                .collect(Collectors.toSet()));
-
-        return tokens.contains(token);
+        return found;
     }
 
     private String findCandidateToSharePartition(TaskSyncContext taskSyncContext) {

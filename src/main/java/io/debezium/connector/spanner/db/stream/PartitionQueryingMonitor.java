@@ -14,11 +14,15 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
+import com.google.common.annotations.VisibleForTesting;
+
+import io.debezium.connector.spanner.db.model.InitialPartition;
 import io.debezium.connector.spanner.db.model.event.ChangeStreamEvent;
 import io.debezium.connector.spanner.db.stream.exception.ChangeStreamException;
 import io.debezium.connector.spanner.db.stream.exception.FailureChangeStreamException;
 import io.debezium.connector.spanner.metrics.MetricsEventPublisher;
 import io.debezium.connector.spanner.metrics.event.StuckHeartbeatIntervalsMetricEvent;
+import io.debezium.function.BlockingConsumer;
 
 /**
  * Monitors partition querying. If maxMissedEvents is reached, onStuckPartitionConsumer is called.
@@ -35,12 +39,14 @@ public class PartitionQueryingMonitor {
 
     private final Consumer<ChangeStreamException> errorConsumer;
 
-    private final Consumer<String> onStuckPartitionConsumer;
+    private final BlockingConsumer<String> onStuckPartitionConsumer;
 
     private final MetricsEventPublisher metricsEventPublisher;
 
-    public PartitionQueryingMonitor(PartitionThreadPool partitionThreadPool, Duration heartBeatInterval,
-                                    Consumer<String> onStuckPartitionConsumer,
+    public PartitionQueryingMonitor(
+                                    PartitionThreadPool partitionThreadPool,
+                                    Duration heartBeatInterval,
+                                    BlockingConsumer<String> onStuckPartitionConsumer,
                                     Consumer<ChangeStreamException> errorConsumer,
                                     MetricsEventPublisher metricsEventPublisher,
                                     int maxMissedEvents) {
@@ -54,7 +60,6 @@ public class PartitionQueryingMonitor {
         this.onStuckPartitionConsumer = onStuckPartitionConsumer;
 
         this.metricsEventPublisher = metricsEventPublisher;
-
     }
 
     public void checkPartitionThreads() throws InterruptedException {
@@ -69,6 +74,11 @@ public class PartitionQueryingMonitor {
 
             int maxStuckHeartbeatIntervals = -1;
             for (String token : activePartitions) {
+                // Only measure stuck heartbeat interval for the partition queries.
+                if (InitialPartition.isInitialPartition(token)) {
+                    continue;
+                }
+
                 Instant lastEventTimestamp = lastEventTimestampMap.get(token);
                 if (lastEventTimestamp == null) {
                     lastEventTimestampMap.put(token, Instant.now());
@@ -77,7 +87,8 @@ public class PartitionQueryingMonitor {
 
                 int stuckHeartbeatIntervals = stuckHeartbeatIntervals(lastEventTimestamp);
                 if (stuckHeartbeatIntervals > maxStuckHeartbeatIntervals) {
-                    metricsEventPublisher.publishMetricEvent(new StuckHeartbeatIntervalsMetricEvent(stuckHeartbeatIntervals));
+                    metricsEventPublisher.publishMetricEvent(
+                            new StuckHeartbeatIntervalsMetricEvent(stuckHeartbeatIntervals));
                     maxStuckHeartbeatIntervals = stuckHeartbeatIntervals;
                 }
 
@@ -91,13 +102,15 @@ public class PartitionQueryingMonitor {
         }
     }
 
-    private int stuckHeartbeatIntervals(Instant lastEventInstant) {
+    @VisibleForTesting
+    int stuckHeartbeatIntervals(Instant lastEventInstant) {
         long stuckMillis = Duration.between(lastEventInstant, Instant.now()).toMillis();
         long stuckIntervals = stuckMillis / heartBeatIntervalMillis;
         return ((int) stuckIntervals);
     }
 
-    private boolean isPartitionStuck(Instant lastEventInstant) {
+    @VisibleForTesting
+    boolean isPartitionStuck(Instant lastEventInstant) {
         return lastEventInstant.isBefore(Instant.now().minus(timeout));
     }
 
@@ -105,19 +118,23 @@ public class PartitionQueryingMonitor {
         if (this.thread != null) {
             return;
         }
-        this.thread = new Thread(() -> {
-            try {
-                checkPartitionThreads();
-            }
-            catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
-        }, "SpannerConnector-PartitionQueryingMonitor");
+        this.thread = new Thread(
+                () -> {
+                    try {
+                        checkPartitionThreads();
+                    }
+                    catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    }
+                },
+                "SpannerConnector-PartitionQueryingMonitor");
 
-        this.thread.setUncaughtExceptionHandler((t, ex) -> {
-            this.errorConsumer.accept(
-                    new FailureChangeStreamException("PartitionQueryingMonitor error", new RuntimeException(ex)));
-        });
+        this.thread.setUncaughtExceptionHandler(
+                (t, ex) -> {
+                    this.errorConsumer.accept(
+                            new FailureChangeStreamException(
+                                    "PartitionQueryingMonitor error", new RuntimeException(ex)));
+                });
 
         this.thread.start();
     }
@@ -130,6 +147,7 @@ public class PartitionQueryingMonitor {
     }
 
     public void acceptStreamEvent(ChangeStreamEvent changeStreamEvent) {
-        this.lastEventTimestampMap.put(changeStreamEvent.getMetadata().getPartitionToken(), Instant.now());
+        this.lastEventTimestampMap.put(
+                changeStreamEvent.getMetadata().getPartitionToken(), Instant.now());
     }
 }

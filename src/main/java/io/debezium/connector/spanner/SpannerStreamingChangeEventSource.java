@@ -114,7 +114,7 @@ public class SpannerStreamingChangeEventSource implements CommittingRecordsStrea
 
             stream.run(context::isRunning, eventQueue::put, new PartitionEventListener() {
                 @Override
-                public void onRun(Partition partition) {
+                public void onRun(Partition partition) throws InterruptedException {
                     finishingPartitionManager.registerPartition(partition.getToken());
                     partitionManager.updateToRunning(partition.getToken());
                 }
@@ -125,7 +125,7 @@ public class SpannerStreamingChangeEventSource implements CommittingRecordsStrea
                 }
 
                 @Override
-                public void onException(Partition partition, Exception exception) {
+                public void onException(Partition partition, Exception exception) throws InterruptedException {
                     LOGGER.error("Try to stream again from partition {} after exception {}", partition.getToken(),
                             exception.getMessage());
 
@@ -133,7 +133,7 @@ public class SpannerStreamingChangeEventSource implements CommittingRecordsStrea
                 }
 
                 @Override
-                public boolean onStuckPartition(String token) {
+                public boolean onStuckPartition(String token) throws InterruptedException {
                     if (STUCK_PARTITION_STRATEGY.equals(StuckPartitionStrategy.REPEAT_STREAMING)) {
                         LOGGER.warn("Try to requery partition {}", token);
                         partitionManager.updateToReadyForStreaming(token);
@@ -189,6 +189,7 @@ public class SpannerStreamingChangeEventSource implements CommittingRecordsStrea
                         processChildPartitionsEvent(childPartitionsEvent);
                     }
                     else if (event instanceof FinishPartitionEvent) {
+                        LOGGER.info("Received FinishPartitionEvent for partition {}", event.getMetadata().getPartitionToken());
                         if (finishPartitionStrategy.equals(FinishPartitionStrategy.AFTER_COMMIT)) {
                             this.finishingPartitionManager.onPartitionFinishEvent(event.getMetadata().getPartitionToken());
                         }
@@ -251,7 +252,7 @@ public class SpannerStreamingChangeEventSource implements CommittingRecordsStrea
         LOGGER.debug("Dispatching heartbeat for event {} with partition {} and offset {}", event, partition, offsetContext.getOffset());
     }
 
-    private void processChildPartitionsEvent(ChildPartitionsEvent event) {
+    private void processChildPartitionsEvent(ChildPartitionsEvent event) throws InterruptedException {
         LOGGER.info("Received ChildPartitionsEvent: {}", event);
 
         List<Partition> partitions = event.getChildPartitions().stream().map(childPartition -> {
@@ -261,6 +262,7 @@ public class SpannerStreamingChangeEventSource implements CommittingRecordsStrea
                     .parentTokens(childPartition.getParentTokens())
                     .startTimestamp(startTimeStamp)
                     .endTimestamp(event.getMetadata().getPartitionEndTimestamp())
+                    .originPartitionToken(event.getMetadata().getPartitionToken())
                     .build();
         }).collect(Collectors.toList());
 
@@ -274,22 +276,22 @@ public class SpannerStreamingChangeEventSource implements CommittingRecordsStrea
     }
 
     @Override
-    public void commitRecords(List<SourceRecord> records) {
+    public void commitRecords(List<SourceRecord> records) throws InterruptedException {
 
         if (!finishPartitionStrategy.equals(FinishPartitionStrategy.AFTER_COMMIT)) {
             return;
         }
 
-        records.forEach(sourceRecord -> {
+        for (SourceRecord sourceRecord : records) {
             String token = SourceRecordUtils.extractToken(sourceRecord);
             String recordUid = SourceRecordUtils.extractRecordUid(sourceRecord);
 
             if (token == null || recordUid == null) {
-                return;
+                continue;
             }
 
             this.finishingPartitionManager.commitRecord(token, recordUid);
-        });
+        }
     }
 
 }

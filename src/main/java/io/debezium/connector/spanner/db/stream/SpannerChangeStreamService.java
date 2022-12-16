@@ -17,6 +17,7 @@ import io.debezium.connector.spanner.db.dao.ChangeStreamResultSet;
 import io.debezium.connector.spanner.db.mapper.ChangeStreamRecordMapper;
 import io.debezium.connector.spanner.db.model.Partition;
 import io.debezium.connector.spanner.db.model.event.ChangeStreamEvent;
+import io.debezium.connector.spanner.db.model.event.ChildPartitionsEvent;
 import io.debezium.connector.spanner.db.model.event.FinishPartitionEvent;
 import io.debezium.connector.spanner.db.model.event.HeartbeatEvent;
 import io.debezium.connector.spanner.metrics.MetricsEventPublisher;
@@ -84,6 +85,7 @@ public class SpannerChangeStreamService {
         }
 
         partitionEventListener.onFinish(partition);
+        LOGGER.info("Finished consuming partition {}", partition);
 
         changeStreamEventConsumer.acceptChangeStreamEvent(new FinishPartitionEvent(partition));
     }
@@ -96,6 +98,10 @@ public class SpannerChangeStreamService {
                                ChangeStreamEventConsumer changeStreamEventConsumer)
             throws InterruptedException {
         for (final ChangeStreamEvent changeStreamEvent : events) {
+            if (changeStreamEvent instanceof ChildPartitionsEvent) {
+                ChildPartitionsEvent childPartitionsEvent = (ChildPartitionsEvent) changeStreamEvent;
+                LOGGER.info("Received child partition from partition {}:{}", partition.getToken(), childPartitionsEvent);
+            }
             LOGGER.debug("Received record from partition {}: {}", partition.getToken(), changeStreamEvent);
 
             changeStreamEventConsumer.acceptChangeStreamEvent(changeStreamEvent);
