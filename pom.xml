@@ -35,19 +35,43 @@
         <assembly.descriptor>connector-distribution-with-jsr310</assembly.descriptor>
     </properties>
 
+    <repositories>
+        <repository>
+            <id>oss</id>
+            <name>OSS Sonatype Nexus</name>
+            <url>https://oss.sonatype.org/content/repositories/snapshots</url>
+            <releases>
+                <enabled>true</enabled>
+                <updatePolicy>never</updatePolicy>
+            </releases>
+            <snapshots>
+                <enabled>true</enabled>
+                <updatePolicy>never</updatePolicy>
+            </snapshots>
+        </repository>
+    </repositories>
+
     <dependencyManagement>
         <dependencies>
 
             <!-- Debezium artifacts -->
             <dependency>
                 <groupId>io.debezium</groupId>
-                <artifactId>debezium-connector-spanner</artifactId>
-                <version>${project.version}</version>
+                <artifactId>debezium-core</artifactId>
+                <version>${version.debezium}</version>
             </dependency>
             <dependency>
                 <groupId>io.debezium</groupId>
-                <artifactId>debezium-core</artifactId>
+                <artifactId>debezium-embedded</artifactId>
                 <version>${version.debezium}</version>
+            </dependency>
+
+            <!-- Building -->
+            <dependency>
+                <groupId>io.debezium</groupId>
+                <artifactId>debezium-ide-configs</artifactId>
+                <version>${version.debezium}</version>
+                <scope>provided</scope>
             </dependency>
             <dependency>
                 <groupId>io.debezium</groupId>
@@ -57,13 +81,15 @@
             </dependency>
             <dependency>
                 <groupId>io.debezium</groupId>
-                <artifactId>debezium-api</artifactId>
+                <artifactId>debezium-assembly-descriptors</artifactId>
                 <version>${version.debezium}</version>
+                <scope>provided</scope>
             </dependency>
             <dependency>
                 <groupId>io.debezium</groupId>
-                <artifactId>debezium-embedded</artifactId>
+                <artifactId>debezium-revapi</artifactId>
                 <version>${version.debezium}</version>
+                <scope>provided</scope>
             </dependency>
 
             <!-- Google API -->
@@ -193,11 +219,6 @@
         <!-- Debezium artifacts -->
         <dependency>
             <groupId>io.debezium</groupId>
-            <artifactId>debezium-checkstyle</artifactId>
-            <scope>provided</scope>
-        </dependency>
-        <dependency>
-            <groupId>io.debezium</groupId>
             <artifactId>debezium-core</artifactId>
         </dependency>
 
@@ -241,6 +262,28 @@
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-api</artifactId>
+        </dependency>
+
+       <!-- Building -->
+        <dependency>
+            <groupId>io.debezium</groupId>
+            <artifactId>debezium-ide-configs</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.debezium</groupId>
+            <artifactId>debezium-checkstyle</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.debezium</groupId>
+            <artifactId>debezium-assembly-descriptors</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.debezium</groupId>
+            <artifactId>debezium-revapi</artifactId>
+            <scope>provided</scope>
         </dependency>
 
         <!-- Testing -->

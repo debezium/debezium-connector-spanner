@@ -5,3 +5,7 @@
 **/*.json
 **/out/*
 **/CmpIT.java
+.classpath
+.project
+.cache
+.settings/
