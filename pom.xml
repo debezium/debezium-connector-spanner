@@ -14,7 +14,7 @@
     <packaging>jar</packaging>
 
     <properties>
-        <version.debezium>2.1.0-SNAPSHOT</version.debezium>
+        <version.debezium>${project.version}</version.debezium>
         <google.cloud.spanner.version>6.25.5</google.cloud.spanner.version>
         <version.sketches-java>0.8.2</version.sketches-java>
         <version.google.protos>2.8.3</version.google.protos>
