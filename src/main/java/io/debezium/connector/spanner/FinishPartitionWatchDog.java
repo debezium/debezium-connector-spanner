@@ -60,6 +60,7 @@ public class FinishPartitionWatchDog {
             }
 
         }, "SpannerConnector-FinishingPartitionWatchDog");
+        this.thread.start();
     }
 
     public void stop() {
