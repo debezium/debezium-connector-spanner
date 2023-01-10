@@ -133,13 +133,13 @@ public class TaskPartitionGreedyLeaderRebalancer implements TaskPartitionRebalan
 
         List<PartitionState> partitions = filterDuplications(survivedTasks.values().stream()
                 .flatMap(taskState -> taskState.getSharedPartitions().stream()).collect(Collectors.toList()))
-                        .stream()
-                        .filter(partitionState -> !tokens.contains(partitionState.getToken()))
-                        .filter(partitionState -> !survivedTasks.containsKey(partitionState.getAssigneeTaskUid()))
-                        .map(partitionState -> partitionState.toBuilder()
-                                .assigneeTaskUid(leaderTaskState.getTaskUid())
-                                .build())
-                        .collect(Collectors.toList());
+                .stream()
+                .filter(partitionState -> !tokens.contains(partitionState.getToken()))
+                .filter(partitionState -> !survivedTasks.containsKey(partitionState.getAssigneeTaskUid()))
+                .map(partitionState -> partitionState.toBuilder()
+                        .assigneeTaskUid(leaderTaskState.getTaskUid())
+                        .build())
+                .collect(Collectors.toList());
 
         List<PartitionState> leaderPartitionList = new ArrayList<>(leaderTaskState.getPartitions());
         leaderPartitionList.addAll(partitions);

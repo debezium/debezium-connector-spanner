@@ -51,7 +51,7 @@ class ChildPartitionOperationTest {
     void doOperationReceiveChildPartitionAfterMergeFromParent2() {
         TaskSyncContext taskSyncContext = new ChildPartitionOperation(
                 List.of(buildPartition("n5", "parent2", Set.of("parent1", "parent2"))))
-                        .doOperation(buildTaskSyncContext2());
+                .doOperation(buildTaskSyncContext2());
 
         Assertions.assertEquals(1, taskSyncContext.getCurrentTaskState().getPartitions().size());
 
@@ -62,7 +62,7 @@ class ChildPartitionOperationTest {
     void doOperationReceiveChildPartitionAfterMergeFromParent1() {
         TaskSyncContext taskSyncContext = new ChildPartitionOperation(
                 List.of(buildPartition("n5", "parent1", Set.of("parent1", "parent2"))))
-                        .doOperation(buildTaskSyncContext2());
+                .doOperation(buildTaskSyncContext2());
 
         Assertions.assertEquals(2, taskSyncContext.getCurrentTaskState().getPartitions().size());
 
@@ -73,7 +73,7 @@ class ChildPartitionOperationTest {
     void doOperationReceiveChildPartitionAfterMergeFromInitialPartition() {
         TaskSyncContext taskSyncContext = new ChildPartitionOperation(
                 List.of(buildPartition("Parent0", null, Set.of())))
-                        .doOperation(buildEmptyTaskSyncContext());
+                .doOperation(buildEmptyTaskSyncContext());
 
         Assertions.assertEquals(1, taskSyncContext.getCurrentTaskState().getPartitions().size());
 

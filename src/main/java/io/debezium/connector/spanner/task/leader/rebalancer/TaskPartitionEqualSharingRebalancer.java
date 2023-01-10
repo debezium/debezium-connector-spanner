@@ -319,14 +319,14 @@ public class TaskPartitionEqualSharingRebalancer implements TaskPartitionRebalan
                 survivedTasks.values().stream()
                         .flatMap(taskState -> taskState.getSharedPartitions().stream())
                         .collect(Collectors.toList()))
-                                .stream()
-                                .filter(partitionState -> !tokens.contains(partitionState.getToken()))
-                                .filter(partitionState -> !survivedOwnedTokens.contains(partitionState.getToken()))
-                                .filter(
-                                        partitionState -> !survivedTasks.containsKey(partitionState.getAssigneeTaskUid()))
-                                .filter(
-                                        partitionState -> !leaderUid.equals(partitionState.getAssigneeTaskUid()))
-                                .collect(Collectors.toList());
+                .stream()
+                .filter(partitionState -> !tokens.contains(partitionState.getToken()))
+                .filter(partitionState -> !survivedOwnedTokens.contains(partitionState.getToken()))
+                .filter(
+                        partitionState -> !survivedTasks.containsKey(partitionState.getAssigneeTaskUid()))
+                .filter(
+                        partitionState -> !leaderUid.equals(partitionState.getAssigneeTaskUid()))
+                .collect(Collectors.toList());
 
         List<PartitionState> leaderPartitionList = new ArrayList<>(leaderTaskState.getPartitions());
         List<PartitionState> leaderSharedPartitionList = new ArrayList<>(leaderTaskState.getSharedPartitions());
