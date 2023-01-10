@@ -35,7 +35,7 @@ class KafkaSpannerTableSchemaTest {
         assertNull(
                 new KafkaSpannerTableSchema(id, keySchema, keyGenerator, envelopeSchema, new ConnectSchema(Schema.Type.INT8),
                         (Function<Mod, Struct>) mock(Function.class), (Function<Mod, Struct>) mock(Function.class))
-                                .getKeyStructFromMod(null));
+                        .getKeyStructFromMod(null));
     }
 
     @Test
@@ -64,7 +64,7 @@ class KafkaSpannerTableSchemaTest {
         assertNull(
                 (new KafkaSpannerTableSchema(id, keySchema, keyGenerator, envelopeSchema, new ConnectSchema(Schema.Type.INT8),
                         (Function<Mod, Struct>) mock(Function.class), (Function<Mod, Struct>) mock(Function.class)))
-                                .getOldValueStructFromMod(null));
+                        .getOldValueStructFromMod(null));
     }
 
     @Test
@@ -93,7 +93,7 @@ class KafkaSpannerTableSchemaTest {
         assertNull(
                 (new KafkaSpannerTableSchema(id, keySchema, keyGenerator, envelopeSchema, new ConnectSchema(Schema.Type.INT8),
                         (Function<Mod, Struct>) mock(Function.class), (Function<Mod, Struct>) mock(Function.class)))
-                                .getNewValueStructFromMod(null));
+                        .getNewValueStructFromMod(null));
     }
 
     @Test
