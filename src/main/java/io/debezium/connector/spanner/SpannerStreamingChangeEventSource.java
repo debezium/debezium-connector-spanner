@@ -48,7 +48,7 @@ public class SpannerStreamingChangeEventSource implements CommittingRecordsStrea
 
     private static final StuckPartitionStrategy STUCK_PARTITION_STRATEGY = StuckPartitionStrategy.ESCALATE;
 
-    private static final Duration FINISHING_PARTITION_TIMEOUT = Duration.ofSeconds(60);
+    private static final Duration FINISHING_PARTITION_TIMEOUT = Duration.ofSeconds(300);
 
     private final FinishPartitionStrategy finishPartitionStrategy;
 
@@ -290,6 +290,7 @@ public class SpannerStreamingChangeEventSource implements CommittingRecordsStrea
                 continue;
             }
 
+            LOGGER.debug("Committing record {} in StreamingChangeEventSource for token {}", recordUid, token);
             this.finishingPartitionManager.commitRecord(token, recordUid);
         }
     }

@@ -39,7 +39,9 @@ public class FinishPartitionWatchDog {
                 List<String> tokens = new ArrayList<>();
 
                 partition.forEach((token, instant) -> {
-                    if (instant.isAfter(instant.plus(timeout))) {
+                    Instant now = Instant.now();
+                    LOGGER.info("Partitions awaiting finish: {}", tokens);
+                    if (now.isAfter(instant.plus(timeout))) {
                         tokens.add(token);
                     }
                 });
@@ -58,6 +60,7 @@ public class FinishPartitionWatchDog {
             }
 
         }, "SpannerConnector-FinishingPartitionWatchDog");
+        this.thread.start();
     }
 
     public void stop() {

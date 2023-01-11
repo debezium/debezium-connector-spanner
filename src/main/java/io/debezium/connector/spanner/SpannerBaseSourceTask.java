@@ -11,6 +11,8 @@ import java.util.List;
 
 import org.apache.kafka.clients.producer.RecordMetadata;
 import org.apache.kafka.connect.source.SourceRecord;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import io.debezium.config.Field;
 import io.debezium.connector.common.BaseSourceTask;
@@ -25,6 +27,8 @@ import io.debezium.util.Collect;
 public abstract class SpannerBaseSourceTask
         extends BaseSourceTask<SpannerPartition, SpannerOffsetContext> {
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(SpannerBaseSourceTask.class);
+
     protected SpannerChangeEventSourceCoordinator coordinator;
 
     private final List<SourceRecord> records = new LinkedList<>();
@@ -35,6 +39,11 @@ public abstract class SpannerBaseSourceTask
 
         synchronized (this) {
             records.add(sourceRecord);
+            String token = SourceRecordUtils.extractToken(sourceRecord);
+            String recordUid = SourceRecordUtils.extractRecordUid(sourceRecord);
+            if (token != null && recordUid != null) {
+                LOGGER.debug("Committing record {} in SpannerBaseSourceTask for token {}", recordUid, token);
+            }
         }
 
         if (metadata != null) {
@@ -55,6 +64,16 @@ public abstract class SpannerBaseSourceTask
         }
         synchronized (this) {
             coordinator.commitRecords(records);
+            for (SourceRecord sourceRecord : records) {
+                String token = SourceRecordUtils.extractToken(sourceRecord);
+                String recordUid = SourceRecordUtils.extractRecordUid(sourceRecord);
+
+                if (token == null || recordUid == null) {
+                    continue;
+                }
+
+                LOGGER.debug("Committed record {} in coordinator for token {}", recordUid, token);
+            }
             records.clear();
         }
     }
