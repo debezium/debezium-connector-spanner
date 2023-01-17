@@ -8,6 +8,7 @@ package io.debezium.connector.spanner.processor;
 import static org.slf4j.LoggerFactory.getLogger;
 
 import java.time.Instant;
+import java.util.Optional;
 import java.util.UUID;
 
 import org.apache.kafka.connect.data.Struct;
@@ -37,9 +38,7 @@ import io.debezium.schema.DatabaseSchema;
 import io.debezium.spi.topic.TopicNamingStrategy;
 import io.debezium.util.SchemaNameAdjuster;
 
-/**
- * Spanner dispatcher for data change and schema change events.
- */
+/** Spanner dispatcher for data change and schema change events. */
 public class SpannerEventDispatcher extends EventDispatcher<SpannerPartition, TableId> {
 
     private static final Logger LOGGER = getLogger(SpannerEventDispatcher.class);
@@ -55,7 +54,8 @@ public class SpannerEventDispatcher extends EventDispatcher<SpannerPartition, Ta
 
     private final KafkaPartitionInfoProvider kafkaPartitionInfoProvider;
 
-    public SpannerEventDispatcher(SpannerConnectorConfig connectorConfig,
+    public SpannerEventDispatcher(
+                                  SpannerConnectorConfig connectorConfig,
                                   TopicNamingStrategy<TableId> topicNamingStrategy,
                                   DatabaseSchema<TableId> schema,
                                   ChangeEventQueue<DataChangeEvent> queue,
@@ -67,8 +67,16 @@ public class SpannerEventDispatcher extends EventDispatcher<SpannerPartition, Ta
                                   SchemaRegistry schemaRegistry,
                                   SourceInfoFactory sourceInfoFactory,
                                   KafkaPartitionInfoProvider kafkaPartitionInfoProvider) {
-        super(connectorConfig, topicNamingStrategy, schema, queue, filter, changeEventCreator, metadataProvider,
-                heartbeatFactory.createHeartbeat(), schemaNameAdjuster);
+        super(
+                connectorConfig,
+                topicNamingStrategy,
+                schema,
+                queue,
+                filter,
+                changeEventCreator,
+                metadataProvider,
+                heartbeatFactory.createHeartbeat(),
+                schemaNameAdjuster);
         this.connectorConfig = connectorConfig;
         this.queue = queue;
         this.topicNamingStrategy = topicNamingStrategy;
@@ -89,7 +97,8 @@ public class SpannerEventDispatcher extends EventDispatcher<SpannerPartition, Ta
 
                 Struct sourceStruct = sourceInfoFactory.getSourceInfoForLowWatermarkStamp(tableId).struct();
 
-                for (int partition : kafkaPartitionInfoProvider.getPartitions(topicName)) {
+                int numPartitions = connectorConfig.getTopicNumPartitions();
+                for (int partition : kafkaPartitionInfoProvider.getPartitions(topicName, Optional.of(numPartitions))) {
                     SourceRecord sourceRecord = emitSourceRecord(topicName, dataCollectionSchema, partition, sourceStruct);
                     LOGGER.debug("Build low watermark stamp record {} ", sourceRecord);
 
@@ -105,8 +114,8 @@ public class SpannerEventDispatcher extends EventDispatcher<SpannerPartition, Ta
             return false;
         }
         catch (Exception ex) {
-            if (CommonConnectorConfig.EventProcessingFailureHandlingMode.FAIL
-                    .equals(connectorConfig.getEventProcessingFailureHandlingMode())) {
+            if (CommonConnectorConfig.EventProcessingFailureHandlingMode.FAIL.equals(
+                    connectorConfig.getEventProcessingFailureHandlingMode())) {
                 throw new SpannerConnectorException("Error while publishing watermark stamp", ex);
             }
             LOGGER.warn("Error while publishing watermark stamp");
@@ -116,12 +125,16 @@ public class SpannerEventDispatcher extends EventDispatcher<SpannerPartition, Ta
     }
 
     @VisibleForTesting
-    SourceRecord emitSourceRecord(String topicName, DataCollectionSchema dataCollectionSchema,
-                                  int partition, Struct sourceStruct) {
+    SourceRecord emitSourceRecord(
+                                  String topicName,
+                                  DataCollectionSchema dataCollectionSchema,
+                                  int partition,
+                                  Struct sourceStruct) {
 
         Struct envelope = buildMessage(dataCollectionSchema.getEnvelopeSchema(), sourceStruct);
 
-        return new SourceRecord(null,
+        return new SourceRecord(
+                null,
                 null,
                 topicName,
                 partition,
@@ -149,5 +162,4 @@ public class SpannerEventDispatcher extends EventDispatcher<SpannerPartition, Ta
     @Override
     public void close() {
     }
-
 }

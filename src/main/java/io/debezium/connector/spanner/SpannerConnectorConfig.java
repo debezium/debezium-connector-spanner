@@ -26,9 +26,7 @@ import io.debezium.connector.SourceInfoStructMaker;
 import io.debezium.connector.spanner.config.BaseSpannerConnectorConfig;
 import io.debezium.connector.spanner.context.source.SourceInfo;
 
-/**
- * Configuration API for the Spanner connector
- */
+/** Configuration API for the Spanner connector */
 public class SpannerConnectorConfig extends BaseSpannerConnectorConfig {
     private static final Logger LOGGER = LoggerFactory.getLogger(SpannerConnectorConfig.class);
 
@@ -85,10 +83,12 @@ public class SpannerConnectorConfig extends BaseSpannerConnectorConfig {
 
         properties.putAll(props);
 
-        Map<String, String> spannerKafkaProps = this.getConfig().asMap().entrySet()
-                .stream()
+        Map<String, String> spannerKafkaProps = this.getConfig().asMap().entrySet().stream()
                 .filter(e -> e.getKey().startsWith(KAFKA_INTERNAL_CLIENT_CONFIG_PREFIX))
-                .map(e -> new AbstractMap.SimpleEntry<>(substringAfter(e.getKey(), KAFKA_INTERNAL_CLIENT_CONFIG_PREFIX), e.getValue()))
+                .map(
+                        e -> new AbstractMap.SimpleEntry<>(
+                                substringAfter(e.getKey(), KAFKA_INTERNAL_CLIENT_CONFIG_PREFIX),
+                                e.getValue()))
                 .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
 
         if (!spannerKafkaProps.isEmpty()) {
@@ -136,7 +136,8 @@ public class SpannerConnectorConfig extends BaseSpannerConnectorConfig {
     }
 
     public int queueCapacity() {
-        return getConfig().getInteger(STREAM_EVENT_QUEUE_CAPACITY, (int) STREAM_EVENT_QUEUE_CAPACITY.defaultValue());
+        return getConfig()
+                .getInteger(STREAM_EVENT_QUEUE_CAPACITY, (int) STREAM_EVENT_QUEUE_CAPACITY.defaultValue());
     }
 
     public String gcpSpannerCredentialsJson() {
@@ -254,8 +255,10 @@ public class SpannerConnectorConfig extends BaseSpannerConnectorConfig {
     }
 
     public long getLowWatermarkUpdatePeriodMs() {
-        return getConfig().getLong(LOW_WATERMARK_UPDATE_PERIOD_MS_FIELD,
-                (Long) LOW_WATERMARK_UPDATE_PERIOD_MS_FIELD.defaultValue());
+        return getConfig()
+                .getLong(
+                        LOW_WATERMARK_UPDATE_PERIOD_MS_FIELD,
+                        (Long) LOW_WATERMARK_UPDATE_PERIOD_MS_FIELD.defaultValue());
     }
 
     public boolean isScalerMonitorEnabled() {
@@ -271,8 +274,10 @@ public class SpannerConnectorConfig extends BaseSpannerConnectorConfig {
     }
 
     public int taskStateChangeEventQueueCapacity() {
-        return getConfig().getInteger(TASK_STATE_CHANGE_EVENT_QUEUE_CAPACITY,
-                (int) TASK_STATE_CHANGE_EVENT_QUEUE_CAPACITY.defaultValue());
+        return getConfig()
+                .getInteger(
+                        TASK_STATE_CHANGE_EVENT_QUEUE_CAPACITY,
+                        (int) TASK_STATE_CHANGE_EVENT_QUEUE_CAPACITY.defaultValue());
     }
 
     public Duration percentageMetricsClearInterval() {
@@ -285,5 +290,9 @@ public class SpannerConnectorConfig extends BaseSpannerConnectorConfig {
 
     public long failOverloadedTaskInterval() {
         return getConfig().getLong(TASKS_FAIL_OVERLOADED_CHECK_INTERVAL);
+    }
+
+    public int getTopicNumPartitions() {
+        return getConfig().getInteger(TOPIC_DEFAULT_AUTO_CREATION_PARTITIONS_FIELD);
     }
 }

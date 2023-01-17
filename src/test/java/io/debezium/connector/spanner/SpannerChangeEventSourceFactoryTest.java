@@ -24,8 +24,7 @@ class SpannerChangeEventSourceFactoryTest {
 
     @Test
     void testGetSnapshotChangeEventSource() {
-        SpannerChangeEventSourceFactory spannerChangeEventSourceFactory = new SpannerChangeEventSourceFactory(
-                null, null, null, null, null, null, null, null);
+        SpannerChangeEventSourceFactory spannerChangeEventSourceFactory = new SpannerChangeEventSourceFactory(null, null, null, null, null, null, null, null);
 
         assertNotNull(spannerChangeEventSourceFactory.getSnapshotChangeEventSource(null));
     }
@@ -40,7 +39,14 @@ class SpannerChangeEventSourceFactoryTest {
         SpannerMeter spannerMeter = new SpannerMeter(new SpannerConnectorTask(), connectorConfig, null, null);
 
         SpannerChangeEventSourceFactory spannerChangeEventSourceFactory = new SpannerChangeEventSourceFactory(
-                connectorConfig, null, null, null, spannerMeter, null, null, new SynchronizedPartitionManager(null));
+                connectorConfig,
+                null,
+                null,
+                null,
+                spannerMeter,
+                null,
+                null,
+                new SynchronizedPartitionManager(null));
         assertNotNull(spannerChangeEventSourceFactory.getStreamingChangeEventSource());
     }
 }

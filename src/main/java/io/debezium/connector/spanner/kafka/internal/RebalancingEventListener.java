@@ -8,6 +8,7 @@ package io.debezium.connector.spanner.kafka.internal;
 import static org.slf4j.LoggerFactory.getLogger;
 
 import java.time.Duration;
+import java.time.Instant;
 import java.util.Collection;
 
 import org.apache.kafka.clients.consumer.Consumer;
@@ -23,10 +24,8 @@ import io.debezium.connector.spanner.task.utils.ResettableDelayedAction;
 import io.debezium.function.BlockingConsumer;
 
 /**
- * Listens for Rebalance Event from the Rebalance-topic,
- * propagates information about it: Member ID, Generation ID,
- * is current task a Leader or not
- * further for processing
+ * Listens for Rebalance Event from the Rebalance-topic, propagates information about it: Member ID,
+ * Generation ID, is current task a Leader or not further for processing
  */
 public class RebalancingEventListener {
 
@@ -51,7 +50,10 @@ public class RebalancingEventListener {
 
     private final SpannerConnectorTask task;
 
-    public RebalancingEventListener(SpannerConnectorTask task, String consumerGroup, String topic,
+    public RebalancingEventListener(
+                                    SpannerConnectorTask task,
+                                    String consumerGroup,
+                                    String topic,
                                     Duration rebalancingTaskWaitingTimeout,
                                     RebalancingConsumerFactory<?, ?> consumerFactory,
                                     java.util.function.Consumer<RuntimeException> errorHandler) {
@@ -68,70 +70,87 @@ public class RebalancingEventListener {
 
     public void listen(BlockingConsumer<RebalanceEventMetadata> action) {
         this.rebalancingAction = action;
-        this.consumer = consumerFactory.createSubscribeConsumer(consumerGroup, topic, new ConsumerRebalanceListener() {
-            @Override
-            public void onPartitionsRevoked(Collection<TopicPartition> partitions) {
-                // not used
-            }
-
-            @Override
-            public void onPartitionsAssigned(Collection<TopicPartition> partitions) {
-
-                LOGGER.info("Task {} - Rebalance happened", task.getTaskUid());
-
-                ConsumerGroupMetadata meta = consumer.groupMetadata();
-                lastRebalanceEventMetadata = new RebalanceEventMetadata(meta.memberId(), meta.generationId(), isLeader(partitions));
-
-                LOGGER.info("Task {} - Rebalance: Waiting for other tasks to connect", task.getTaskUid());
-                resettableDelayedAction.set(() -> {
-                    LOGGER.info("Task {} -Rebalance finished", task.getTaskUid());
-
-                    try {
-                        rebalancingAction.accept(lastRebalanceEventMetadata);
+        this.consumer = consumerFactory.createSubscribeConsumer(
+                consumerGroup,
+                topic,
+                new ConsumerRebalanceListener() {
+                    @Override
+                    public void onPartitionsRevoked(Collection<TopicPartition> partitions) {
+                        // not used
                     }
-                    catch (InterruptedException ex) {
-                        Thread.currentThread().interrupt();
+
+                    @Override
+                    public void onPartitionsAssigned(Collection<TopicPartition> partitions) {
+
+                        LOGGER.info("Task {} - Rebalance happened", task.getTaskUid());
+
+                        ConsumerGroupMetadata meta = consumer.groupMetadata();
+                        lastRebalanceEventMetadata = new RebalanceEventMetadata(
+                                meta.memberId(), meta.generationId(), isLeader(partitions));
+
+                        LOGGER.info(
+                                "Task {} - Rebalance: Waiting for other tasks to connect", task.getTaskUid());
+                        resettableDelayedAction.set(
+                                () -> {
+                                    LOGGER.info("Task {} -Rebalance finished", task.getTaskUid());
+
+                                    try {
+                                        rebalancingAction.accept(lastRebalanceEventMetadata);
+                                    }
+                                    catch (InterruptedException ex) {
+                                        Thread.currentThread().interrupt();
+                                    }
+                                });
+                    }
+
+                    @Override
+                    public void onPartitionsLost(Collection<TopicPartition> partitions) {
+                        // not used
                     }
                 });
-            }
 
-            @Override
-            public void onPartitionsLost(Collection<TopicPartition> partitions) {
-                // not used
-            }
-        });
-
-        thread = new Thread(() -> {
-            try {
-                long commitOffsetStart = System.currentTimeMillis();
-                while (!Thread.currentThread().isInterrupted()) {
+        thread = new Thread(
+                () -> {
                     try {
-                        consumer.poll(pollDuration);
+                        long commitOffsetStart = System.currentTimeMillis();
+                        Instant lastUpdatedTime = Instant.now();
+                        while (!Thread.currentThread().isInterrupted()) {
+                            try {
+                                consumer.poll(pollDuration);
 
-                        if (commitOffsetStart + commitOffsetsInterval < System.currentTimeMillis()) {
-                            consumer.commitSync(commitOffsetsTimeout);
-                            commitOffsetStart = System.currentTimeMillis();
+                                if (commitOffsetStart + commitOffsetsInterval < System.currentTimeMillis()) {
+                                    consumer.commitSync(commitOffsetsTimeout);
+                                    commitOffsetStart = System.currentTimeMillis();
+                                }
+                                if (Instant.now().isAfter(lastUpdatedTime.plus(Duration.ofSeconds(600)))) {
+                                    LOGGER.info(
+                                            "Task Uid {} is still listening to RebalanceEventListener",
+                                            this.task.getTaskUid());
+                                    lastUpdatedTime = Instant.now();
+                                }
+                            }
+                            catch (org.apache.kafka.common.errors.InterruptException e) {
+                                return;
+                            }
+                        }
+
+                    }
+                    finally {
+                        try {
+                            consumer.unsubscribe();
+                            consumer.close();
+                        }
+                        catch (org.apache.kafka.common.errors.InterruptException e) {
                         }
                     }
-                    catch (org.apache.kafka.common.errors.InterruptException e) {
-                        return;
-                    }
-                }
+                },
+                "SpannerConnector-RebalancingEventListener");
 
-            }
-            finally {
-                try {
-                    consumer.unsubscribe();
-                    consumer.close();
-                }
-                catch (org.apache.kafka.common.errors.InterruptException e) {
-                }
-            }
-        }, "SpannerConnector-RebalancingEventListener");
-
-        thread.setUncaughtExceptionHandler((t, ex) -> {
-            errorHandler.accept(new SpannerConnectorException("Error during poll from the Rebalance Topic", ex));
-        });
+        thread.setUncaughtExceptionHandler(
+                (t, ex) -> {
+                    errorHandler.accept(
+                            new SpannerConnectorException("Error during poll from the Rebalance Topic", ex));
+                });
 
         thread.start();
     }
@@ -153,5 +172,4 @@ public class RebalancingEventListener {
         }
         this.thread = null;
     }
-
 }

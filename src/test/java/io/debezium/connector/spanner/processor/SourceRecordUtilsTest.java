@@ -25,16 +25,28 @@ class SourceRecordUtilsTest {
     void testExtractRecordUid() {
         HashMap<String, Object> sourcePartition = new HashMap<>();
         HashMap<String, Object> sourceOffset = new HashMap<>();
-        assertNull(SourceRecordUtils.extractRecordUid(
-                new SourceRecord(sourcePartition, sourceOffset, "Topic", new ConnectSchema(Schema.Type.INT8), "Value")));
+        assertNull(
+                SourceRecordUtils.extractRecordUid(
+                        new SourceRecord(
+                                sourcePartition,
+                                sourceOffset,
+                                "Topic",
+                                new ConnectSchema(Schema.Type.INT8),
+                                "Value")));
     }
 
     @Test
     void testIsDataChangeRecord() {
         HashMap<String, Object> sourcePartition = new HashMap<>();
         HashMap<String, Object> sourceOffset = new HashMap<>();
-        assertFalse(SourceRecordUtils.isDataChangeRecord(
-                new SourceRecord(sourcePartition, sourceOffset, "Topic", new ConnectSchema(Schema.Type.INT8), "Value")));
+        assertFalse(
+                SourceRecordUtils.isDataChangeRecord(
+                        new SourceRecord(
+                                sourcePartition,
+                                sourceOffset,
+                                "Topic",
+                                new ConnectSchema(Schema.Type.INT8),
+                                "Value")));
     }
 
     @Test
@@ -46,9 +58,17 @@ class SourceRecordUtilsTest {
     void testAddEmitTimestamp() {
         HashMap<String, Object> sourcePartition = new HashMap<>();
         HashMap<String, Object> sourceOffset = new HashMap<>();
-        assertFalse(SourceRecordUtils.addEmitTimestamp(
-                new SourceRecord(sourcePartition, sourceOffset, "Topic", new ConnectSchema(Schema.Type.INT8), "Value"), 10L)
-                .headers().isEmpty());
+        assertFalse(
+                SourceRecordUtils.addEmitTimestamp(
+                        new SourceRecord(
+                                sourcePartition,
+                                sourceOffset,
+                                "Topic",
+                                new ConnectSchema(Schema.Type.INT8),
+                                "Value"),
+                        10L)
+                        .headers()
+                        .isEmpty());
     }
 
     @Test
@@ -56,9 +76,14 @@ class SourceRecordUtilsTest {
         HashMap<String, Object> sourcePartition = new HashMap<>();
         HashMap<String, Object> sourceOffset = new HashMap<>();
         assertFalse(
-                SourceRecordUtils
-                        .addPublishTimestamp(new SourceRecord(sourcePartition, sourceOffset, "Topic",
-                                new ConnectSchema(Schema.Type.INT8), "Value"), 10L)
+                SourceRecordUtils.addPublishTimestamp(
+                        new SourceRecord(
+                                sourcePartition,
+                                sourceOffset,
+                                "Topic",
+                                new ConnectSchema(Schema.Type.INT8),
+                                "Value"),
+                        10L)
                         .headers()
                         .isEmpty());
     }
@@ -68,9 +93,14 @@ class SourceRecordUtilsTest {
         HashMap<String, Object> sourcePartition = new HashMap<>();
         HashMap<String, Object> sourceOffset = new HashMap<>();
         assertFalse(
-                SourceRecordUtils
-                        .addPollTimestamp(new SourceRecord(sourcePartition, sourceOffset, "Topic",
-                                new ConnectSchema(Schema.Type.INT8), "Value"), 10L)
+                SourceRecordUtils.addPollTimestamp(
+                        new SourceRecord(
+                                sourcePartition,
+                                sourceOffset,
+                                "Topic",
+                                new ConnectSchema(Schema.Type.INT8),
+                                "Value"),
+                        10L)
                         .headers()
                         .isEmpty());
     }
@@ -79,8 +109,14 @@ class SourceRecordUtilsTest {
     void testExtractToken() {
         HashMap<String, Object> sourcePartition = new HashMap<>();
         HashMap<String, Object> sourceOffset = new HashMap<>();
-        assertNull(SourceRecordUtils.extractToken(
-                new SourceRecord(sourcePartition, sourceOffset, "Topic", new ConnectSchema(Schema.Type.INT8), "Value")));
+        assertNull(
+                SourceRecordUtils.extractToken(
+                        new SourceRecord(
+                                sourcePartition,
+                                sourceOffset,
+                                "Topic",
+                                new ConnectSchema(Schema.Type.INT8),
+                                "Value")));
     }
 
     @Test

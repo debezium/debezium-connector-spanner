@@ -7,7 +7,6 @@ package io.debezium.connector.spanner;
 
 import java.time.Duration;
 import java.util.List;
-import java.util.UUID;
 import java.util.stream.Collectors;
 
 import org.apache.kafka.connect.source.SourceRecord;
@@ -39,16 +38,15 @@ import io.debezium.connector.spanner.processor.SpannerEventDispatcher;
 import io.debezium.pipeline.ErrorHandler;
 import io.debezium.util.Clock;
 
-/**
- * Processes all types of Spanner Stream Events
- */
-public class SpannerStreamingChangeEventSource implements CommittingRecordsStreamingChangeEventSource<SpannerPartition, SpannerOffsetContext> {
+/** Processes all types of Spanner Stream Events */
+public class SpannerStreamingChangeEventSource
+        implements CommittingRecordsStreamingChangeEventSource<SpannerPartition, SpannerOffsetContext> {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(SpannerStreamingChangeEventSource.class);
 
-    private static final StuckPartitionStrategy STUCK_PARTITION_STRATEGY = StuckPartitionStrategy.ESCALATE;
-
     private static final Duration FINISHING_PARTITION_TIMEOUT = Duration.ofSeconds(60);
+
+    private static final StuckPartitionStrategy STUCK_PARTITION_STRATEGY = StuckPartitionStrategy.ESCALATE;
 
     private final FinishPartitionStrategy finishPartitionStrategy;
 
@@ -74,7 +72,8 @@ public class SpannerStreamingChangeEventSource implements CommittingRecordsStrea
 
     private volatile Thread thread;
 
-    public SpannerStreamingChangeEventSource(ErrorHandler errorHandler,
+    public SpannerStreamingChangeEventSource(
+                                             ErrorHandler errorHandler,
                                              ChangeStream stream,
                                              StreamEventQueue eventQueue,
                                              MetricsEventPublisher metricsEventPublisher,
@@ -92,9 +91,12 @@ public class SpannerStreamingChangeEventSource implements CommittingRecordsStrea
         this.schemaRegistry = schemaRegistry;
         this.spannerEventDispatcher = spannerEventDispatcher;
         this.finishingPartitionManager = new FinishingPartitionManager(partitionManager::updateToFinished);
-        this.finishPartitionWatchDog = new FinishPartitionWatchDog(finishingPartitionManager, FINISHING_PARTITION_TIMEOUT, tokens -> {
-            processFailure(new FinishingPartitionTimeout(tokens));
-        });
+        this.finishPartitionWatchDog = new FinishPartitionWatchDog(
+                finishingPartitionManager,
+                FINISHING_PARTITION_TIMEOUT,
+                tokens -> {
+                    processFailure(new FinishingPartitionTimeout(tokens));
+                });
 
         this.finishPartitionStrategy = finishingAfterCommit
                 ? FinishPartitionStrategy.AFTER_COMMIT
@@ -102,7 +104,8 @@ public class SpannerStreamingChangeEventSource implements CommittingRecordsStrea
     }
 
     @Override
-    public void execute(ChangeEventSourceContext context,
+    public void execute(
+                        ChangeEventSourceContext context,
                         SpannerPartition partition,
                         SpannerOffsetContext offsetContext)
             throws InterruptedException {
@@ -112,38 +115,44 @@ public class SpannerStreamingChangeEventSource implements CommittingRecordsStrea
 
             startProcessing(context);
 
-            stream.run(context::isRunning, eventQueue::put, new PartitionEventListener() {
-                @Override
-                public void onRun(Partition partition) throws InterruptedException {
-                    finishingPartitionManager.registerPartition(partition.getToken());
-                    partitionManager.updateToRunning(partition.getToken());
-                }
+            stream.run(
+                    context::isRunning,
+                    eventQueue::put,
+                    new PartitionEventListener() {
+                        @Override
+                        public void onRun(Partition partition) throws InterruptedException {
+                            finishingPartitionManager.registerPartition(partition.getToken());
+                            partitionManager.updateToRunning(partition.getToken());
+                        }
 
-                @Override
-                public void onFinish(Partition partition) {
-                    LOGGER.info("Partition onFinish: {}", partition.getToken());
-                }
+                        @Override
+                        public void onFinish(Partition partition) {
+                            LOGGER.info("Partition onFinish: {}", partition.getToken());
+                        }
 
-                @Override
-                public void onException(Partition partition, Exception exception) throws InterruptedException {
-                    LOGGER.error("Try to stream again from partition {} after exception {}", partition.getToken(),
-                            exception.getMessage());
+                        @Override
+                        public void onException(Partition partition, Exception exception)
+                                throws InterruptedException {
+                            LOGGER.error(
+                                    "Try to stream again from partition {} after exception {}",
+                                    partition.getToken(),
+                                    exception.getMessage());
 
-                    partitionManager.updateToReadyForStreaming(partition.getToken());
-                }
+                            partitionManager.updateToReadyForStreaming(partition.getToken());
+                        }
 
-                @Override
-                public boolean onStuckPartition(String token) throws InterruptedException {
-                    if (STUCK_PARTITION_STRATEGY.equals(StuckPartitionStrategy.REPEAT_STREAMING)) {
-                        LOGGER.warn("Try to requery partition {}", token);
-                        partitionManager.updateToReadyForStreaming(token);
-                    }
-                    else if (STUCK_PARTITION_STRATEGY.equals(StuckPartitionStrategy.ESCALATE)) {
-                        return true;
-                    }
-                    return false;
-                }
-            });
+                        @Override
+                        public boolean onStuckPartition(String token) throws InterruptedException {
+                            if (STUCK_PARTITION_STRATEGY.equals(StuckPartitionStrategy.REPEAT_STREAMING)) {
+                                LOGGER.warn("Try to requery partition {}", token);
+                                partitionManager.updateToReadyForStreaming(token);
+                            }
+                            else if (STUCK_PARTITION_STRATEGY.equals(StuckPartitionStrategy.ESCALATE)) {
+                                return true;
+                            }
+                            return false;
+                        }
+                    });
 
         }
         catch (InterruptedException ex) {
@@ -155,60 +164,64 @@ public class SpannerStreamingChangeEventSource implements CommittingRecordsStrea
         finally {
             LOGGER.info("Stopping streaming...");
 
-            finishPartitionWatchDog.stop();
-
             if (thread != null) {
                 thread.interrupt();
             }
         }
-
     }
 
     private void startProcessing(ChangeEventSourceContext context) {
-        thread = new Thread(() -> {
-            try {
-                while (context.isRunning()) {
-                    ChangeStreamEvent event = eventQueue.take();
+        thread = new Thread(
+                () -> {
+                    try {
+                        while (context.isRunning()) {
+                            ChangeStreamEvent event = eventQueue.take();
 
-                    if (event instanceof DataChangeEvent) {
+                            if (event instanceof DataChangeEvent) {
 
-                        DataChangeEvent dataChangeEvent = (DataChangeEvent) event;
+                                DataChangeEvent dataChangeEvent = (DataChangeEvent) event;
 
-                        processDataChangeEvent(dataChangeEvent);
-                    }
-                    else if (event instanceof HeartbeatEvent) {
+                                processDataChangeEvent(dataChangeEvent);
+                            }
+                            else if (event instanceof HeartbeatEvent) {
 
-                        HeartbeatEvent heartbeatEvent = (HeartbeatEvent) event;
+                                HeartbeatEvent heartbeatEvent = (HeartbeatEvent) event;
 
-                        processHeartBeatEvent(heartbeatEvent);
-                    }
-                    else if (event instanceof ChildPartitionsEvent) {
+                                processHeartBeatEvent(heartbeatEvent);
+                            }
+                            else if (event instanceof ChildPartitionsEvent) {
 
-                        ChildPartitionsEvent childPartitionsEvent = (ChildPartitionsEvent) event;
+                                ChildPartitionsEvent childPartitionsEvent = (ChildPartitionsEvent) event;
 
-                        processChildPartitionsEvent(childPartitionsEvent);
-                    }
-                    else if (event instanceof FinishPartitionEvent) {
-                        LOGGER.info("Received FinishPartitionEvent for partition {}", event.getMetadata().getPartitionToken());
-                        if (finishPartitionStrategy.equals(FinishPartitionStrategy.AFTER_COMMIT)) {
-                            this.finishingPartitionManager.onPartitionFinishEvent(event.getMetadata().getPartitionToken());
+                                processChildPartitionsEvent(childPartitionsEvent);
+                            }
+                            else if (event instanceof FinishPartitionEvent) {
+                                LOGGER.info(
+                                        "Received FinishPartitionEvent for partition {}",
+                                        event.getMetadata().getPartitionToken());
+                                if (finishPartitionStrategy.equals(FinishPartitionStrategy.AFTER_COMMIT)) {
+                                    this.finishingPartitionManager.onPartitionFinishEvent(
+                                            event.getMetadata().getPartitionToken());
+                                }
+                                else if (finishPartitionStrategy.equals(
+                                        FinishPartitionStrategy.AFTER_STREAMING_FINISH)) {
+                                    finishingPartitionManager.forceFinish(
+                                            event.getMetadata().getPartitionToken());
+                                }
+                            }
+                            else {
+                                // ignore event
+                            }
                         }
-                        else if (finishPartitionStrategy.equals(FinishPartitionStrategy.AFTER_STREAMING_FINISH)) {
-                            finishingPartitionManager.forceFinish(event.getMetadata().getPartitionToken());
-                        }
                     }
-                    else {
-                        // ignore event
+                    catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
                     }
-                }
-            }
-            catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
-            catch (Exception ex) {
-                processFailure(ex);
-            }
-        }, "SpannerConnector-SpannerStreamingChangeEventSource");
+                    catch (Exception ex) {
+                        processFailure(ex);
+                    }
+                },
+                "SpannerConnector-SpannerStreamingChangeEventSource");
 
         thread.start();
     }
@@ -222,24 +235,30 @@ public class SpannerStreamingChangeEventSource implements CommittingRecordsStrea
         SpannerPartition partition = new SpannerPartition(event.getPartitionToken());
 
         for (Mod mod : event.getMods()) {
-            String recordUid = UUID.randomUUID().toString();
-
             SpannerOffsetContext offsetContext = offsetContextFactory.getOffsetContextFromDataChangeEvent(mod.getModNumber(), event);
 
-            finishingPartitionManager.newRecord(partition.getValue(), recordUid);
-
-            boolean dispatched = spannerEventDispatcher.dispatchDataChangeEvent(partition, tableId,
-                    new SpannerChangeRecordEmitter(recordUid, event.getModType(), mod, partition, offsetContext,
-                            Clock.SYSTEM));
+            String recordUid = this.finishingPartitionManager.newRecord(event.getPartitionToken());
+            boolean dispatched = spannerEventDispatcher.dispatchDataChangeEvent(
+                    partition,
+                    tableId,
+                    new SpannerChangeRecordEmitter(
+                            recordUid, event.getModType(), mod, partition, offsetContext, Clock.SYSTEM));
             if (dispatched) {
-                LOGGER.debug("DataChangeEvent has been dispatched form table {} with modification: {}, offset{}, event: {}", tableId.getTableName(), mod,
-                        offsetContext.getOffset(), event);
+                LOGGER.debug(
+                        "DataChangeEvent has been dispatched form table {} with modification: {}, offset{},"
+                                + " event: {}",
+                        tableId.getTableName(),
+                        mod,
+                        offsetContext.getOffset(),
+                        event);
             }
             else {
-                LOGGER.info("DataChangeEvent has not been dispatched form table {} with modification: {}", tableId.getTableName(), mod);
+                LOGGER.info(
+                        "DataChangeEvent has not been dispatched form table {} with modification: {}",
+                        tableId.getTableName(),
+                        mod);
             }
         }
-
     }
 
     private void processHeartBeatEvent(HeartbeatEvent event) throws InterruptedException {
@@ -249,26 +268,34 @@ public class SpannerStreamingChangeEventSource implements CommittingRecordsStrea
 
         spannerEventDispatcher.alwaysDispatchHeartbeatEvent(partition, offsetContext);
 
-        LOGGER.debug("Dispatching heartbeat for event {} with partition {} and offset {}", event, partition, offsetContext.getOffset());
+        LOGGER.debug(
+                "Dispatching heartbeat for event {} with partition {} and offset {}",
+                event,
+                partition,
+                offsetContext.getOffset());
     }
 
     private void processChildPartitionsEvent(ChildPartitionsEvent event) throws InterruptedException {
         LOGGER.info("Received ChildPartitionsEvent: {}", event);
 
-        List<Partition> partitions = event.getChildPartitions().stream().map(childPartition -> {
-            Timestamp startTimeStamp = event.getStartTimestamp();
-            return Partition.builder()
-                    .token(childPartition.getToken())
-                    .parentTokens(childPartition.getParentTokens())
-                    .startTimestamp(startTimeStamp)
-                    .endTimestamp(event.getMetadata().getPartitionEndTimestamp())
-                    .originPartitionToken(event.getMetadata().getPartitionToken())
-                    .build();
-        }).collect(Collectors.toList());
+        List<Partition> partitions = event.getChildPartitions().stream()
+                .map(
+                        childPartition -> {
+                            Timestamp startTimeStamp = event.getStartTimestamp();
+                            return Partition.builder()
+                                    .token(childPartition.getToken())
+                                    .parentTokens(childPartition.getParentTokens())
+                                    .startTimestamp(startTimeStamp)
+                                    .endTimestamp(event.getMetadata().getPartitionEndTimestamp())
+                                    .originPartitionToken(event.getMetadata().getPartitionToken())
+                                    .build();
+                        })
+                .collect(Collectors.toList());
 
         this.partitionManager.newChildPartitions(partitions);
 
-        metricsEventPublisher.publishMetricEvent(new ChildPartitionsMetricEvent(event.getChildPartitions().size()));
+        metricsEventPublisher.publishMetricEvent(
+                new ChildPartitionsMetricEvent(event.getChildPartitions().size()));
     }
 
     private void processFailure(Exception ex) {
@@ -285,6 +312,7 @@ public class SpannerStreamingChangeEventSource implements CommittingRecordsStrea
         for (SourceRecord sourceRecord : records) {
             String token = SourceRecordUtils.extractToken(sourceRecord);
             String recordUid = SourceRecordUtils.extractRecordUid(sourceRecord);
+            // String pollUid = SourceRecordUtils.extractPollUid(sourceRecord);
 
             if (token == null || recordUid == null) {
                 continue;
@@ -293,5 +321,4 @@ public class SpannerStreamingChangeEventSource implements CommittingRecordsStrea
             this.finishingPartitionManager.commitRecord(token, recordUid);
         }
     }
-
 }

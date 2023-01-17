@@ -93,7 +93,8 @@ class SpannerConnectorTest {
         assertEquals("gcp.spanner.database.id", getResult.name());
         List<String> errorMessagesResult1 = getResult.errorMessages();
         assertEquals(1, errorMessagesResult1.size());
-        assertEquals("The 'gcp.spanner.database.id' value is invalid: The field is not specified",
+        assertEquals(
+                "The 'gcp.spanner.database.id' value is invalid: The field is not specified",
                 errorMessagesResult1.get(0));
         ConfigValue getResult2 = configValuesResult.get(42);
         assertNull(getResult2.value());
@@ -132,7 +133,7 @@ class SpannerConnectorTest {
     void testConfig() {
         ConfigDef actualConfigResult = new SpannerConnector().config();
         Map<String, ConfigDef.ConfigKey> configKeysResult = actualConfigResult.configKeys();
-        assertEquals(51, configKeysResult.size());
+        assertEquals(52, configKeysResult.size());
         List<String> groupsResult = actualConfigResult.groups();
         assertEquals(3, groupsResult.size());
         assertEquals("Spanner", groupsResult.get(0));

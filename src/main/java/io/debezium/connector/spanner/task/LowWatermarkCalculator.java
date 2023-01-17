@@ -49,6 +49,7 @@ public class LowWatermarkCalculator {
         TaskSyncContext taskSyncContext = taskSyncContextHolder.get();
 
         if (!taskSyncContext.isInitialized()) {
+            LOGGER.warn("TaskSyncContextHolder not initialized");
             return null;
         }
 

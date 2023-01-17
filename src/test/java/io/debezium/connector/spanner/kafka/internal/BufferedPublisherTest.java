@@ -56,10 +56,14 @@ class BufferedPublisherTest {
         runAndCheck(publishImmediately, onPublish);
     }
 
-    private void runAndCheck(Predicate<Integer> publishImmediately, Consumer<Integer> onPublish) throws InterruptedException {
+    private void runAndCheck(Predicate<Integer> publishImmediately, Consumer<Integer> onPublish)
+            throws InterruptedException {
         List<Integer> result = new CopyOnWriteArrayList<>();
 
-        BufferedPublisher<Integer> pub = new BufferedPublisher<>("pub-1", 5,
+        BufferedPublisher<Integer> pub = new BufferedPublisher<>(
+                "task-1",
+                "pub-1",
+                5,
                 publishImmediately,
                 onPublish
                         // .andThen(System.out::println)

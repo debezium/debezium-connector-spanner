@@ -96,37 +96,49 @@ class SpannerStreamingChangeEventSourceTest {
         when(configuration3.getString((Field) any())).thenReturn("String");
         when(configuration3.asProperties()).thenReturn(new Properties());
         SpannerConnectorConfig connectorConfig2 = new SpannerConnectorConfig(configuration3);
-        TopicNamingStrategy<TableId> topicNamingStrategy1 = (TopicNamingStrategy<TableId>) mock(
-                TopicNamingStrategy.class);
+        TopicNamingStrategy<TableId> topicNamingStrategy1 = (TopicNamingStrategy<TableId>) mock(TopicNamingStrategy.class);
         when(topicNamingStrategy1.heartbeatTopic()).thenReturn("Heartbeat Topic");
         SchemaNameAdjuster schemaNameAdjuster = mock(SchemaNameAdjuster.class);
         when(schemaNameAdjuster.adjust((String) any())).thenReturn("Adjust");
-        HeartbeatFactory<TableId> heartbeatFactory = new HeartbeatFactory<>(connectorConfig2, topicNamingStrategy1,
-                schemaNameAdjuster);
+        HeartbeatFactory<TableId> heartbeatFactory = new HeartbeatFactory<>(connectorConfig2, topicNamingStrategy1, schemaNameAdjuster);
 
         SchemaNameAdjuster schemaNameAdjuster1 = mock(SchemaNameAdjuster.class);
         when(schemaNameAdjuster1.adjust((String) any())).thenReturn("Adjust");
         Configuration configuration4 = mock(Configuration.class);
         when(configuration4.getString((Field) any())).thenReturn("String");
         when(configuration4.asProperties()).thenReturn(new Properties());
-        SourceInfoFactory sourceInfoFactory = new SourceInfoFactory(new SpannerConnectorConfig(configuration4),
-                mock(LowWatermarkProvider.class));
+        SourceInfoFactory sourceInfoFactory = new SourceInfoFactory(
+                new SpannerConnectorConfig(configuration4), mock(LowWatermarkProvider.class));
 
-        TopicNamingStrategy<TableId> topicNamingStrategy2 = (TopicNamingStrategy<TableId>) mock(
-                TopicNamingStrategy.class);
+        TopicNamingStrategy<TableId> topicNamingStrategy2 = (TopicNamingStrategy<TableId>) mock(TopicNamingStrategy.class);
         SchemaNameAdjuster schemaNameAdjuster2 = mock(SchemaNameAdjuster.class);
         SchemaRegistry schemaRegistry = new SchemaRegistry("Stream Name", mock(SchemaDao.class), mock(Runnable.class));
 
-        KafkaSpannerSchema schema = new KafkaSpannerSchema(new KafkaSpannerTableSchemaFactory(topicNamingStrategy2,
-                schemaNameAdjuster2, schemaRegistry, new ConnectSchema(Schema.Type.INT8)));
+        KafkaSpannerSchema schema = new KafkaSpannerSchema(
+                new KafkaSpannerTableSchemaFactory(
+                        topicNamingStrategy2,
+                        schemaNameAdjuster2,
+                        schemaRegistry,
+                        new ConnectSchema(Schema.Type.INT8)));
         ChangeEventQueue<DataChangeEvent> queue = (ChangeEventQueue<DataChangeEvent>) mock(ChangeEventQueue.class);
         ChangeEventCreator changeEventCreator = mock(ChangeEventCreator.class);
         SpannerEventMetadataProvider metadataProvider = new SpannerEventMetadataProvider();
-        SchemaRegistry schemaRegistry1 = new SchemaRegistry("Stream Name", new SchemaDao(mock(DatabaseClient.class)), mock(Runnable.class));
+        SchemaRegistry schemaRegistry1 = new SchemaRegistry(
+                "Stream Name", new SchemaDao(mock(DatabaseClient.class)), mock(Runnable.class));
 
-        SpannerEventDispatcher spannerEventDispatcher = new SpannerEventDispatcher(connectorConfig1, topicNamingStrategy,
-                schema, queue, filter, changeEventCreator, metadataProvider, heartbeatFactory, schemaNameAdjuster1,
-                schemaRegistry1, sourceInfoFactory, new KafkaPartitionInfoProvider(null));
+        SpannerEventDispatcher spannerEventDispatcher = new SpannerEventDispatcher(
+                connectorConfig1,
+                topicNamingStrategy,
+                schema,
+                queue,
+                filter,
+                changeEventCreator,
+                metadataProvider,
+                heartbeatFactory,
+                schemaNameAdjuster1,
+                schemaRegistry1,
+                sourceInfoFactory,
+                new KafkaPartitionInfoProvider(null));
 
         StreamEventQueue eventQueue = new StreamEventQueue(3, new MetricsEventPublisher());
 
@@ -134,14 +146,23 @@ class SpannerStreamingChangeEventSourceTest {
         SynchronizedPartitionManager partitionManager = new SynchronizedPartitionManager(
                 (BlockingConsumer<TaskStateChangeEvent>) mock(BlockingConsumer.class));
         SpannerStreamingChangeEventSource spannerStreamingChangeEventSource = new SpannerStreamingChangeEventSource(
-                errorHandler, null, eventQueue, metricsEventPublisher, partitionManager, new SchemaRegistry("Stream Name",
-                        new SchemaDao(mock(DatabaseClient.class)), mock(Runnable.class)),
-                spannerEventDispatcher, true, mock(SpannerOffsetContextFactory.class));
+                errorHandler,
+                null,
+                eventQueue,
+                metricsEventPublisher,
+                partitionManager,
+                new SchemaRegistry(
+                        "Stream Name", new SchemaDao(mock(DatabaseClient.class)), mock(Runnable.class)),
+                spannerEventDispatcher,
+                true,
+                mock(SpannerOffsetContextFactory.class));
         Configuration configuration5 = mock(Configuration.class);
         when(configuration5.getString((Field) any())).thenReturn("String");
         when(configuration5.asProperties()).thenReturn(new Properties());
         SpannerConnectorConfig connectorConfig3 = new SpannerConnectorConfig(configuration5);
-        ErrorHandler errorHandler1 = new ErrorHandler(SourceConnector.class, connectorConfig3,
+        ErrorHandler errorHandler1 = new ErrorHandler(
+                SourceConnector.class,
+                connectorConfig3,
                 (ChangeEventQueue<?>) mock(ChangeEventQueue.class));
 
         Configuration configuration6 = mock(Configuration.class);
@@ -152,8 +173,13 @@ class SpannerStreamingChangeEventSourceTest {
         ChangeEventSourceFactory<Partition, OffsetContext> changeEventSourceFactory = (ChangeEventSourceFactory<Partition, OffsetContext>) mock(
                 ChangeEventSourceFactory.class);
         ChangeEventSourceCoordinator<Partition, OffsetContext>.ChangeEventSourceContextImpl context = (new ChangeEventSourceCoordinator<>(
-                null, errorHandler1, connectorType, connectorConfig4, changeEventSourceFactory,
-                new DefaultChangeEventSourceMetricsFactory<>(), (EventDispatcher<Partition, ?>) mock(EventDispatcher.class),
+                null,
+                errorHandler1,
+                connectorType,
+                connectorConfig4,
+                changeEventSourceFactory,
+                new DefaultChangeEventSourceMetricsFactory<>(),
+                (EventDispatcher<Partition, ?>) mock(EventDispatcher.class),
                 (DatabaseSchema<?>) mock(DatabaseSchema.class))).new ChangeEventSourceContextImpl();
         SpannerPartition partition = SpannerPartition.getInitialSpannerPartition();
         Configuration configuration7 = mock(Configuration.class);
@@ -191,7 +217,9 @@ class SpannerStreamingChangeEventSourceTest {
         when(configuration.getString((String) any())).thenReturn("String");
         when(configuration.asProperties()).thenReturn(new Properties());
         SpannerConnectorConfig connectorConfig = new SpannerConnectorConfig(configuration);
-        ErrorHandler errorHandler = new ErrorHandler(SourceConnector.class, connectorConfig,
+        ErrorHandler errorHandler = new ErrorHandler(
+                SourceConnector.class,
+                connectorConfig,
                 (ChangeEventQueue<?>) mock(ChangeEventQueue.class));
 
         Configuration configuration1 = mock(Configuration.class);
@@ -212,38 +240,53 @@ class SpannerStreamingChangeEventSourceTest {
         when(topicNamingStrategy1.heartbeatTopic()).thenReturn("Heartbeat Topic");
         SchemaNameAdjuster schemaNameAdjuster = mock(SchemaNameAdjuster.class);
         when(schemaNameAdjuster.adjust((String) any())).thenReturn("Adjust");
-        HeartbeatFactory<TableId> heartbeatFactory = new HeartbeatFactory<>(
-                connectorConfig2, topicNamingStrategy1, schemaNameAdjuster);
+        HeartbeatFactory<TableId> heartbeatFactory = new HeartbeatFactory<>(connectorConfig2, topicNamingStrategy1, schemaNameAdjuster);
 
         SchemaNameAdjuster schemaNameAdjuster1 = mock(SchemaNameAdjuster.class);
         when(schemaNameAdjuster1.adjust((String) any())).thenReturn("Adjust");
         Configuration configuration4 = mock(Configuration.class);
         when(configuration4.getString((String) any())).thenReturn("String");
         when(configuration4.asProperties()).thenReturn(new Properties());
-        SourceInfoFactory sourceInfoFactory = new SourceInfoFactory(new SpannerConnectorConfig(configuration4),
-                mock(LowWatermarkProvider.class));
+        SourceInfoFactory sourceInfoFactory = new SourceInfoFactory(
+                new SpannerConnectorConfig(configuration4), mock(LowWatermarkProvider.class));
 
         TopicNamingStrategy<TableId> topicNamingStrategy2 = (TopicNamingStrategy<TableId>) mock(TopicNamingStrategy.class);
         SchemaNameAdjuster schemaNameAdjuster2 = mock(SchemaNameAdjuster.class);
         SchemaRegistry schemaRegistry = new SchemaRegistry("Stream Name", mock(SchemaDao.class), mock(Runnable.class));
 
-        KafkaSpannerSchema schema = new KafkaSpannerSchema(new KafkaSpannerTableSchemaFactory(topicNamingStrategy2,
-                schemaNameAdjuster2, schemaRegistry, new ConnectSchema(Schema.Type.INT8)));
+        KafkaSpannerSchema schema = new KafkaSpannerSchema(
+                new KafkaSpannerTableSchemaFactory(
+                        topicNamingStrategy2,
+                        schemaNameAdjuster2,
+                        schemaRegistry,
+                        new ConnectSchema(Schema.Type.INT8)));
         ChangeEventQueue<io.debezium.pipeline.DataChangeEvent> queue = (ChangeEventQueue<io.debezium.pipeline.DataChangeEvent>) mock(ChangeEventQueue.class);
         ChangeEventCreator changeEventCreator = mock(ChangeEventCreator.class);
         SpannerEventMetadataProvider metadataProvider = new SpannerEventMetadataProvider();
-        SchemaRegistry schemaRegistryDatabaseClient = spy(new SchemaRegistry(
-                "Stream Name", new SchemaDao(mock(DatabaseClient.class)), mock(Runnable.class)));
+        SchemaRegistry schemaRegistryDatabaseClient = spy(
+                new SchemaRegistry(
+                        "Stream Name", new SchemaDao(mock(DatabaseClient.class)), mock(Runnable.class)));
 
-        SpannerEventDispatcher spannerEventDispatcher = new SpannerEventDispatcher(connectorConfig1, topicNamingStrategy,
-                schema, queue, filter, changeEventCreator, metadataProvider, heartbeatFactory, schemaNameAdjuster1,
-                schemaRegistryDatabaseClient, sourceInfoFactory, new KafkaPartitionInfoProvider(null));
+        SpannerEventDispatcher spannerEventDispatcher = new SpannerEventDispatcher(
+                connectorConfig1,
+                topicNamingStrategy,
+                schema,
+                queue,
+                filter,
+                changeEventCreator,
+                metadataProvider,
+                heartbeatFactory,
+                schemaNameAdjuster1,
+                schemaRegistryDatabaseClient,
+                sourceInfoFactory,
+                new KafkaPartitionInfoProvider(null));
 
         Configuration configuration5 = mock(Configuration.class);
         when(configuration5.getString((String) any())).thenReturn("String");
         when(configuration5.asProperties()).thenReturn(new Properties());
         SpannerOffsetContextFactory offsetContextFactory = new SpannerOffsetContextFactory(
-                new SourceInfoFactory(new SpannerConnectorConfig(configuration5), mock(LowWatermarkProvider.class)));
+                new SourceInfoFactory(
+                        new SpannerConnectorConfig(configuration5), mock(LowWatermarkProvider.class)));
         StreamEventQueue eventQueue = new StreamEventQueue(3, new MetricsEventPublisher());
 
         MetricsEventPublisher metricsEventPublisher = new MetricsEventPublisher();
@@ -253,13 +296,34 @@ class SpannerStreamingChangeEventSourceTest {
         doNothing().when(schemaRegistryDatabaseClient).checkSchema(any(), any(), any());
 
         SpannerStreamingChangeEventSource spannerStreamingChangeEventSource = new SpannerStreamingChangeEventSource(
-                errorHandler, null, eventQueue, metricsEventPublisher, partitionManager,
-                schemaRegistryDatabaseClient, spannerEventDispatcher, true, offsetContextFactory);
+                errorHandler,
+                null,
+                eventQueue,
+                metricsEventPublisher,
+                partitionManager,
+                schemaRegistryDatabaseClient,
+                spannerEventDispatcher,
+                true,
+                offsetContextFactory);
         Timestamp commitTimestamp = Timestamp.ofTimeMicroseconds(1L);
         ArrayList<Column> rowType = new ArrayList<>();
-        io.debezium.connector.spanner.db.model.event.DataChangeEvent dataChangeEvent = spy(new io.debezium.connector.spanner.db.model.event.DataChangeEvent("ABC123",
-                commitTimestamp, "42", true, "Record Sequence", "Table Name", rowType, new ArrayList<>(), ModType.INSERT,
-                ValueCaptureType.NEW_ROW, 1L, 1L, "Transaction Tag", true, mock(StreamEventMetadata.class)));
+        io.debezium.connector.spanner.db.model.event.DataChangeEvent dataChangeEvent = spy(
+                new io.debezium.connector.spanner.db.model.event.DataChangeEvent(
+                        "ABC123",
+                        commitTimestamp,
+                        "42",
+                        true,
+                        "Record Sequence",
+                        "Table Name",
+                        rowType,
+                        new ArrayList<>(),
+                        ModType.INSERT,
+                        ValueCaptureType.NEW_ROW,
+                        1L,
+                        1L,
+                        "Transaction Tag",
+                        true,
+                        mock(StreamEventMetadata.class)));
         spannerStreamingChangeEventSource.processDataChangeEvent(dataChangeEvent);
 
         verify(dataChangeEvent).getMods();
@@ -267,26 +331,42 @@ class SpannerStreamingChangeEventSourceTest {
 
     @Test
     void testCommitOffset() {
-        SynchronizedPartitionManager partitionManager = spy(new SynchronizedPartitionManager((BlockingConsumer<TaskStateChangeEvent>) mock(BlockingConsumer.class)));
+        SynchronizedPartitionManager partitionManager = spy(
+                new SynchronizedPartitionManager(
+                        (BlockingConsumer<TaskStateChangeEvent>) mock(BlockingConsumer.class)));
 
         SpannerStreamingChangeEventSource spannerStreamingChangeEventSource = new SpannerStreamingChangeEventSource(
-                null, null, null, null, partitionManager, new SchemaRegistry(
+                null,
+                null,
+                null,
+                null,
+                partitionManager,
+                new SchemaRegistry(
                         "Stream Name", new SchemaDao(mock(DatabaseClient.class)), mock(Runnable.class)),
-                null, true, mock(SpannerOffsetContextFactory.class));
+                null,
+                true,
+                mock(SpannerOffsetContextFactory.class));
 
         spannerStreamingChangeEventSource.commitOffset(
                 Map.of("partitionToken", "v1"), Map.of("offset", Timestamp.now().toString()));
-
     }
 
     @Test
     void testCommitRecords() throws InterruptedException {
-        SynchronizedPartitionManager partitionManager = new SynchronizedPartitionManager((BlockingConsumer<TaskStateChangeEvent>) mock(BlockingConsumer.class));
+        SynchronizedPartitionManager partitionManager = new SynchronizedPartitionManager(
+                (BlockingConsumer<TaskStateChangeEvent>) mock(BlockingConsumer.class));
 
         SpannerStreamingChangeEventSource spannerStreamingChangeEventSource = new SpannerStreamingChangeEventSource(
-                null, null, null, null, partitionManager, new SchemaRegistry(
+                null,
+                null,
+                null,
+                null,
+                partitionManager,
+                new SchemaRegistry(
                         "Stream Name", new SchemaDao(mock(DatabaseClient.class)), mock(Runnable.class)),
-                null, true, mock(SpannerOffsetContextFactory.class));
+                null,
+                true,
+                mock(SpannerOffsetContextFactory.class));
 
         SourceRecord sourceRecord1 = spy(new SourceRecord(Map.of(), Map.of(), "t1", Schema.STRING_SCHEMA, "v1"));
         SourceRecord sourceRecord2 = spy(new SourceRecord(Map.of(), Map.of(), "t2", Schema.STRING_SCHEMA, "v2"));

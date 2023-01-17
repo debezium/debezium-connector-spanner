@@ -15,11 +15,11 @@ public class SourceRecordUtils {
 
     private static final String RECORD_UID = "spannerDataChangeRecordUid";
 
+    private static final String POLL_AT_TIMESTAMP_KEY = "pollAtTimestamp";
+
     private static final String EMIT_AT_TIMESTAMP_KEY = "emitAtTimestamp";
 
     private static final String PUBLISH_AT_TIMESTAMP_KEY = "publishAtTimestamp";
-
-    private static final String POLL_AT_TIMESTAMP_KEY = "pollAtTimestamp";
 
     private SourceRecordUtils() {
     }

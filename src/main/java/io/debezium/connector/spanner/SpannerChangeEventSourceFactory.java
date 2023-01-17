@@ -18,11 +18,9 @@ import io.debezium.pipeline.source.spi.SnapshotChangeEventSource;
 import io.debezium.pipeline.source.spi.SnapshotProgressListener;
 import io.debezium.pipeline.spi.SnapshotResult;
 
-/**
- * Creates SpannerStreamingChangeEventSource
- * and SnapshotChangeEventSource
- */
-public class SpannerChangeEventSourceFactory implements ChangeEventSourceFactory<SpannerPartition, SpannerOffsetContext> {
+/** Creates SpannerStreamingChangeEventSource and SnapshotChangeEventSource */
+public class SpannerChangeEventSourceFactory
+        implements ChangeEventSourceFactory<SpannerPartition, SpannerOffsetContext> {
 
     private final SpannerConnectorConfig connectorConfig;
     private final SpannerEventDispatcher dispatcher;
@@ -38,7 +36,8 @@ public class SpannerChangeEventSourceFactory implements ChangeEventSourceFactory
 
     private final PartitionManager partitionManager;
 
-    public SpannerChangeEventSourceFactory(SpannerConnectorConfig connectorConfig,
+    public SpannerChangeEventSourceFactory(
+                                           SpannerConnectorConfig connectorConfig,
                                            SpannerEventDispatcher dispatcher,
                                            ErrorHandler errorHandler,
                                            SchemaRegistry schemaRegistry,
@@ -64,11 +63,13 @@ public class SpannerChangeEventSourceFactory implements ChangeEventSourceFactory
     @Override
     public SpannerStreamingChangeEventSource getStreamingChangeEventSource() {
 
-        StreamEventQueue streamEventQueue = new StreamEventQueue(connectorConfig.queueCapacity(), spannerMeter.getMetricsEventPublisher());
+        StreamEventQueue streamEventQueue = new StreamEventQueue(
+                connectorConfig.queueCapacity(), spannerMeter.getMetricsEventPublisher());
 
         SpannerOffsetContextFactory offsetContextFactory = new SpannerOffsetContextFactory(sourceInfoFactory);
 
-        return new SpannerStreamingChangeEventSource(errorHandler,
+        return new SpannerStreamingChangeEventSource(
+                errorHandler,
                 changeStream,
                 streamEventQueue,
                 spannerMeter.getMetricsEventPublisher(),

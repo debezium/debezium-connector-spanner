@@ -15,9 +15,7 @@ import com.google.cloud.Timestamp;
 import io.debezium.connector.spanner.context.source.SourceInfo;
 import io.debezium.connector.spanner.processor.SourceRecordUtils;
 
-/**
- * Utility to calculate various of connector latencies
- */
+/** Utility to calculate various of connector latencies */
 public class LatencyCalculator {
 
     private LatencyCalculator() {
@@ -76,12 +74,9 @@ public class LatencyCalculator {
 
         long commitTimestamp = source.getInt64(SourceInfo.TIMESTAMP_KEY);
 
-        Long emitAtTimestamp = SourceRecordUtils.extractEmitTimestamp(record);
-        if (emitAtTimestamp == null) {
-            return null;
-        }
+        long pollAtTimestamp = SourceRecordUtils.extractPollTimestamp(record);
 
-        return emitAtTimestamp - commitTimestamp;
+        return pollAtTimestamp - commitTimestamp;
     }
 
     public static Long getTimeBehindLowWatermark(Timestamp lowWatermark) {
@@ -110,12 +105,9 @@ public class LatencyCalculator {
         if (source == null || publishAtTimestamp == null) {
             return null;
         }
-        Long emitAtTimestamp = SourceRecordUtils.extractEmitTimestamp(record);
-        if (emitAtTimestamp == null) {
-            return null;
-        }
+        long pollAtTimestamp = SourceRecordUtils.extractPollTimestamp(record);
 
-        return publishAtTimestamp - emitAtTimestamp;
+        return publishAtTimestamp - pollAtTimestamp;
     }
 
     public static Long getOwnConnectorLatency(SourceRecord record) {

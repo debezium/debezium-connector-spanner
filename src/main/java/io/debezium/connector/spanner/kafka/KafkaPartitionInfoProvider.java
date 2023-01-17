@@ -12,6 +12,7 @@ import static org.slf4j.LoggerFactory.getLogger;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
@@ -24,10 +25,7 @@ import org.apache.kafka.common.TopicPartitionInfo;
 import org.apache.kafka.common.errors.UnknownTopicOrPartitionException;
 import org.slf4j.Logger;
 
-/**
- * Uses Kafka Admin Client to receive collection of partitions
- * for Kafka topic.
- */
+/** Uses Kafka Admin Client to receive collection of partitions for Kafka topic. */
 public class KafkaPartitionInfoProvider {
     private static final Logger LOGGER = getLogger(KafkaPartitionInfoProvider.class);
     private final AdminClient adminClient;
@@ -36,11 +34,12 @@ public class KafkaPartitionInfoProvider {
         this.adminClient = adminClient;
     }
 
-    public Collection<Integer> getPartitions(String topicName) throws ExecutionException, InterruptedException {
+    public Collection<Integer> getPartitions(String topicName, Optional<Integer> numPartitions)
+            throws ExecutionException, InterruptedException {
 
         try {
             if (!topicExists(adminClient, topicName)) {
-                createTopic(adminClient, topicName, 1, Map.of());
+                createTopic(adminClient, topicName, numPartitions, Map.of());
             }
 
             DescribeTopicsResult result = adminClient.describeTopics(Collections.singletonList(topicName));
@@ -58,5 +57,4 @@ public class KafkaPartitionInfoProvider {
             throw ex;
         }
     }
-
 }

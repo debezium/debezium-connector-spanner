@@ -16,8 +16,8 @@ import org.slf4j.LoggerFactory;
 import io.debezium.function.BlockingConsumer;
 
 /**
- * Tracking Finish State of a Partition when handling kafka connect commit, finish event.
- * Sending a notification to the {@code finishedPartitionConsumer}
+ * Tracking Finish State of a Partition when handling kafka connect commit, finish event. Sending a
+ * notification to the {@code finishedPartitionConsumer}
  */
 public class FinishingPartitionManager {
 
@@ -34,8 +34,10 @@ public class FinishingPartitionManager {
         this.finishedPartitionConsumer = finishedPartitionConsumer;
     }
 
-    public void newRecord(String token, String recordUid) {
+    public String newRecord(String token) {
+        String recordUid = lastEmittedRecord.get(token) == null ? "aaaaaaaa" : next(lastEmittedRecord.get(token));
         lastEmittedRecord.put(token, recordUid);
+        return recordUid;
     }
 
     public void registerPartition(String token) {
@@ -51,7 +53,15 @@ public class FinishingPartitionManager {
         }
 
         if (!pendingFinishFlag) {
-            lastCommittedRecord.put(token, recordUid);
+            // // Long lastRecordUid = lastCommittedRecord.get(token);
+            if (lastCommittedRecord.get(token) == null) {
+                lastCommittedRecord.put(token, recordUid);
+            }
+            else {
+                if (recordUid.compareTo(lastCommittedRecord.get(token)) > 0) {
+                    lastCommittedRecord.put(token, recordUid);
+                }
+            }
             return;
         }
 
@@ -71,13 +81,20 @@ public class FinishingPartitionManager {
             return;
         }
 
-        if (lastEmittedRecord.get(token) == null || lastEmittedRecord.get(token).equals(lastCommittedRecord.get(token))) {
+        if (lastEmittedRecord.get(token) == null
+                || lastEmittedRecord.get(token).equals(lastCommittedRecord.get(token))) {
             LOGGER.info("Forcing the token to be finished {}", token);
             forceFinish(token);
             LOGGER.info("Finished forcing the token to be finished {}", token);
         }
         else {
             partitionPendingFinish.put(token, true);
+            LOGGER.info(
+                    "Cannot finish the token {} due to lastCommittedRecord {} not being equal to"
+                            + " lastEmittedRecord {}",
+                    token,
+                    lastCommittedRecord.get(token),
+                    lastEmittedRecord.get(token));
         }
     }
 
@@ -91,9 +108,40 @@ public class FinishingPartitionManager {
 
     public Set<String> getPendingFinishPartitions() {
         return partitionPendingFinish.entrySet().stream()
-                .filter(entry -> Boolean.TRUE.equals(entry.getValue()))
+                .filter(entry -> entry.getValue().equals(true))
                 .map(Map.Entry::getKey)
                 .collect(Collectors.toSet());
     }
 
+    public Set<String> getPendingPartitions() {
+        return partitionPendingFinish.entrySet().stream()
+                .map(Map.Entry::getKey)
+                .collect(Collectors.toSet());
+    }
+
+    private String next(String str) {
+        // If string is empty.
+        if (str.isEmpty()) {
+            return "a";
+        }
+
+        // Find first character from right
+        // which is not z.
+
+        int i = str.length() - 1;
+        while (i >= 0 && str.charAt(i) == 'z') {
+            i--;
+        }
+        if (i == -1) {
+            str = str + 'a';
+        }
+        else {
+            String suffix = "";
+            for (int j = i + 1; j < str.length(); j++) {
+                suffix += 'a';
+            }
+            str = str.substring(0, i) + (char) ((int) (str.charAt(i)) + 1) + suffix;
+        }
+        return str;
+    }
 }

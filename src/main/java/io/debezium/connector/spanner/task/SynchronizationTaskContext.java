@@ -34,11 +34,11 @@ import io.debezium.connector.spanner.task.state.TaskStateChangeEvent;
 import io.debezium.pipeline.ErrorHandler;
 
 /**
- * This class coordinates between the connector producers and consumers:
- * The RebalancingEventListener producer produces events that are consumed by the RebalanceHandler.
- * The TaskSyncEventListener produces events that are consumed by the SyncEventHandler.
- * The SynchronizedPartitionManager produces events to the queue, which are then consumed from
- * by the TaskStateChangeEventHandler.
+ * This class coordinates between the connector producers and consumers: The
+ * RebalancingEventListener producer produces events that are consumed by the RebalanceHandler. The
+ * TaskSyncEventListener produces events that are consumed by the SyncEventHandler. The
+ * SynchronizedPartitionManager produces events to the queue, which are then consumed from by the
+ * TaskStateChangeEventHandler.
  */
 public class SynchronizationTaskContext {
     private static final Logger LOGGER = getLogger(SynchronizationTaskContext.class);
@@ -80,7 +80,8 @@ public class SynchronizationTaskContext {
 
     private final SpannerConnectorConfig connectorConfig;
 
-    public SynchronizationTaskContext(SpannerConnectorTask task,
+    public SynchronizationTaskContext(
+                                      SpannerConnectorTask task,
                                       SpannerConnectorConfig connectorConfig,
                                       ErrorHandler errorHandler,
                                       PartitionOffsetProvider partitionOffsetProvider,
@@ -111,58 +112,83 @@ public class SynchronizationTaskContext {
 
         this.taskSyncContextHolder = new TaskSyncContextHolder(metricsEventPublisher);
 
-        this.taskSyncPublisher = new TaskSyncPublisher(taskSyncTopic, connectorConfig.syncEventPublisherWaitingTimeout(), producerFactory, this::onError);
+        this.taskSyncPublisher = new TaskSyncPublisher(
+                task.getTaskUid(),
+                taskSyncTopic,
+                connectorConfig.syncEventPublisherWaitingTimeout(),
+                producerFactory,
+                this::onError);
 
         final KafkaConsumerAdminService kafkaAdminService = new KafkaConsumerAdminService(adminClientFactory.getAdminClient(), connectorName);
 
         this.partitionFactory = new PartitionFactory(partitionOffsetProvider, metricsEventPublisher);
 
-        final LeaderService leaderService = new LeaderService(taskSyncContextHolder,
+        final LeaderService leaderService = new LeaderService(
+                taskSyncContextHolder,
                 connectorConfig,
                 this::publishEvent,
                 errorHandler,
                 partitionFactory,
                 metricsEventPublisher);
 
-        this.lowWatermarkStampPublisher = new LowWatermarkStampPublisher(connectorConfig,
-                spannerEventDispatcher, this::onError, taskSyncContextHolder);
+        this.lowWatermarkStampPublisher = new LowWatermarkStampPublisher(
+                connectorConfig, spannerEventDispatcher, this::onError, taskSyncContextHolder);
 
         TaskPartitionRebalancer taskPartitionRebalancer = leaderRebalanceStrategy.equals(LeaderRebalanceStrategy.EQUAL_SHARING)
                 ? new TaskPartitionEqualSharingRebalancer()
                 : new TaskPartitionGreedyLeaderRebalancer();
 
-        this.leaderAction = new LeaderAction(taskSyncContextHolder, kafkaAdminService, leaderService,
-                taskPartitionRebalancer, taskSyncPublisher, this::onError);
+        this.leaderAction = new LeaderAction(
+                taskSyncContextHolder,
+                kafkaAdminService,
+                leaderService,
+                taskPartitionRebalancer,
+                taskSyncPublisher,
+                this::onError);
 
-        this.taskSyncEventListener = new TaskSyncEventListener(task.getTaskUid(), taskSyncTopic, syncEventConsumerFactory,
-                true, this::onError);
+        this.taskSyncEventListener = new TaskSyncEventListener(
+                task.getTaskUid(), taskSyncTopic, syncEventConsumerFactory, true, this::onError);
 
-        this.rebalancingEventListener = new RebalancingEventListener(task, connectorName, rebalancingTopic,
-                connectorConfig.rebalancingTaskWaitingTimeout(), rebalancingConsumerFactory, this::onError);
+        this.rebalancingEventListener = new RebalancingEventListener(
+                task,
+                connectorName,
+                rebalancingTopic,
+                connectorConfig.rebalancingTaskWaitingTimeout(),
+                rebalancingConsumerFactory,
+                this::onError);
 
-        this.taskStateChangeEventHandler = new TaskStateChangeEventHandler(taskSyncContextHolder, taskSyncPublisher,
-                changeStream, partitionFactory, this::onFinish, connectorConfig, this::onError);
+        this.taskStateChangeEventHandler = new TaskStateChangeEventHandler(
+                taskSyncContextHolder,
+                taskSyncPublisher,
+                changeStream,
+                partitionFactory,
+                this::onFinish,
+                connectorConfig,
+                this::onError);
 
-        this.rebalanceHandler = new RebalanceHandler(taskSyncContextHolder, taskSyncPublisher,
-                leaderAction, lowWatermarkStampPublisher);
+        this.rebalanceHandler = new RebalanceHandler(
+                taskSyncContextHolder, taskSyncPublisher, leaderAction, lowWatermarkStampPublisher);
 
-        this.syncEventHandler = new SyncEventHandler(taskSyncContextHolder,
-                taskSyncPublisher, this::publishEvent);
+        this.syncEventHandler = new SyncEventHandler(taskSyncContextHolder, taskSyncPublisher, this::publishEvent);
 
         final LowWatermarkCalculator lowWatermarkCalculator = new LowWatermarkCalculator(connectorConfig, taskSyncContextHolder, partitionOffsetProvider);
 
-        this.lowWatermarkCalculationJob = new LowWatermarkCalculationJob(connectorConfig, this::onError, lowWatermarkCalculator,
-                lowWatermarkHolder);
+        this.lowWatermarkCalculationJob = new LowWatermarkCalculationJob(
+                connectorConfig, this::onError, lowWatermarkCalculator, lowWatermarkHolder);
 
-        this.taskStateChangeEventProcessor = new TaskStateChangeEventProcessor(connectorConfig.taskStateChangeEventQueueCapacity(),
-                taskSyncContextHolder, taskStateChangeEventHandler, this::onError, metricsEventPublisher);
-
+        this.taskStateChangeEventProcessor = new TaskStateChangeEventProcessor(
+                connectorConfig.taskStateChangeEventQueueCapacity(),
+                taskSyncContextHolder,
+                taskStateChangeEventHandler,
+                this::onError,
+                metricsEventPublisher);
     }
 
     public synchronized void init() {
         try {
 
-            this.taskSyncContextHolder.init(TaskSyncContext.getInitialContext(this.task.getTaskUid(), connectorConfig));
+            this.taskSyncContextHolder.init(
+                    TaskSyncContext.getInitialContext(this.task.getTaskUid(), connectorConfig));
 
             this.rebalanceHandler.init();
 
@@ -180,8 +206,11 @@ public class SynchronizationTaskContext {
 
             this.taskSyncContextHolder.awaitInitialization();
 
-            this.rebalancingEventListener
-                    .listen(metadata -> rebalanceHandler.process(metadata.isLeader(), metadata.getConsumerId(), metadata.getRebalanceGenerationId()));
+            this.rebalancingEventListener.listen(
+                    metadata -> rebalanceHandler.process(
+                            metadata.isLeader(),
+                            metadata.getConsumerId(),
+                            metadata.getRebalanceGenerationId()));
 
             this.taskSyncContextHolder.awaitNewEpoch();
 
@@ -216,11 +245,11 @@ public class SynchronizationTaskContext {
         catch (Throwable ex) {
             LOGGER.warn("Exception during sync context destroying", ex);
         }
-
     }
 
     public void publishEvent(TaskStateChangeEvent event) throws InterruptedException {
-        LoggerUtils.debug(LOGGER, "publishEvent: type: {}, event: {}", event.getClass().getSimpleName(), event);
+        LoggerUtils.debug(
+                LOGGER, "publishEvent: type: {}, event: {}", event.getClass().getSimpleName(), event);
 
         this.taskStateChangeEventProcessor.processEvent(event);
     }
