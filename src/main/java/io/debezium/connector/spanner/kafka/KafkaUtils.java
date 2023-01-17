@@ -24,9 +24,9 @@ public class KafkaUtils {
         return topics.contains(topic);
     }
 
-    public static void createTopic(AdminClient adminClient, String topic, int numPartitions, Map<String, String> configs)
+    public static void createTopic(AdminClient adminClient, String topic, Optional<Integer> numPartitions, Map<String, String> configs)
             throws ExecutionException, InterruptedException {
-        NewTopic newTopic = new NewTopic(topic, Optional.of(numPartitions), Optional.empty()).configs(configs);
+        NewTopic newTopic = new NewTopic(topic, numPartitions, Optional.empty()).configs(configs);
         CreateTopicsResult result = adminClient.createTopics(List.of(newTopic));
         result.topicId(topic).get();
     }

@@ -199,7 +199,7 @@ class SpannerEventDispatcherTest {
         when(sourceInfo.struct()).thenReturn(struct);
 
         KafkaPartitionInfoProvider kafkaPartitionInfoProvider = mock(KafkaPartitionInfoProvider.class);
-        when(kafkaPartitionInfoProvider.getPartitions(anyString())).thenReturn(List.of(1));
+        when(kafkaPartitionInfoProvider.getPartitions(anyString(), any())).thenReturn(List.of(1));
 
         SpannerEventDispatcher spannerEventDispatcher = spy(new SpannerEventDispatcher(
                 connectorConfig, topicNamingStrategy, schema, queue, filter, changeEventCreator, metadataProvider,

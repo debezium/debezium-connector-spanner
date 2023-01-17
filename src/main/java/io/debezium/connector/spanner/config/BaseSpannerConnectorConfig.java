@@ -32,6 +32,8 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
 
     private static final String LOW_WATERMARK_STAMP_INTERVAL_NAME = "gcp.spanner.low-watermark.stamp.interval";
 
+    private static final String TOPIC_DEFAULT_AUTO_CREATION_PARTITIONS_PROPERTY_NAME = "topic.creation.default.partitions";
+
     protected static final String GCP_SPANNER_PROJECT_ID_PROPERTY_NAME = "gcp.spanner.project.id";
     protected static final String GCP_SPANNER_INSTANCE_ID_PROPERTY_NAME = "gcp.spanner.instance.id";
     protected static final String GCP_SPANNER_DATABASE_ID_PROPERTY_NAME = "gcp.spanner.database.id";
@@ -225,6 +227,15 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
                     "low watermark stamp messages to all table topics and all kafka partitions")
             .withDefault(10000)
             .withValidation(Field::isNonNegativeInteger);
+
+    protected static final Field TOPIC_DEFAULT_AUTO_CREATION_PARTITIONS_FIELD = Field.create(TOPIC_DEFAULT_AUTO_CREATION_PARTITIONS_PROPERTY_NAME)
+            .withDisplayName("Topic auto creation num partitions")
+            .withType(Type.INT)
+            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR, 10))
+            .withWidth(Width.SHORT)
+            .withImportance(Importance.HIGH)
+            .withDefault(1)
+            .withDescription("Number of partitions in automatically created topic");
 
     protected static final Field MAX_MISSED_HEARTBEATS = Field.create(MAX_MISSED_HEARTBEATS_PROPERTY_NAME)
             .withDisplayName("Maximum missed heartbeats to identify that partition gets stuck")
@@ -520,6 +531,7 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
                     TASK_STATE_CHANGE_EVENT_QUEUE_CAPACITY,
                     VALUE_CAPTURE_MODE,
                     SPANNER_HEART_BEAT_INTERVAL,
+                    TOPIC_DEFAULT_AUTO_CREATION_PARTITIONS_FIELD,
 
                     MAX_BATCH_SIZE,
                     MAX_QUEUE_SIZE,
