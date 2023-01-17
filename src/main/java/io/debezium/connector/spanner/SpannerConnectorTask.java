@@ -7,7 +7,6 @@ package io.debezium.connector.spanner;
 
 import java.time.Instant;
 import java.util.List;
-import java.util.UUID;
 import java.util.stream.Collectors;
 
 import org.apache.kafka.connect.errors.ConnectException;
@@ -72,8 +71,6 @@ public class SpannerConnectorTask extends SpannerBaseSourceTask {
     private volatile SpannerEventDispatcher dispatcher;
 
     private volatile KafkaSpannerSchema schema;
-
-    private volatile FinishingPartitionManager finishPartitionManager;
 
     @Override
     protected SpannerChangeEventSourceCoordinator start(Configuration configuration) {
@@ -216,7 +213,6 @@ public class SpannerConnectorTask extends SpannerBaseSourceTask {
 
         long pollAtTimestamp = Instant.now().toEpochMilli();
 
-        String pollUid = UUID.randomUUID().toString();
         List<SourceRecord> resultedRecords = records.stream()
                 .map(DataChangeEvent::getRecord)
                 .map(record -> SourceRecordUtils.addPollTimestamp(record, pollAtTimestamp))

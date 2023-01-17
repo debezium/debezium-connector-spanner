@@ -164,6 +164,7 @@ public class SpannerStreamingChangeEventSource
         finally {
             LOGGER.info("Stopping streaming...");
 
+            finishPartitionWatchDog.stop();
             if (thread != null) {
                 thread.interrupt();
             }
@@ -312,7 +313,6 @@ public class SpannerStreamingChangeEventSource
         for (SourceRecord sourceRecord : records) {
             String token = SourceRecordUtils.extractToken(sourceRecord);
             String recordUid = SourceRecordUtils.extractRecordUid(sourceRecord);
-            // String pollUid = SourceRecordUtils.extractPollUid(sourceRecord);
 
             if (token == null || recordUid == null) {
                 continue;
