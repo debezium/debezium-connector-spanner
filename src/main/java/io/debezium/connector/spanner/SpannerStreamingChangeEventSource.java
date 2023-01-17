@@ -7,7 +7,6 @@ package io.debezium.connector.spanner;
 
 import java.time.Duration;
 import java.util.List;
-import java.util.UUID;
 import java.util.stream.Collectors;
 
 import org.apache.kafka.connect.source.SourceRecord;
@@ -222,11 +221,9 @@ public class SpannerStreamingChangeEventSource implements CommittingRecordsStrea
         SpannerPartition partition = new SpannerPartition(event.getPartitionToken());
 
         for (Mod mod : event.getMods()) {
-            String recordUid = UUID.randomUUID().toString();
-
             SpannerOffsetContext offsetContext = offsetContextFactory.getOffsetContextFromDataChangeEvent(mod.getModNumber(), event);
 
-            finishingPartitionManager.newRecord(partition.getValue(), recordUid);
+            String recordUid = this.finishingPartitionManager.newRecord(event.getPartitionToken());
 
             boolean dispatched = spannerEventDispatcher.dispatchDataChangeEvent(partition, tableId,
                     new SpannerChangeRecordEmitter(recordUid, event.getModType(), mod, partition, offsetContext,

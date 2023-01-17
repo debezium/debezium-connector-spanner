@@ -8,6 +8,7 @@ package io.debezium.connector.spanner.processor;
 import static org.slf4j.LoggerFactory.getLogger;
 
 import java.time.Instant;
+import java.util.Optional;
 import java.util.UUID;
 
 import org.apache.kafka.connect.data.Struct;
@@ -89,7 +90,8 @@ public class SpannerEventDispatcher extends EventDispatcher<SpannerPartition, Ta
 
                 Struct sourceStruct = sourceInfoFactory.getSourceInfoForLowWatermarkStamp(tableId).struct();
 
-                for (int partition : kafkaPartitionInfoProvider.getPartitions(topicName)) {
+                int numPartitions = connectorConfig.getTopicNumPartitions();
+                for (int partition : kafkaPartitionInfoProvider.getPartitions(topicName, Optional.of(numPartitions))) {
                     SourceRecord sourceRecord = emitSourceRecord(topicName, dataCollectionSchema, partition, sourceStruct);
                     LOGGER.debug("Build low watermark stamp record {} ", sourceRecord);
 

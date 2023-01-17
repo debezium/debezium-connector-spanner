@@ -8,6 +8,7 @@ package io.debezium.connector.spanner.kafka.internal;
 import static org.slf4j.LoggerFactory.getLogger;
 
 import java.time.Duration;
+import java.time.Instant;
 import java.util.Collection;
 
 import org.apache.kafka.clients.consumer.Consumer;
@@ -104,6 +105,7 @@ public class RebalancingEventListener {
         thread = new Thread(() -> {
             try {
                 long commitOffsetStart = System.currentTimeMillis();
+                Instant lastUpdatedTime = Instant.now();
                 while (!Thread.currentThread().isInterrupted()) {
                     try {
                         consumer.poll(pollDuration);
@@ -111,6 +113,12 @@ public class RebalancingEventListener {
                         if (commitOffsetStart + commitOffsetsInterval < System.currentTimeMillis()) {
                             consumer.commitSync(commitOffsetsTimeout);
                             commitOffsetStart = System.currentTimeMillis();
+                        }
+                        if (Instant.now().isAfter(lastUpdatedTime.plus(Duration.ofSeconds(600)))) {
+                            LOGGER.info(
+                                    "Task Uid {} is still listening to RebalanceEventListener",
+                                    this.task.getTaskUid());
+                            lastUpdatedTime = Instant.now();
                         }
                     }
                     catch (org.apache.kafka.common.errors.InterruptException e) {

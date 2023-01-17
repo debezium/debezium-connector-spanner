@@ -12,6 +12,7 @@ import static org.slf4j.LoggerFactory.getLogger;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
@@ -36,11 +37,11 @@ public class KafkaPartitionInfoProvider {
         this.adminClient = adminClient;
     }
 
-    public Collection<Integer> getPartitions(String topicName) throws ExecutionException, InterruptedException {
+    public Collection<Integer> getPartitions(String topicName, Optional<Integer> numPartitions) throws ExecutionException, InterruptedException {
 
         try {
             if (!topicExists(adminClient, topicName)) {
-                createTopic(adminClient, topicName, 1, Map.of());
+                createTopic(adminClient, topicName, numPartitions, Map.of());
             }
 
             DescribeTopicsResult result = adminClient.describeTopics(Collections.singletonList(topicName));

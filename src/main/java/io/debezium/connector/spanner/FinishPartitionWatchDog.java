@@ -9,6 +9,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -28,21 +29,38 @@ public class FinishPartitionWatchDog {
 
         this.thread = new Thread(() -> {
 
+            Instant lastUpdatedTime = Instant.now();
             while (true) {
 
                 Set<String> pendingToFinish = finishingPartitionManager.getPendingFinishPartitions();
+                Set<String> pending = finishingPartitionManager.getPendingPartitions();
 
-                pendingToFinish.forEach(token -> partition.computeIfAbsent(token, token1 -> Instant.now()));
+                pendingToFinish.forEach(
+                        token -> partition.computeIfAbsent(token, token1 -> Instant.now()));
 
-                partition.keySet().stream().filter(token -> !pendingToFinish.contains(token)).forEach(partition::remove);
+                if (Instant.now().isAfter(lastUpdatedTime.plus(Duration.ofSeconds(600)))) {
+                    LOGGER.info("Get pending partitions: {}", pendingToFinish);
+                    LOGGER.info("Get pending total partitions: {}", pending);
+                    lastUpdatedTime = Instant.now();
+                }
+
+                Iterator<Map.Entry<String, Instant>> itr = partition.entrySet().iterator();
+                while (itr.hasNext()) {
+                    Map.Entry<String, Instant> entry = itr.next();
+                    if (!pendingToFinish.contains(entry.getKey())) {
+                        itr.remove();
+                    }
+                }
 
                 List<String> tokens = new ArrayList<>();
 
-                partition.forEach((token, instant) -> {
-                    if (instant.isAfter(instant.plus(timeout))) {
-                        tokens.add(token);
-                    }
-                });
+                Instant currentTime = Instant.now();
+                partition.forEach(
+                        (token, instant) -> {
+                            if (currentTime.isAfter(instant.plus(timeout))) {
+                                tokens.add(token);
+                            }
+                        });
 
                 if (!tokens.isEmpty()) {
                     LOGGER.warn("Partitions awaiting finish : {}, timeout: {}", tokens, timeout);
@@ -58,9 +76,11 @@ public class FinishPartitionWatchDog {
             }
 
         }, "SpannerConnector-FinishingPartitionWatchDog");
+        this.thread.start();
     }
 
     public void stop() {
+        LOGGER.info("Interrupting SpannerConnector-FinishingPartitionWatchDog");
         this.thread.interrupt();
     }
 }

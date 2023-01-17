@@ -8,6 +8,7 @@ package io.debezium.connector.spanner.kafka.internal;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ExecutionException;
 
 import org.apache.kafka.clients.admin.AdminClient;
@@ -36,7 +37,7 @@ public class KafkaInternalTopicAdminService {
             String rebalancingTopic = config.rebalancingTopic();
             int maxTasks = config.getMaxTasks();
             if (!topicExists(rebalancingTopic)) {
-                createTopic(rebalancingTopic, maxTasks, Map.of());
+                createTopic(rebalancingTopic, Optional.of(maxTasks), Map.of());
                 return;
             }
 
@@ -62,7 +63,7 @@ public class KafkaInternalTopicAdminService {
                 topicProps.put(TopicConfig.SEGMENT_MS_CONFIG, String.valueOf(config.syncSegmentMs()));
                 topicProps.put(TopicConfig.MIN_CLEANABLE_DIRTY_RATIO_CONFIG, config.syncMinCleanableDirtyRatio());
 
-                createTopic(syncTopic, 1, topicProps);
+                createTopic(syncTopic, Optional.of(1), topicProps);
                 return;
             }
 
@@ -82,7 +83,7 @@ public class KafkaInternalTopicAdminService {
         return KafkaUtils.topicExists(adminClient, topic);
     }
 
-    private void createTopic(String topic, int numPartitions, Map<String, String> configs) throws ExecutionException, InterruptedException {
+    private void createTopic(String topic, Optional<Integer> numPartitions, Map<String, String> configs) throws ExecutionException, InterruptedException {
         KafkaUtils.createTopic(adminClient, topic, numPartitions, configs);
     }
 
