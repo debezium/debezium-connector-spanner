@@ -20,11 +20,11 @@ class FinishingPartitionManagerTest {
 
         finishingPartitionManager.registerPartition("testToken");
 
-        finishingPartitionManager.newRecord("testToken", "recordUid1");
+        finishingPartitionManager.newRecord("testToken");
 
         finishingPartitionManager.onPartitionFinishEvent("testToken");
 
-        finishingPartitionManager.commitRecord("testToken", "recordUid1");
+        finishingPartitionManager.commitRecord("testToken", "aaaaaaaa");
 
         Mockito.verify(consumer, Mockito.times(1)).accept("testToken");
     }
@@ -37,9 +37,9 @@ class FinishingPartitionManagerTest {
 
         finishingPartitionManager.registerPartition("testToken");
 
-        finishingPartitionManager.newRecord("testToken", "recordUid1");
+        finishingPartitionManager.newRecord("testToken");
 
-        finishingPartitionManager.commitRecord("testToken", "recordUid1");
+        finishingPartitionManager.commitRecord("testToken", "aaaaaaaa");
 
         finishingPartitionManager.onPartitionFinishEvent("testToken");
 
@@ -54,7 +54,7 @@ class FinishingPartitionManagerTest {
 
         finishingPartitionManager.registerPartition("testToken");
 
-        finishingPartitionManager.newRecord("testToken", "recordUid1");
+        finishingPartitionManager.newRecord("testToken");
 
         finishingPartitionManager.forceFinish("testToken");
 
@@ -67,9 +67,9 @@ class FinishingPartitionManagerTest {
 
         FinishingPartitionManager finishingPartitionManager = new FinishingPartitionManager(consumer);
 
-        finishingPartitionManager.newRecord("testToken", "recordUid1");
+        finishingPartitionManager.newRecord("testToken");
 
-        finishingPartitionManager.commitRecord("testToken", "recordUid1");
+        finishingPartitionManager.commitRecord("testToken", "aaaaaaaa");
 
         Mockito.verify(consumer, Mockito.times(0)).accept("testToken");
 
@@ -86,22 +86,22 @@ class FinishingPartitionManagerTest {
 
         finishingPartitionManager.registerPartition("testToken");
 
-        finishingPartitionManager.newRecord("testToken", "recordUid1");
+        finishingPartitionManager.newRecord("testToken");
 
-        finishingPartitionManager.newRecord("testToken", "recordUid2");
+        finishingPartitionManager.newRecord("testToken");
 
-        finishingPartitionManager.newRecord("testToken", "recordUid3");
+        finishingPartitionManager.newRecord("testToken");
 
-        finishingPartitionManager.commitRecord("testToken", "recordUid1");
+        finishingPartitionManager.commitRecord("testToken", "aaaaaaaa");
 
-        finishingPartitionManager.commitRecord("testToken", "recordUid2");
+        finishingPartitionManager.commitRecord("testToken", "aaaaaaab");
 
         finishingPartitionManager.onPartitionFinishEvent("testToken");
 
         // don't except call consumer.accept
         Mockito.verify(consumer, Mockito.times(0)).accept("testToken");
 
-        finishingPartitionManager.commitRecord("testToken", "recordUid3");
+        finishingPartitionManager.commitRecord("testToken", "aaaaaaac");
 
         // except call consumer.accept
         Mockito.verify(consumer, Mockito.times(1)).accept("testToken");
@@ -115,17 +115,17 @@ class FinishingPartitionManagerTest {
 
         finishingPartitionManager.registerPartition("testToken");
 
-        finishingPartitionManager.newRecord("testToken", "recordUid1");
+        finishingPartitionManager.newRecord("testToken");
 
-        finishingPartitionManager.newRecord("testToken", "recordUid2");
+        finishingPartitionManager.newRecord("testToken");
 
-        finishingPartitionManager.newRecord("testToken", "recordUid3");
+        finishingPartitionManager.newRecord("testToken");
 
-        finishingPartitionManager.commitRecord("testToken", "recordUid1");
+        finishingPartitionManager.commitRecord("testToken", "aaaaaaaa");
 
-        finishingPartitionManager.commitRecord("testToken", "recordUid2");
+        finishingPartitionManager.commitRecord("testToken", "aaaaaaab");
 
-        finishingPartitionManager.commitRecord("testToken", "recordUid3");
+        finishingPartitionManager.commitRecord("testToken", "aaaaaaac");
 
         // don't except call consumer.accept
         Mockito.verify(consumer, Mockito.times(0)).accept("testToken");
@@ -144,23 +144,50 @@ class FinishingPartitionManagerTest {
 
         finishingPartitionManager.registerPartition("testToken");
 
-        finishingPartitionManager.newRecord("testToken", "recordUid1");
+        finishingPartitionManager.newRecord("testToken");
 
-        finishingPartitionManager.newRecord("testToken", "recordUid2");
+        finishingPartitionManager.newRecord("testToken");
 
-        finishingPartitionManager.commitRecord("testToken", "recordUid1");
+        finishingPartitionManager.commitRecord("testToken", "aaaaaaaa");
 
-        finishingPartitionManager.commitRecord("testToken", "recordUid2");
+        finishingPartitionManager.commitRecord("testToken", "aaaaaaab");
 
-        finishingPartitionManager.newRecord("testToken", "recordUid3");
+        finishingPartitionManager.newRecord("testToken");
 
-        finishingPartitionManager.commitRecord("testToken", "recordUid3");
+        finishingPartitionManager.commitRecord("testToken", "aaaaaaac");
 
         // don't except call consumer.accept
         Mockito.verify(consumer, Mockito.times(0)).accept("testToken");
 
         finishingPartitionManager.onPartitionFinishEvent("testToken");
 
+        // except call consumer.accept
+        Mockito.verify(consumer, Mockito.times(1)).accept("testToken");
+    }
+
+    @Test
+    void multipleCommitCommitOutOfOrder() throws InterruptedException {
+        BlockingConsumer<String> consumer = Mockito.mock(BlockingConsumer.class);
+
+        FinishingPartitionManager finishingPartitionManager = new FinishingPartitionManager(consumer);
+
+        finishingPartitionManager.registerPartition("testToken");
+
+        finishingPartitionManager.newRecord("testToken");
+
+        finishingPartitionManager.newRecord("testToken");
+
+        finishingPartitionManager.newRecord("testToken");
+
+        finishingPartitionManager.commitRecord("testToken", "aaaaaaaa");
+
+        finishingPartitionManager.commitRecord("testToken", "aaaaaaac");
+
+        finishingPartitionManager.commitRecord("testToken", "aaaaaaab");
+
+        // don't except call consumer.accept
+        Mockito.verify(consumer, Mockito.times(0)).accept("testToken");
+        finishingPartitionManager.onPartitionFinishEvent("testToken");
         // except call consumer.accept
         Mockito.verify(consumer, Mockito.times(1)).accept("testToken");
     }

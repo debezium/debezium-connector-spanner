@@ -49,6 +49,7 @@ public class LowWatermarkCalculator {
         TaskSyncContext taskSyncContext = taskSyncContextHolder.get();
 
         if (!taskSyncContext.isInitialized()) {
+            LOGGER.warn("TaskSyncContextHolder not initialized");
             return null;
         }
 
@@ -146,6 +147,14 @@ public class LowWatermarkCalculator {
                                 return timestamp;
                             }
                             if (partitionState.getStartTimestamp() != null) {
+                                final long now = new Date().getTime();
+                                long lag = now - partitionState.getStartTimestamp().toDate().getTime();
+                                if (lag > OFFSET_MONITORING_LAG_MAX_MS) {
+                                    LOGGER.warn(
+                                            "Partition has a very old start timestamp, lag: {}, token: {}",
+                                            lag,
+                                            partitionState.getStartTimestamp());
+                                }
                                 return partitionState.getStartTimestamp();
                             }
                             throw new IllegalStateException(

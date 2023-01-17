@@ -286,4 +286,8 @@ public class SpannerConnectorConfig extends BaseSpannerConnectorConfig {
     public long failOverloadedTaskInterval() {
         return getConfig().getLong(TASKS_FAIL_OVERLOADED_CHECK_INTERVAL);
     }
+
+    public int getTopicNumPartitions() {
+        return getConfig().getInteger(TOPIC_DEFAULT_AUTO_CREATION_PARTITIONS_FIELD);
+    }
 }
