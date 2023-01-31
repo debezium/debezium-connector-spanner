@@ -19,8 +19,9 @@ jobs:
           repository: debezium/debezium
           path: core
       - name: Set up JDK
-        uses: actions/setup-java@v1
+        uses: actions/setup-java@v3
         with:
+          distribution: 'temurin'
           java-version: 17
         ## Add Gcp credentials by service accaunt (.json)
       - id: 'auth'
@@ -29,7 +30,7 @@ jobs:
         with:
           credentials_json: '${{ secrets.GOOGLE_CREDENTIALS }}'
       - name: Cache Maven packages
-        uses: actions/cache@v1
+        uses: actions/cache@v3
         with:
           path: ~/.m2
           key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
