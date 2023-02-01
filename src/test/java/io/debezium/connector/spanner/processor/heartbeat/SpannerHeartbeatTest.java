@@ -25,7 +25,7 @@ import org.apache.kafka.connect.source.SourceRecord;
 import org.junit.jupiter.api.Test;
 
 import io.debezium.function.BlockingConsumer;
-import io.debezium.util.SchemaNameAdjuster;
+import io.debezium.schema.SchemaNameAdjuster;
 
 class SpannerHeartbeatTest {
 

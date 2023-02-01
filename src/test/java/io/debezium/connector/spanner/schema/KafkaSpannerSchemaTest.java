@@ -22,8 +22,8 @@ import com.google.cloud.spanner.DatabaseClient;
 import io.debezium.connector.spanner.db.dao.SchemaDao;
 import io.debezium.connector.spanner.db.metadata.SchemaRegistry;
 import io.debezium.connector.spanner.db.metadata.TableId;
+import io.debezium.schema.SchemaNameAdjuster;
 import io.debezium.spi.topic.TopicNamingStrategy;
-import io.debezium.util.SchemaNameAdjuster;
 
 class KafkaSpannerSchemaTest {
 

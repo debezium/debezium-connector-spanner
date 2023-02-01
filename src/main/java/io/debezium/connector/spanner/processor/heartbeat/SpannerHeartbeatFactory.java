@@ -9,8 +9,8 @@ import io.debezium.config.CommonConnectorConfig;
 import io.debezium.connector.spanner.db.metadata.TableId;
 import io.debezium.heartbeat.Heartbeat;
 import io.debezium.heartbeat.HeartbeatFactory;
+import io.debezium.schema.SchemaNameAdjuster;
 import io.debezium.spi.topic.TopicNamingStrategy;
-import io.debezium.util.SchemaNameAdjuster;
 
 /**
  * Creates {@link SpannerHeartbeat} based on configured properties

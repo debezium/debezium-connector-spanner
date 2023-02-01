@@ -19,8 +19,8 @@ import io.debezium.connector.spanner.db.metadata.TableId;
 import io.debezium.connector.spanner.db.model.schema.TableSchema;
 import io.debezium.connector.spanner.schema.KafkaSpannerTableSchema;
 import io.debezium.connector.spanner.schema.KafkaSpannerTableSchemaFactory;
+import io.debezium.schema.SchemaNameAdjuster;
 import io.debezium.spi.topic.TopicNamingStrategy;
-import io.debezium.util.SchemaNameAdjuster;
 
 class KafkaSpannerSchemaTest {
 

@@ -21,7 +21,7 @@ import io.debezium.connector.AbstractSourceInfo;
 import io.debezium.connector.spanner.SpannerPartition;
 import io.debezium.function.BlockingConsumer;
 import io.debezium.heartbeat.Heartbeat;
-import io.debezium.util.SchemaNameAdjuster;
+import io.debezium.schema.SchemaNameAdjuster;
 
 /**
  * Generates Spanner Heartbeat messages
