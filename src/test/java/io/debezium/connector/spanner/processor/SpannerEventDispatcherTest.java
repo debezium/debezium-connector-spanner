@@ -51,8 +51,8 @@ import io.debezium.heartbeat.HeartbeatFactory;
 import io.debezium.pipeline.DataChangeEvent;
 import io.debezium.pipeline.spi.ChangeEventCreator;
 import io.debezium.schema.DataCollectionSchema;
+import io.debezium.schema.SchemaNameAdjuster;
 import io.debezium.spi.topic.TopicNamingStrategy;
-import io.debezium.util.SchemaNameAdjuster;
 
 class SpannerEventDispatcherTest {
 
