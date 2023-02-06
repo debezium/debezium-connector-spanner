@@ -39,8 +39,11 @@ class SpannerSourceInfoStructMakerTest {
         when(configuration.getString((io.debezium.config.Field) any())).thenReturn("String");
         when(configuration.getString(anyString())).thenReturn("String");
         when(configuration.asProperties()).thenReturn(new Properties());
-        Schema schemaResult = new SpannerSourceInfoStructMaker("Connector", "1.0.2",
-                new SpannerConnectorConfig(configuration)).schema();
+
+        SpannerSourceInfoStructMaker spannerSourceInfoStructMaker = new SpannerSourceInfoStructMaker();
+        spannerSourceInfoStructMaker.init("Connector", "1.0.2", new SpannerConnectorConfig(configuration));
+        Schema schemaResult = spannerSourceInfoStructMaker.schema();
+
         assertTrue(schemaResult instanceof ConnectSchema);
         assertNull(schemaResult.defaultValue());
         assertNull(schemaResult.version());
@@ -75,10 +78,11 @@ class SpannerSourceInfoStructMakerTest {
         when(configuration.getString(anyString())).thenReturn("String");
         when(configuration.asProperties()).thenReturn(new Properties());
 
-        SpannerSourceInfoStructMaker connector = new SpannerSourceInfoStructMaker("Connector", "1.0.2", new SpannerConnectorConfig(configuration));
+        SpannerSourceInfoStructMaker spannerSourceInfoStructMaker = new SpannerSourceInfoStructMaker();
+        spannerSourceInfoStructMaker.init("Connector", "1.0.2", new SpannerConnectorConfig(configuration));
 
-        assertNotNull(connector.schema());
-        assertTrue(connector.schema() instanceof ConnectSchema);
+        assertNotNull(spannerSourceInfoStructMaker.schema());
+        assertTrue(spannerSourceInfoStructMaker.schema() instanceof ConnectSchema);
     }
 
     @Test
@@ -87,7 +91,8 @@ class SpannerSourceInfoStructMakerTest {
         when(configuration.getString((Field) any())).thenReturn("String");
         when(configuration.getString(anyString())).thenReturn("String");
         when(configuration.asProperties()).thenReturn(new Properties());
-        SpannerSourceInfoStructMaker spannerSourceInfoStructMaker = new SpannerSourceInfoStructMaker("Connector", "1.0.2", new SpannerConnectorConfig(configuration));
+        SpannerSourceInfoStructMaker spannerSourceInfoStructMaker = new SpannerSourceInfoStructMaker();
+        spannerSourceInfoStructMaker.init("Connector", "1.0.2", new SpannerConnectorConfig(configuration));
         Configuration configuration1 = mock(Configuration.class);
         when(configuration1.getString((Field) any())).thenReturn("String");
         when(configuration1.getString(anyString())).thenReturn("String");

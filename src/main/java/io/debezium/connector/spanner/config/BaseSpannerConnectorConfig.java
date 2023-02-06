@@ -17,6 +17,7 @@ import io.debezium.config.CommonConnectorConfig;
 import io.debezium.config.ConfigDefinition;
 import io.debezium.config.Configuration;
 import io.debezium.config.Field;
+import io.debezium.connector.spanner.SpannerSourceInfoStructMaker;
 import io.debezium.connector.spanner.config.validation.FieldValidator;
 import io.debezium.heartbeat.Heartbeat;
 import io.debezium.schema.AbstractTopicNamingStrategy;
@@ -539,6 +540,14 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
             .withImportance(Importance.HIGH)
             .withDefault("10485880")
             .withDescription("Sync topic max message size");
+
+    public static final Field SOURCE_INFO_STRUCT_MAKER = Field.create("sourceinfo.struct.maker")
+            .withDisplayName("Source info struct maker class")
+            .withType(Type.CLASS)
+            .withWidth(Width.MEDIUM)
+            .withImportance(ConfigDef.Importance.LOW)
+            .withDescription("The name of the SourceInfoStructMaker class that returns SourceInfo schema and struct.")
+            .withDefault(SpannerSourceInfoStructMaker.class.getName());
 
     protected static final ConfigDefinition CONFIG_DEFINITION = ConfigDefinition.editor()
             .name("Spanner")

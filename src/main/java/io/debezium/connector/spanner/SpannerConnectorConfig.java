@@ -45,7 +45,7 @@ public class SpannerConnectorConfig extends BaseSpannerConnectorConfig {
 
     @Override
     protected SourceInfoStructMaker<SourceInfo> getSourceInfoStructMaker(Version version) {
-        return new SpannerSourceInfoStructMaker(Module.name(), Module.version(), this);
+        return getSourceInfoStructMaker(SOURCE_INFO_STRUCT_MAKER, Module.name(), Module.version(), this);
     }
 
     @Override
