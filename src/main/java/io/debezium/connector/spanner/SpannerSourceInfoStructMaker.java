@@ -17,10 +17,11 @@ import io.debezium.connector.spanner.context.source.SourceInfo;
  */
 public class SpannerSourceInfoStructMaker extends AbstractSourceInfoStructMaker<SourceInfo> {
 
-    private final Schema schema;
+    private Schema schema;
 
-    public SpannerSourceInfoStructMaker(String connector, String version, CommonConnectorConfig connectorConfig) {
-        super(connector, version, connectorConfig);
+    @Override
+    public void init(String connector, String version, CommonConnectorConfig connectorConfig) {
+        super.init(connector, version, connectorConfig);
         schema = commonSchemaBuilder()
                 .name("com.google.spanner.connector.Source")
                 .field(SourceInfo.PROJECT_ID_KEY, Schema.STRING_SCHEMA)
