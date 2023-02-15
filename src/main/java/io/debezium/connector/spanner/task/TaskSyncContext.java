@@ -51,6 +51,95 @@ public class TaskSyncContext {
         return Map.copyOf(taskStateMap);
     }
 
+    public Map<String, TaskState> getCurrentTaskStateMap() {
+        Map<String, TaskState> currentTaskStateMap = new HashMap<>();
+        currentTaskStateMap.put(this.taskUid, currentTaskState.toBuilder()
+                .consumerId(consumerId)
+                .rebalanceGenerationId(rebalanceGenerationId)
+                .stateTimestamp(Instant.now().toEpochMilli()).build());
+        return currentTaskStateMap;
+    }
+
+    public TaskSyncContext buildIncrementalTaskSyncEvent(
+            List<String> updatedOwnedPartitions,
+            List<String> updatedSharedPartitions,
+            List<String> removedOwnedPartitions,
+            List<String> removedSharedPartitions,
+    ) { 
+        List<PartitionState> newOwnedPartitions =
+                currentTaskState.getPartitions()
+                .filter(partitionState -> updatedOwnedPartitions.contains(partitionState.getToken()))
+                .collect(Collectors.toList());
+        for (String removedPartition : removedOwnedPartitions) {
+            newOwnedPartitions.add(
+                    PartitionState.builder().token(removedPartition).state(PartitionStateEnum.REMOVED).build())
+        }
+
+        List<PartitionState> newSharedPartitions =
+                currentTaskState.getPartitions()
+                .filter(partitionState -> updatedSharedPartitions.contains(partitionState.getToken()))
+                .collect(Collectors.toList());
+        for (String removedPartition : removedSharedPartitions) {
+            newSharedPartitions.add(
+                    PartitionState.builder().token(removedPartition).state(PartitionStateEnum.REMOVED).build())
+        }
+        return TaskSyncContext.builder()
+                .taskUid(this.getTaskUid())
+                .consumerId(this.getConsumerId())
+                .databaseSchemaTimestamp(databaseSchemaTimestamp)
+                .messageTimestamp(this.getCreatedTimestamp())
+                .messageType(MessageTypeEnum.REGULAR)
+                .databaseSchemaTimestamp(databaseSchemaTimestamp)
+                .currentTaskState(
+                        TaskState.builder()
+                                .taskUid(this.getTaskUid())
+                                .consumerId(this.getConsumerId())
+                                .rebalanceGenerationId(rebalanceGenerationId)
+                                .partitions(newOwnedPartitions)
+                                .sharedPartitions(newSharedPartitions)
+                                .stateTimestamp(Instant.now().toEpochMilli())
+                                .build())
+                .build();
+    }
+
+
+
+    public TaskSyncEvent buildNewEpochTaskSyncEvent() {
+        return TaskSyncEvent.builder().epochOffset(this.epochOffsetHolder.getEpochOffset()).taskStates(
+                this.getAllTaskStates())
+                .taskUid(this.getTaskUid())
+                .consumerId(this.getConsumerId())
+                .rebalanceGenerationId(this.getRebalanceGenerationId())
+                .messageTimestamp(this.getCreatedTimestamp())
+                .messageType(MessageTypeEnum.NEW_EPOCH)
+                .databaseSchemaTimestamp(databaseSchemaTimestamp)
+                .build();
+    }
+
+    public TaskSyncEvent buildUpdateEpochTaskSyncEvent() {
+        return TaskSyncEvent.builder().epochOffset(this.epochOffsetHolder.getEpochOffset()).taskStates(
+                this.getAllTaskStates())
+                .taskUid(this.getTaskUid())
+                .consumerId(this.getConsumerId())
+                .rebalanceGenerationId(this.getRebalanceGenerationId())
+                .messageTimestamp(this.getCreatedTimestamp())
+                .messageType(MessageTypeEnum.UPDATE_EPOCH)
+                .databaseSchemaTimestamp(databaseSchemaTimestamp)
+                .build();
+    }
+
+    public TaskSyncEvent buildRebalanceAnswerTaskSyncEvent() {
+        return TaskSyncEvent.builder().epochOffset(this.epochOffsetHolder.getEpochOffset()).taskStates(
+                this.getCurrentTaskStateMap())
+                .taskUid(this.getTaskUid())
+                .consumerId(this.getConsumerId())
+                .rebalanceGenerationId(this.getRebalanceGenerationId())
+                .messageTimestamp(this.getCreatedTimestamp())
+                .messageType(MessageTypeEnum.REBALANCE_ANSWER)
+                .databaseSchemaTimestamp(databaseSchemaTimestamp)
+                .build();
+    }
+
     public TaskSyncEvent buildTaskSyncEvent() {
         return buildTaskSyncEvent(MessageTypeEnum.REGULAR);
     }

@@ -80,8 +80,6 @@ public class SpannerConnectorConfig extends BaseSpannerConnectorConfig {
     public Properties kafkaProps(Map<?, ?> props) {
         Properties properties = new Properties();
         properties.setProperty(CommonClientConfigs.BOOTSTRAP_SERVERS_CONFIG, this.bootStrapServer());
-        properties.put("max.request.size", 104858800);
-        properties.put("max.partition.fetch.bytes", 104858800);
 
         properties.putAll(props);
 

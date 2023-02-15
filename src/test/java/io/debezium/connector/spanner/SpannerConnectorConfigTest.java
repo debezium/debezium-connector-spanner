@@ -89,6 +89,6 @@ class SpannerConnectorConfigTest {
         when(configuration.getString(anyString())).thenReturn("String");
         when(configuration.asProperties()).thenReturn(new Properties());
         SpannerConnectorConfig spannerConnectorConfig = new SpannerConnectorConfig(configuration);
-        assertEquals(3, spannerConnectorConfig.kafkaProps(new HashMap<>()).size());
+        assertEquals(1, spannerConnectorConfig.kafkaProps(new HashMap<>()).size());
     }
 }

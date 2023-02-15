@@ -5,7 +5,9 @@
  */
 package io.debezium.connector.spanner.task.operation;
 
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -36,8 +38,11 @@ public class CheckPartitionDuplicationOperation implements Operation {
 
     private final ChangeStream changeStream;
 
+    List<String> partitionsToStopStreaming;
+
     public CheckPartitionDuplicationOperation(ChangeStream changeStream) {
         this.changeStream = changeStream;
+        this.partitionsToStopStreaming = new ArrayList<String>();
     }
 
     @Override
@@ -62,6 +67,7 @@ public class CheckPartitionDuplicationOperation implements Operation {
 
             if (isRequiredPublishSyncEvent) {
                 taskSyncContext = stopStreaming(taskSyncContext, partitionState);
+                partitionsToStopStreaming.add(partitionState.getToken());
                 LOGGER.debug("Stop streaming the partition: {}", token);
             }
             else {
@@ -115,4 +121,24 @@ public class CheckPartitionDuplicationOperation implements Operation {
                 .currentTaskState(currentTaskState.toBuilder().partitions(partitions).build())
                 .build();
     }
+
+    @Override
+    public List<String> updatedOwnedPartitions() {
+        return Collections.emptyList();
+    }
+
+    @Override
+    public List<String> updatedSharedPartitions() {
+        return Collections.emptyList();
+    };
+
+    @Override
+    public List<String> removedOwnedPartitions() {
+        return partitionsToStopStreaming;
+    };
+
+    @Override
+    public List<String> removedSharedPartitions() {
+        return Collections.emptyList();
+    };
 }

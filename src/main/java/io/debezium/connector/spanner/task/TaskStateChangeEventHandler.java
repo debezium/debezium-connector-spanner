@@ -155,6 +155,11 @@ public class TaskStateChangeEventHandler {
 
         TaskSyncContext taskSyncContext;
 
+        List<String> ownedPartitions = new ArrayList<String>();
+        List<String> sharedPartitions = new ArrayList<String>();
+        List<String> removedOwnedPartitions = new ArrayList<String>();
+        List<String> removedSharedPartitions = new ArrayList<String>();
+
         try {
             taskSyncContext = taskSyncContextHolder.updateAndGet(context -> {
                 TaskSyncContext newContext = context;
@@ -164,6 +169,18 @@ public class TaskStateChangeEventHandler {
                         LOGGER.debug("Task {} - need to publish sync event for operation {}",
                                 taskSyncContextHolder.get().getTaskUid(), operation.getClass().getSimpleName());
                         publishTaskSyncEvent.set(true);
+                    }
+                    if (!operation.updatedOwnedPartitions().isEmpty()) {
+                        updatedOwnedPartitions.addAll(operation.updatedOwnedPartitions());
+                    }
+                    if (!operation.updatedSharedPartitions().isEmpty()) {
+                        sharedPartitions.addAll(operation.updatedSharedPartitions());
+                    }
+                    if (!operation.removedOwnedPartitions().isEmpty()) {
+                        removedOwnedPartitions.addAll(operation.removedOwnedPartitions());
+                    }
+                    if (!operation.removedSharedPartitions().isEmpty()) {
+                        removedSharedPartitions.addAll(operation.removedSharedPartitions());
                     }
                 }
                 return newContext;
@@ -175,7 +192,7 @@ public class TaskStateChangeEventHandler {
 
         if (publishTaskSyncEvent.get()) {
             LOGGER.debug("Task {} - send sync event", taskSyncContext.getTaskUid());
-            taskSyncPublisher.send(taskSyncContext.buildTaskSyncEvent());
+            taskSyncPublisher.send(taskSyncContext.buildIncrementalTaskSyncEvent(ownedPartititions, sharedPartitions, removedOwnedPartitions, removedSharedPartitions));
         }
 
         return taskSyncContext;

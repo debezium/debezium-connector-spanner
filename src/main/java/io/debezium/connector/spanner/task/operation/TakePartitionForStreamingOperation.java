@@ -5,7 +5,9 @@
  */
 package io.debezium.connector.spanner.task.operation;
 
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
@@ -32,6 +34,7 @@ public class TakePartitionForStreamingOperation implements Operation {
 
     private final ChangeStream changeStream;
     private final PartitionFactory partitionFactory;
+    private List<String> tokensScheduled = new ArrayList<String>();;
 
     private boolean isRequiredPublishSyncEvent = false;
 
@@ -59,6 +62,7 @@ public class TakePartitionForStreamingOperation implements Operation {
         List<PartitionState> partitions = taskState.getPartitions().stream()
                 .map(partitionState -> {
                     if (toSchedule.contains(partitionState.getToken())) {
+                        tokensScheduled.add(partitionState.getToken());
                         return partitionState.toBuilder()
                                 .state(PartitionStateEnum.SCHEDULED)
                                 .build();
@@ -132,5 +136,25 @@ public class TakePartitionForStreamingOperation implements Operation {
     public TaskSyncContext doOperation(TaskSyncContext taskSyncContext) {
         taskSyncContext = removeAlreadyStreamingPartitions(taskSyncContext);
         return takePartitionForStreaming(taskSyncContext);
+    }
+
+    @Override
+    public List<String> updatedOwnedPartitions() {
+        return tokensScheduled;
+    }
+
+    @Override
+    public List<String> updatedSharedPartitions() {
+        return Collections.emptyList();
+    }
+
+    @Override
+    public List<String> removedOwnedPartitions() {
+        return Collections.emptyList();
+    }
+
+    @Override
+    public List<String> removedSharedPartitions() {
+        return Collections.emptyList();
     }
 }

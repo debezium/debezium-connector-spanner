@@ -108,7 +108,7 @@ public class SyncEventHandler {
                     inSync.getMessageType() == MessageTypeEnum.NEW_EPOCH &&
                     inGeneration >= currentGeneration) { // We ignore messages with a stale rebalanceGenerationid.
 
-                LOGGER.debug("Task {} - processNewEpoch : {} metadata {}, rebalanceId: {}",
+                LOGGER.info("Task {} - processNewEpoch : {} metadata {}, rebalanceId: {}",
                         taskSyncContextHolder.get().getTaskUid(),
                         inSync,
                         metadata,
@@ -131,15 +131,41 @@ public class SyncEventHandler {
                                 .build())
                         .build());
 
-                LOGGER.debug("Task {} - SyncEventHandler sent response for new epoch", taskSyncContextHolder.get().getTaskUid());
-
-                taskSyncPublisher.send(taskSyncContextHolder.get().buildTaskSyncEvent());
+                LOGGER.info("Task {} - Current task state after receiving newEpoch message", taskSyncContextHolder.get().getTaskUid(), taskSyncContextHolder.get());
             }
         }
         finally {
             taskSyncContextHolder.unlock();
         }
 
+    }
+
+    public void processUpdateEpoch(TaskSyncEvent inSync, SyncEventMetadata metadata) throws InterruptedException {
+        if (inSync == null) {
+            return;
+        }
+        if (skipFromPreviousGeneration(inSync)) {
+            return;
+        }
+
+        taskSyncContextHolder.lock();
+        try {
+
+            if (!taskSyncContextHolder.get().getRebalanceState().equals(RebalanceState.NEW_EPOCH_STARTED) ||
+                    inSync.getMessageType() != MessageTypeEnum.UPDATE_EPOCH) {
+                // We skip all messages that are not UPDATE_EPOCH here.
+                return;
+            }
+
+            LOGGER.info("Task {} - process epoch update", taskSyncContextHolder.get().getTaskUid());
+
+            taskSyncContextHolder.update(context -> SyncEventMerger.mergeEpochUpdate(context, inSync));
+
+            eventConsumer.accept(new SyncEvent());
+        }
+        finally {
+            taskSyncContextHolder.unlock();
+        }
     }
 
     public void process(TaskSyncEvent inSync, SyncEventMetadata metadata) throws InterruptedException {
@@ -185,9 +211,9 @@ public class SyncEventHandler {
                 return;
             }
 
-            LOGGER.debug("Task {} - process sync event - rebalance answer", taskSyncContextHolder.get().getTaskUid());
+            LOGGER.info("Task {} - process sync event - rebalance answer {}", taskSyncContextHolder.get().getTaskUid(), inSync);
 
-            taskSyncContextHolder.update(context -> SyncEventMerger.merge(context, inSync));
+            taskSyncContextHolder.update(context -> SyncEventMerger.mergeRebalanceAnswer(context, inSync));
 
         }
         finally {
