@@ -51,7 +51,9 @@ public class SpannerSchema {
                 columns = new ArrayList<>();
                 tableMap.put(tableName, columns);
             }
-            columns.add(Column.create(columnName, type, primaryKey, ordinalPosition, nullable));
+            if (!columns.stream().anyMatch(column -> column.getName().equals(columnName))) {
+                columns.add(Column.create(columnName, type, primaryKey, ordinalPosition, nullable));
+            }
         }
 
         public SpannerSchema build() {
