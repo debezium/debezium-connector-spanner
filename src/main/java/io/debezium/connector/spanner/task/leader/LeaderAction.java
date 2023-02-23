@@ -19,7 +19,6 @@ import org.slf4j.LoggerFactory;
 
 import io.debezium.connector.spanner.kafka.internal.KafkaConsumerAdminService;
 import io.debezium.connector.spanner.kafka.internal.TaskSyncPublisher;
-import io.debezium.connector.spanner.kafka.internal.model.MessageTypeEnum;
 import io.debezium.connector.spanner.kafka.internal.model.RebalanceState;
 import io.debezium.connector.spanner.kafka.internal.model.TaskState;
 import io.debezium.connector.spanner.kafka.internal.model.TaskSyncEvent;
@@ -114,7 +113,7 @@ public class LeaderAction {
                 .epochOffsetHolder(oldContext.getEpochOffsetHolder().nextOffset(oldContext.getCurrentKafkaRecordOffset()))
                 .build());
 
-        taskSyncPublisher.send(taskSyncContext.buildTaskSyncEvent(MessageTypeEnum.UPDATE_EPOCH));
+        taskSyncPublisher.send(taskSyncContext.buildUpdateEpochTaskSyncEvent());
 
         LOGGER.info("Task {} - Epoch offset has been incremented and published {}:{}",
                 taskSyncContextHolder.get().getTaskUid(), taskSyncContext.getRebalanceGenerationId(), taskSyncContext.getEpochOffsetHolder().getEpochOffset());
@@ -177,7 +176,7 @@ public class LeaderAction {
                     .build();
         });
 
-        TaskSyncEvent taskSyncEvent = taskSyncContext.buildTaskSyncEvent(MessageTypeEnum.NEW_EPOCH);
+        TaskSyncEvent taskSyncEvent = taskSyncContext.buildNewEpochTaskSyncEvent();
 
         LOGGER.info("Task {} - LeaderAction sent sync event start new epoch {}:{}", taskSyncContext.getTaskUid(),
                 taskSyncContext.getRebalanceGenerationId(), taskSyncContext.getEpochOffsetHolder().getEpochOffset());

@@ -6,6 +6,8 @@
 package io.debezium.connector.spanner;
 
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -20,6 +22,7 @@ import io.debezium.connector.spanner.context.offset.SpannerOffsetContext;
 import io.debezium.connector.spanner.context.offset.SpannerOffsetContextFactory;
 import io.debezium.connector.spanner.db.metadata.SchemaRegistry;
 import io.debezium.connector.spanner.db.metadata.TableId;
+import io.debezium.connector.spanner.db.model.InitialPartition;
 import io.debezium.connector.spanner.db.model.Mod;
 import io.debezium.connector.spanner.db.model.Partition;
 import io.debezium.connector.spanner.db.model.event.ChangeStreamEvent;
@@ -48,6 +51,8 @@ public class SpannerStreamingChangeEventSource implements CommittingRecordsStrea
     private static final StuckPartitionStrategy STUCK_PARTITION_STRATEGY = StuckPartitionStrategy.ESCALATE;
 
     private static final Duration FINISHING_PARTITION_TIMEOUT = Duration.ofSeconds(60);
+
+    private static final long INITIAL_TOKEN_BATCH_SIZE = 200;
 
     private final FinishPartitionStrategy finishPartitionStrategy;
 
@@ -166,6 +171,7 @@ public class SpannerStreamingChangeEventSource implements CommittingRecordsStrea
     private void startProcessing(ChangeEventSourceContext context) {
         thread = new Thread(() -> {
             try {
+                List<ChildPartitionsEvent> initialChildPartitionTokens = new ArrayList<ChildPartitionsEvent>();
                 while (context.isRunning()) {
                     ChangeStreamEvent event = eventQueue.take();
 
@@ -184,10 +190,39 @@ public class SpannerStreamingChangeEventSource implements CommittingRecordsStrea
                     else if (event instanceof ChildPartitionsEvent) {
 
                         ChildPartitionsEvent childPartitionsEvent = (ChildPartitionsEvent) event;
-
-                        processChildPartitionsEvent(childPartitionsEvent);
+                        if (!childPartitionsEvent.getChildPartitions().isEmpty() &&
+                                childPartitionsEvent.getChildPartitions().get(0).getParentTokens().contains(InitialPartition.PARTITION_TOKEN)) {
+                            LOGGER.info("Batching child partition event {}", childPartitionsEvent);
+                            initialChildPartitionTokens.add(childPartitionsEvent);
+                        }
+                        else {
+                            processChildPartitionsEvent(Collections.singletonList(childPartitionsEvent));
+                        }
                     }
                     else if (event instanceof FinishPartitionEvent) {
+                        // Process batched initial child partition tokens.
+                        if (!initialChildPartitionTokens.isEmpty()) {
+                            LOGGER.info("Received FinishPartitionEvent {}, so clearing initial tokens", event.getMetadata().getPartitionToken());
+                            if (initialChildPartitionTokens.size() <= INITIAL_TOKEN_BATCH_SIZE) {
+                                processChildPartitionsEvent(initialChildPartitionTokens);
+                            }
+                            else {
+                                List<ChildPartitionsEvent> batchedInitialTokens = new ArrayList<>();
+                                for (ChildPartitionsEvent childPartitionsEvent : initialChildPartitionTokens) {
+                                    batchedInitialTokens.add(childPartitionsEvent);
+                                    if (batchedInitialTokens.size() >= INITIAL_TOKEN_BATCH_SIZE) {
+                                        processChildPartitionsEvent(batchedInitialTokens);
+                                        batchedInitialTokens.clear();
+                                    }
+
+                                }
+                                if (!batchedInitialTokens.isEmpty()) {
+                                    processChildPartitionsEvent(batchedInitialTokens);
+                                }
+                            }
+                            initialChildPartitionTokens.clear();
+                        }
+
                         LOGGER.info("Received FinishPartitionEvent for partition {}", event.getMetadata().getPartitionToken());
                         if (finishPartitionStrategy.equals(FinishPartitionStrategy.AFTER_COMMIT)) {
                             this.finishingPartitionManager.onPartitionFinishEvent(event.getMetadata().getPartitionToken());
@@ -249,23 +284,26 @@ public class SpannerStreamingChangeEventSource implements CommittingRecordsStrea
         LOGGER.debug("Dispatching heartbeat for event {} with partition {} and offset {}", event, partition, offsetContext.getOffset());
     }
 
-    private void processChildPartitionsEvent(ChildPartitionsEvent event) throws InterruptedException {
-        LOGGER.info("Received ChildPartitionsEvent: {}", event);
+    private void processChildPartitionsEvent(List<ChildPartitionsEvent> events) throws InterruptedException {
+        List<Partition> childPartitionsToSend = new ArrayList<>();
+        for (ChildPartitionsEvent event : events) {
+            LOGGER.info("Received ChildPartitionsEvent in StreamingChangeEventSource: {}", event);
+            List<Partition> partitions = event.getChildPartitions().stream().map(childPartition -> {
+                Timestamp startTimeStamp = event.getStartTimestamp();
+                return Partition.builder()
+                        .token(childPartition.getToken())
+                        .parentTokens(childPartition.getParentTokens())
+                        .startTimestamp(startTimeStamp)
+                        .endTimestamp(event.getMetadata().getPartitionEndTimestamp())
+                        .originPartitionToken(event.getMetadata().getPartitionToken())
+                        .build();
+            }).collect(Collectors.toList());
+            childPartitionsToSend.addAll(partitions);
+            metricsEventPublisher.publishMetricEvent(new ChildPartitionsMetricEvent(event.getChildPartitions().size()));
+        }
+        LOGGER.info("Sending List<Partition> to PartitionManager: {}", childPartitionsToSend);
 
-        List<Partition> partitions = event.getChildPartitions().stream().map(childPartition -> {
-            Timestamp startTimeStamp = event.getStartTimestamp();
-            return Partition.builder()
-                    .token(childPartition.getToken())
-                    .parentTokens(childPartition.getParentTokens())
-                    .startTimestamp(startTimeStamp)
-                    .endTimestamp(event.getMetadata().getPartitionEndTimestamp())
-                    .originPartitionToken(event.getMetadata().getPartitionToken())
-                    .build();
-        }).collect(Collectors.toList());
-
-        this.partitionManager.newChildPartitions(partitions);
-
-        metricsEventPublisher.publishMetricEvent(new ChildPartitionsMetricEvent(event.getChildPartitions().size()));
+        this.partitionManager.newChildPartitions(childPartitionsToSend);
     }
 
     private void processFailure(Exception ex) {

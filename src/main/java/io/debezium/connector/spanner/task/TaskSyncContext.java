@@ -8,13 +8,18 @@ package io.debezium.connector.spanner.task;
 import static java.util.Collections.emptyList;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import com.google.cloud.Timestamp;
 
 import io.debezium.connector.spanner.SpannerConnectorConfig;
 import io.debezium.connector.spanner.kafka.internal.model.MessageTypeEnum;
+import io.debezium.connector.spanner.kafka.internal.model.PartitionState;
+import io.debezium.connector.spanner.kafka.internal.model.PartitionStateEnum;
 import io.debezium.connector.spanner.kafka.internal.model.RebalanceState;
 import io.debezium.connector.spanner.kafka.internal.model.TaskState;
 import io.debezium.connector.spanner.kafka.internal.model.TaskSyncEvent;
@@ -49,6 +54,115 @@ public class TaskSyncContext {
                 .rebalanceGenerationId(rebalanceGenerationId)
                 .stateTimestamp(Instant.now().toEpochMilli()).build());
         return Map.copyOf(taskStateMap);
+    }
+
+    public Map<String, TaskState> getCurrentTaskStateMap() {
+        Map<String, TaskState> currentTaskStateMap = new HashMap<>();
+        currentTaskStateMap.put(this.taskUid, currentTaskState.toBuilder()
+                .consumerId(consumerId)
+                .rebalanceGenerationId(rebalanceGenerationId)
+                .stateTimestamp(Instant.now().toEpochMilli()).build());
+        return currentTaskStateMap;
+    }
+
+    public Map<String, TaskState> getIncrementalTaskStateMap(List<String> updatedOwnedPartitions,
+                                                             List<String> updatedSharedPartitions,
+                                                             List<String> removedOwnedPartitions,
+                                                             List<String> removedSharedPartitions) {
+        // Add all partitions that are newly owned by this task.
+        List<PartitionState> newOwnedPartitions = currentTaskState.getPartitions().stream()
+                .filter(partitionState -> updatedOwnedPartitions.contains(partitionState.getToken()))
+                .collect(Collectors.toList());
+        // Add all partitions that are owned but newly removed by this task.
+        List<PartitionState> newRemovedOwnedPartitions = currentTaskState.getPartitions().stream()
+                .filter(partitionState -> removedOwnedPartitions.contains(partitionState.getToken()))
+                .map(partitionState -> PartitionState.builder().state(PartitionStateEnum.REMOVED).build())
+                .collect(Collectors.toList());
+        List<PartitionState> modifiedOwnedPartitions = new ArrayList<PartitionState>();
+        modifiedOwnedPartitions.addAll(newOwnedPartitions);
+        modifiedOwnedPartitions.addAll(newRemovedOwnedPartitions);
+
+        // Add all partitions that are newly shared by this task.
+        List<PartitionState> newSharedPartitions = currentTaskState.getPartitions().stream()
+                .filter(partitionState -> updatedSharedPartitions.contains(partitionState.getToken()))
+                .collect(Collectors.toList());
+        // Add all partitions that were shared by this task but were removed.
+        List<PartitionState> newRemovedSharedPartitions = currentTaskState.getPartitions().stream()
+                .filter(partitionState -> removedSharedPartitions.contains(partitionState.getToken()))
+                .map(partitionState -> PartitionState.builder().state(PartitionStateEnum.REMOVED).build())
+                .collect(Collectors.toList());
+        List<PartitionState> modifiedSharedPartitions = new ArrayList<PartitionState>();
+        modifiedOwnedPartitions.addAll(newSharedPartitions);
+        modifiedOwnedPartitions.addAll(newRemovedSharedPartitions);
+
+        Map<String, TaskState> currentTaskStateMap = new HashMap<>();
+        currentTaskStateMap.put(this.taskUid, currentTaskState.toBuilder()
+                .consumerId(consumerId)
+                .rebalanceGenerationId(rebalanceGenerationId)
+                .partitions(modifiedOwnedPartitions)
+                .sharedPartitions(modifiedSharedPartitions)
+                .stateTimestamp(Instant.now().toEpochMilli()).build());
+
+        return currentTaskStateMap;
+    }
+
+    public TaskSyncEvent buildIncrementalTaskSyncEvent(
+                                                       List<String> updatedOwnedPartitions,
+                                                       List<String> updatedSharedPartitions,
+                                                       List<String> removedOwnedPartitions,
+                                                       List<String> removedSharedPartitions) {
+
+        // This task sync context will only contain partitions that were either newly owned or
+        // newly removed by this task, as well as partitions that were newly shared or
+        // newly removed by this task.
+        return TaskSyncEvent.builder().epochOffset(this.epochOffsetHolder.getEpochOffset()).taskStates(
+                this.getIncrementalTaskStateMap(updatedOwnedPartitions, updatedSharedPartitions, removedOwnedPartitions, removedSharedPartitions))
+                .taskUid(this.getTaskUid())
+                .consumerId(this.getConsumerId())
+                .rebalanceGenerationId(this.getRebalanceGenerationId())
+                .messageTimestamp(this.getCreatedTimestamp())
+                .messageType(MessageTypeEnum.REGULAR)
+                .databaseSchemaTimestamp(databaseSchemaTimestamp)
+                .build();
+    }
+
+    // Builds a new epoch message, which will contain all task states.
+    public TaskSyncEvent buildNewEpochTaskSyncEvent() {
+        return TaskSyncEvent.builder().epochOffset(this.epochOffsetHolder.getEpochOffset()).taskStates(
+                this.getAllTaskStates())
+                .taskUid(this.getTaskUid())
+                .consumerId(this.getConsumerId())
+                .rebalanceGenerationId(this.getRebalanceGenerationId())
+                .messageTimestamp(this.getCreatedTimestamp())
+                .messageType(MessageTypeEnum.NEW_EPOCH)
+                .databaseSchemaTimestamp(databaseSchemaTimestamp)
+                .build();
+    }
+
+    // Builds an epoch update message, which will contain all task states.
+    public TaskSyncEvent buildUpdateEpochTaskSyncEvent() {
+        return TaskSyncEvent.builder().epochOffset(this.epochOffsetHolder.getEpochOffset()).taskStates(
+                this.getAllTaskStates())
+                .taskUid(this.getTaskUid())
+                .consumerId(this.getConsumerId())
+                .rebalanceGenerationId(this.getRebalanceGenerationId())
+                .messageTimestamp(this.getCreatedTimestamp())
+                .messageType(MessageTypeEnum.UPDATE_EPOCH)
+                .databaseSchemaTimestamp(databaseSchemaTimestamp)
+                .build();
+    }
+
+    // Builds a rebalance answer task sync event, which will contain only the current task state.
+    public TaskSyncEvent buildRebalanceAnswerTaskSyncEvent() {
+        return TaskSyncEvent.builder().epochOffset(this.epochOffsetHolder.getEpochOffset()).taskStates(
+                this.getCurrentTaskStateMap())
+                .taskUid(this.getTaskUid())
+                .consumerId(this.getConsumerId())
+                .rebalanceGenerationId(this.getRebalanceGenerationId())
+                .messageTimestamp(this.getCreatedTimestamp())
+                .messageType(MessageTypeEnum.REBALANCE_ANSWER)
+                .databaseSchemaTimestamp(databaseSchemaTimestamp)
+                .build();
     }
 
     public TaskSyncEvent buildTaskSyncEvent() {

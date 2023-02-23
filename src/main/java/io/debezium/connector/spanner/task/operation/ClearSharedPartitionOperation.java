@@ -5,6 +5,8 @@
  */
 package io.debezium.connector.spanner.task.operation;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -24,6 +26,7 @@ public class ClearSharedPartitionOperation implements Operation {
     private static final Logger LOGGER = LoggerFactory.getLogger(ClearSharedPartitionOperation.class);
 
     private boolean isRequiredPublishSyncEvent = false;
+    List<String> removedSharedTokens = new ArrayList<String>();
 
     private TaskSyncContext clear(TaskSyncContext taskSyncContext) {
 
@@ -41,6 +44,12 @@ public class ClearSharedPartitionOperation implements Operation {
             LOGGER.debug("Task cleared shared partitions, taskUid: {}", taskSyncContext.getTaskUid());
         }
 
+        for (PartitionState partition : currentTaskState.getSharedPartitions()) {
+            if (!newSharedList.contains(partition)) {
+                removedSharedTokens.add(partition.getToken());
+            }
+        }
+
         return taskSyncContext.toBuilder().currentTaskState(currentTaskState.toBuilder()
                 .sharedPartitions(newSharedList)
                 .build()).build();
@@ -54,5 +63,25 @@ public class ClearSharedPartitionOperation implements Operation {
     @Override
     public TaskSyncContext doOperation(TaskSyncContext taskSyncContext) {
         return clear(taskSyncContext);
+    }
+
+    @Override
+    public List<String> updatedOwnedPartitions() {
+        return Collections.emptyList();
+    }
+
+    @Override
+    public List<String> updatedSharedPartitions() {
+        return Collections.emptyList();
+    };
+
+    @Override
+    public List<String> removedOwnedPartitions() {
+        return Collections.emptyList();
+    }
+
+    @Override
+    public List<String> removedSharedPartitions() {
+        return removedSharedTokens;
     }
 }

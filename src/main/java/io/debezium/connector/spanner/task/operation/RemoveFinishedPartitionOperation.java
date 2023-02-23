@@ -8,6 +8,8 @@ package io.debezium.connector.spanner.task.operation;
 import static org.slf4j.LoggerFactory.getLogger;
 
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -30,6 +32,7 @@ public class RemoveFinishedPartitionOperation implements Operation {
     private static final Duration DELETION_DELAY = Duration.ofMinutes(60);
 
     private boolean isRequiredPublishSyncEvent = false;
+    private final List<String> removedFinishedPartitions = new ArrayList<>();
 
     private TaskSyncContext removeFinishedPartitions(TaskSyncContext taskSyncContext) {
 
@@ -60,6 +63,7 @@ public class RemoveFinishedPartitionOperation implements Operation {
                                             partitionState.getFinishedTimestamp(),
                                             deletionTime,
                                             currentTime);
+                                    removedFinishedPartitions.add(partitionState.getToken());
                                     return null;
                                 }
                                 LOGGER.info(
@@ -121,5 +125,25 @@ public class RemoveFinishedPartitionOperation implements Operation {
     @Override
     public TaskSyncContext doOperation(TaskSyncContext taskSyncContext) {
         return removeFinishedPartitions(taskSyncContext);
+    }
+
+    @Override
+    public List<String> updatedOwnedPartitions() {
+        return Collections.emptyList();
+    }
+
+    @Override
+    public List<String> updatedSharedPartitions() {
+        return Collections.emptyList();
+    }
+
+    @Override
+    public List<String> removedOwnedPartitions() {
+        return removedFinishedPartitions;
+    }
+
+    @Override
+    public List<String> removedSharedPartitions() {
+        return Collections.emptyList();
     }
 }
