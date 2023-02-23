@@ -571,7 +571,6 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
             .events(TABLE_EXCLUDE_LIST,
                     TABLE_INCLUDE_LIST,
                     CUSTOM_CONVERTERS,
-                    SANITIZE_FIELD_NAMES,
                     TOMBSTONES_ON_DELETE,
                     AbstractTopicNamingStrategy.TOPIC_HEARTBEAT_PREFIX)
             .create();

@@ -19,7 +19,7 @@ import io.debezium.connector.spanner.db.dao.SchemaDao;
 import io.debezium.connector.spanner.db.metadata.SchemaRegistry;
 import io.debezium.connector.spanner.db.metadata.TableId;
 import io.debezium.connector.spanner.db.model.schema.TableSchema;
-import io.debezium.util.SchemaNameAdjuster;
+import io.debezium.schema.SchemaNameAdjuster;
 
 class KafkaSpannerTableSchemaFactoryTest {
 
