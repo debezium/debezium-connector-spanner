@@ -45,8 +45,8 @@ import io.debezium.pipeline.DataChangeEvent;
 import io.debezium.pipeline.source.spi.EventMetadataProvider;
 import io.debezium.schema.DataCollectionFilters;
 import io.debezium.schema.DefaultTopicNamingStrategy;
+import io.debezium.schema.SchemaNameAdjuster;
 import io.debezium.spi.topic.TopicNamingStrategy;
-import io.debezium.util.SchemaNameAdjuster;
 
 /** Spanner implementation for Debezium's CDC SourceTask */
 public class SpannerConnectorTask extends SpannerBaseSourceTask {
@@ -99,7 +99,7 @@ public class SpannerConnectorTask extends SpannerBaseSourceTask {
         this.spannerMeter = new SpannerMeter(
                 this, connectorConfig, errorHandler, () -> lowWatermarkHolder.getLowWatermark());
 
-        final SchemaNameAdjuster schemaNameAdjuster = connectorConfig.schemaNameAdjustmentMode().createAdjuster();
+        final SchemaNameAdjuster schemaNameAdjuster = connectorConfig.schemaNameAdjuster();
 
         final DataCollectionFilters.DataCollectionFilter<TableId> tableFilter = new SpannerTableFilter(connectorConfig);
 

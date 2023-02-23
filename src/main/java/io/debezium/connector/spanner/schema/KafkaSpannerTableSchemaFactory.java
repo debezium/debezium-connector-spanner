@@ -23,8 +23,8 @@ import io.debezium.connector.spanner.db.model.schema.TableSchema;
 import io.debezium.connector.spanner.schema.mapper.ColumnTypeSchemaMapper;
 import io.debezium.connector.spanner.schema.mapper.FieldJsonNodeValueMapper;
 import io.debezium.data.Envelope;
+import io.debezium.schema.SchemaNameAdjuster;
 import io.debezium.spi.topic.TopicNamingStrategy;
-import io.debezium.util.SchemaNameAdjuster;
 
 /**
  * Builds Kafka record schema for Spanner DB table

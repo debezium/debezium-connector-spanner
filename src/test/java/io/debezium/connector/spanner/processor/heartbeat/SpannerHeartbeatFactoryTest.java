@@ -17,8 +17,8 @@ import io.debezium.config.Configuration;
 import io.debezium.config.Field;
 import io.debezium.connector.spanner.SpannerConnectorConfig;
 import io.debezium.heartbeat.Heartbeat;
+import io.debezium.schema.SchemaNameAdjuster;
 import io.debezium.spi.topic.TopicNamingStrategy;
-import io.debezium.util.SchemaNameAdjuster;
 
 class SpannerHeartbeatFactoryTest {
 
