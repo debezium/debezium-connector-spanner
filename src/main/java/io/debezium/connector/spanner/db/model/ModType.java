@@ -12,7 +12,8 @@ import io.debezium.connector.spanner.db.model.event.DataChangeEvent;
  * following: INSERT, UPDATE or DELETE.
  */
 public enum ModType {
-    INSERT,
-    UPDATE,
-    DELETE
+  INSERT,
+  UPDATE,
+  DELETE,
+  UNKNOWN
 }
