@@ -86,7 +86,7 @@ public class FindPartitionForStreamingOperation implements Operation {
 
     @Override
     public List<String> updatedOwnedPartitions() {
-        return partitionsToBeStreamed;
+        return Collections.emptyList();
     }
 
     @Override
@@ -102,6 +102,11 @@ public class FindPartitionForStreamingOperation implements Operation {
     @Override
     public List<String> removedSharedPartitions() {
         return Collections.emptyList();
+    }
+
+    @Override
+    public List<String> modifiedOwnedPartitions() {
+        return partitionsToBeStreamed;
     }
 
 }

@@ -130,15 +130,20 @@ public class CheckPartitionDuplicationOperation implements Operation {
     @Override
     public List<String> updatedSharedPartitions() {
         return Collections.emptyList();
-    };
+    }
 
     @Override
     public List<String> removedOwnedPartitions() {
         return partitionsToStopStreaming;
-    };
+    }
 
     @Override
     public List<String> removedSharedPartitions() {
         return Collections.emptyList();
-    };
+    }
+
+    @Override
+    public List<String> modifiedOwnedPartitions() {
+        return Collections.emptyList();
+    }
 }

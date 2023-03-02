@@ -146,4 +146,9 @@ public class RemoveFinishedPartitionOperation implements Operation {
     public List<String> removedSharedPartitions() {
         return Collections.emptyList();
     }
+
+    @Override
+    public List<String> modifiedOwnedPartitions() {
+        return Collections.emptyList();
+    }
 }

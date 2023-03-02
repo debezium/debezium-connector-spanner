@@ -68,7 +68,8 @@ public class TaskSyncContext {
     public Map<String, TaskState> getIncrementalTaskStateMap(List<String> updatedOwnedPartitions,
                                                              List<String> updatedSharedPartitions,
                                                              List<String> removedOwnedPartitions,
-                                                             List<String> removedSharedPartitions) {
+                                                             List<String> removedSharedPartitions,
+                                                             List<String> modifiedOwnedPartitions) {
         // Add all partitions that are newly owned by this task.
         List<PartitionState> newOwnedPartitions = currentTaskState.getPartitions().stream()
                 .filter(partitionState -> updatedOwnedPartitions.contains(partitionState.getToken()))
@@ -78,9 +79,13 @@ public class TaskSyncContext {
                 .filter(partitionState -> removedOwnedPartitions.contains(partitionState.getToken()))
                 .map(partitionState -> PartitionState.builder().state(PartitionStateEnum.REMOVED).build())
                 .collect(Collectors.toList());
-        List<PartitionState> modifiedOwnedPartitions = new ArrayList<PartitionState>();
-        modifiedOwnedPartitions.addAll(newOwnedPartitions);
-        modifiedOwnedPartitions.addAll(newRemovedOwnedPartitions);
+        List<PartitionState> newModifiedOwnedPartitions = currentTaskState.getPartitions().stream()
+                .filter(partitionState -> modifiedOwnedPartitions.contains(partitionState.getToken()))
+                .collect(Collectors.toList());
+        List<PartitionState> ownedPartitionsToAdd = new ArrayList<PartitionState>();
+        ownedPartitionsToAdd.addAll(newOwnedPartitions);
+        ownedPartitionsToAdd.addAll(newRemovedOwnedPartitions);
+        ownedPartitionsToAdd.addAll(newModifiedOwnedPartitions);
 
         // Add all partitions that are newly shared by this task.
         List<PartitionState> newSharedPartitions = currentTaskState.getPartitions().stream()
@@ -91,16 +96,16 @@ public class TaskSyncContext {
                 .filter(partitionState -> removedSharedPartitions.contains(partitionState.getToken()))
                 .map(partitionState -> PartitionState.builder().state(PartitionStateEnum.REMOVED).build())
                 .collect(Collectors.toList());
-        List<PartitionState> modifiedSharedPartitions = new ArrayList<PartitionState>();
-        modifiedOwnedPartitions.addAll(newSharedPartitions);
-        modifiedOwnedPartitions.addAll(newRemovedSharedPartitions);
+        List<PartitionState> sharedPartitionsToAdd = new ArrayList<PartitionState>();
+        sharedPartitionsToAdd.addAll(newSharedPartitions);
+        sharedPartitionsToAdd.addAll(newRemovedSharedPartitions);
 
         Map<String, TaskState> currentTaskStateMap = new HashMap<>();
         currentTaskStateMap.put(this.taskUid, currentTaskState.toBuilder()
                 .consumerId(consumerId)
                 .rebalanceGenerationId(rebalanceGenerationId)
-                .partitions(modifiedOwnedPartitions)
-                .sharedPartitions(modifiedSharedPartitions)
+                .partitions(ownedPartitionsToAdd)
+                .sharedPartitions(sharedPartitionsToAdd)
                 .stateTimestamp(Instant.now().toEpochMilli()).build());
 
         return currentTaskStateMap;
@@ -110,13 +115,15 @@ public class TaskSyncContext {
                                                        List<String> updatedOwnedPartitions,
                                                        List<String> updatedSharedPartitions,
                                                        List<String> removedOwnedPartitions,
-                                                       List<String> removedSharedPartitions) {
+                                                       List<String> removedSharedPartitions,
+                                                       List<String> modifiedOwnedPartitions) {
 
         // This task sync context will only contain partitions that were either newly owned or
         // newly removed by this task, as well as partitions that were newly shared or
         // newly removed by this task.
         return TaskSyncEvent.builder().epochOffset(this.epochOffsetHolder.getEpochOffset()).taskStates(
-                this.getIncrementalTaskStateMap(updatedOwnedPartitions, updatedSharedPartitions, removedOwnedPartitions, removedSharedPartitions))
+                this.getIncrementalTaskStateMap(updatedOwnedPartitions, updatedSharedPartitions, removedOwnedPartitions, removedSharedPartitions,
+                        modifiedOwnedPartitions))
                 .taskUid(this.getTaskUid())
                 .consumerId(this.getConsumerId())
                 .rebalanceGenerationId(this.getRebalanceGenerationId())

@@ -201,4 +201,9 @@ public class ChildPartitionOperation implements Operation {
         return Collections.emptyList();
     }
 
+    @Override
+    public List<String> modifiedOwnedPartitions() {
+        return Collections.emptyList();
+    }
+
 }
