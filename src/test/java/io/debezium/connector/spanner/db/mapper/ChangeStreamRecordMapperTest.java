@@ -17,19 +17,11 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-
-import org.joda.time.Duration;
-import org.junit.jupiter.api.Test;
-
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.cloud.Timestamp;
+import com.google.cloud.spanner.Dialect;
 import com.google.cloud.spanner.Struct;
 import com.google.cloud.spanner.Type;
-
 import io.debezium.connector.spanner.db.dao.ChangeStreamResultSetMetadata;
 import io.debezium.connector.spanner.db.model.ChildPartition;
 import io.debezium.connector.spanner.db.model.Mod;
@@ -39,12 +31,19 @@ import io.debezium.connector.spanner.db.model.event.ChildPartitionsEvent;
 import io.debezium.connector.spanner.db.model.event.DataChangeEvent;
 import io.debezium.connector.spanner.db.model.event.HeartbeatEvent;
 import io.debezium.connector.spanner.db.model.schema.Column;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import org.joda.time.Duration;
+import org.junit.jupiter.api.Test;
 
 class ChangeStreamRecordMapperTest {
 
     @Test
     void testToChangeStreamEvents() {
-        ChangeStreamRecordMapper changeStreamRecordMapper = new ChangeStreamRecordMapper();
+        ChangeStreamRecordMapper changeStreamRecordMapper = new ChangeStreamRecordMapper(
+            Dialect.GOOGLE_STANDARD_SQL);
         HashSet<String> parentTokens = new HashSet<>();
         Timestamp startTimestamp = Timestamp.ofTimeMicroseconds(1L);
         Partition partition = new Partition("token", parentTokens, startTimestamp, Timestamp.ofTimeMicroseconds(1L), "originPartition");
