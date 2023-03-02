@@ -6,11 +6,12 @@
 package io.debezium.connector.spanner.db.model;
 
 /**
- * Represents the capture type of a change stream.
- * See https://cloud.google.com/spanner/docs/change-streams#value-capture-type.
+ * Represents the capture type of a change stream. See
+ * https://cloud.google.com/spanner/docs/change-streams#value-capture-type.
  */
 public enum ValueCaptureType {
-    OLD_AND_NEW_VALUES,
-    NEW_ROW,
-    NEW_VALUES
+  OLD_AND_NEW_VALUES,
+  NEW_ROW,
+  NEW_VALUES,
+  UNKNOWN
 }

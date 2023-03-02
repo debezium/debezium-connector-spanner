@@ -15,7 +15,7 @@
 
     <properties>
         <version.debezium>${project.version}</version.debezium>
-        <google.cloud.spanner.version>6.25.5</google.cloud.spanner.version>
+        <google.cloud.spanner.version>6.30.1</google.cloud.spanner.version>
         <version.sketches-java>0.8.2</version.sketches-java>
         <version.google.protos>2.8.3</version.google.protos>
         <version.com.google.protobuf>3.21.6</version.com.google.protobuf>

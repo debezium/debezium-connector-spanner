@@ -7,22 +7,24 @@ package io.debezium.connector.spanner.db;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
-import java.time.Duration;
-
-import org.junit.jupiter.api.Test;
-
+import com.google.cloud.spanner.Dialect;
 import io.debezium.connector.spanner.db.stream.SpannerChangeStream;
 import io.debezium.connector.spanner.metrics.MetricsEventPublisher;
+import java.time.Duration;
+import org.junit.jupiter.api.Test;
 
 class SpannerChangeStreamFactoryTest {
 
     @Test
     void testGetStream() {
         DaoFactory daoFactory = new DaoFactory(
-                new DatabaseClientFactory(
-                        "myproject", "42", "42", "Credentials Json", "Credentials Path", null));
-        SpannerChangeStreamFactory spannerChangeStreamFactory = new SpannerChangeStreamFactory(daoFactory, new MetricsEventPublisher(), "test-connector");
-        SpannerChangeStream stream = spannerChangeStreamFactory.getStream("stream1", Duration.ofMillis(100), 1);
+            new DatabaseClientFactory(
+                "myproject", "42", "42", "Credentials Json", "Credentials Path", null));
+        SpannerChangeStreamFactory spannerChangeStreamFactory = new SpannerChangeStreamFactory(
+            daoFactory, new MetricsEventPublisher(), "test-connector",
+            Dialect.GOOGLE_STANDARD_SQL);
+        SpannerChangeStream stream = spannerChangeStreamFactory.getStream("stream1",
+            Duration.ofMillis(100), 1);
         assertNotNull(stream);
     }
 }
