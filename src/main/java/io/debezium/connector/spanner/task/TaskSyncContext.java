@@ -58,11 +58,11 @@ public class TaskSyncContext {
 
     public Map<String, TaskState> getCurrentTaskStateMap() {
         Map<String, TaskState> currentTaskStateMap = new HashMap<>();
-        currentTaskStateMap.put(this.taskUid, currentTaskState.toBuilder()
+        currentTaskStateMap.put(currentTaskState.getTaskUid(), currentTaskState.toBuilder()
                 .consumerId(consumerId)
                 .rebalanceGenerationId(rebalanceGenerationId)
                 .stateTimestamp(Instant.now().toEpochMilli()).build());
-        return currentTaskStateMap;
+        return Map.copyOf(currentTaskStateMap);
     }
 
     public Map<String, TaskState> getIncrementalTaskStateMap(List<String> updatedOwnedPartitions,
@@ -72,15 +72,18 @@ public class TaskSyncContext {
                                                              List<String> modifiedOwnedPartitions) {
         // Add all partitions that are newly owned by this task.
         List<PartitionState> newOwnedPartitions = currentTaskState.getPartitions().stream()
-                .filter(partitionState -> updatedOwnedPartitions.contains(partitionState.getToken()))
+                .filter(partitionState -> updatedOwnedPartitions.contains(
+                        partitionState.getToken()))
                 .collect(Collectors.toList());
         // Add all partitions that are owned but newly removed by this task.
-        List<PartitionState> newRemovedOwnedPartitions = currentTaskState.getPartitions().stream()
-                .filter(partitionState -> removedOwnedPartitions.contains(partitionState.getToken()))
-                .map(partitionState -> PartitionState.builder().state(PartitionStateEnum.REMOVED).build())
+        List<PartitionState> newRemovedOwnedPartitions = removedOwnedPartitions.stream()
+                .map(partitionToken -> PartitionState.builder().token(partitionToken)
+                        .state(PartitionStateEnum.REMOVED).build())
                 .collect(Collectors.toList());
+        // Add all partitions that had their state modified.
         List<PartitionState> newModifiedOwnedPartitions = currentTaskState.getPartitions().stream()
-                .filter(partitionState -> modifiedOwnedPartitions.contains(partitionState.getToken()))
+                .filter(partitionState -> modifiedOwnedPartitions.contains(
+                        partitionState.getToken()))
                 .collect(Collectors.toList());
         List<PartitionState> ownedPartitionsToAdd = new ArrayList<PartitionState>();
         ownedPartitionsToAdd.addAll(newOwnedPartitions);
@@ -88,13 +91,14 @@ public class TaskSyncContext {
         ownedPartitionsToAdd.addAll(newModifiedOwnedPartitions);
 
         // Add all partitions that are newly shared by this task.
-        List<PartitionState> newSharedPartitions = currentTaskState.getPartitions().stream()
-                .filter(partitionState -> updatedSharedPartitions.contains(partitionState.getToken()))
+        List<PartitionState> newSharedPartitions = currentTaskState.getSharedPartitions().stream()
+                .filter(partitionState -> updatedSharedPartitions.contains(
+                        partitionState.getToken()))
                 .collect(Collectors.toList());
         // Add all partitions that were shared by this task but were removed.
-        List<PartitionState> newRemovedSharedPartitions = currentTaskState.getPartitions().stream()
-                .filter(partitionState -> removedSharedPartitions.contains(partitionState.getToken()))
-                .map(partitionState -> PartitionState.builder().state(PartitionStateEnum.REMOVED).build())
+        List<PartitionState> newRemovedSharedPartitions = removedSharedPartitions.stream()
+                .map(partitionToken -> PartitionState.builder().token(partitionToken)
+                        .state(PartitionStateEnum.REMOVED).build())
                 .collect(Collectors.toList());
         List<PartitionState> sharedPartitionsToAdd = new ArrayList<PartitionState>();
         sharedPartitionsToAdd.addAll(newSharedPartitions);
@@ -108,7 +112,7 @@ public class TaskSyncContext {
                 .sharedPartitions(sharedPartitionsToAdd)
                 .stateTimestamp(Instant.now().toEpochMilli()).build());
 
-        return currentTaskStateMap;
+        return Map.copyOf(currentTaskStateMap);
     }
 
     public TaskSyncEvent buildIncrementalTaskSyncEvent(
@@ -122,8 +126,9 @@ public class TaskSyncContext {
         // newly removed by this task, as well as partitions that were newly shared or
         // newly removed by this task.
         return TaskSyncEvent.builder().epochOffset(this.epochOffsetHolder.getEpochOffset()).taskStates(
-                this.getIncrementalTaskStateMap(updatedOwnedPartitions, updatedSharedPartitions, removedOwnedPartitions, removedSharedPartitions,
-                        modifiedOwnedPartitions))
+                this.getIncrementalTaskStateMap(
+                        updatedOwnedPartitions, updatedSharedPartitions, removedOwnedPartitions,
+                        removedSharedPartitions, modifiedOwnedPartitions))
                 .taskUid(this.getTaskUid())
                 .consumerId(this.getConsumerId())
                 .rebalanceGenerationId(this.getRebalanceGenerationId())
@@ -172,18 +177,14 @@ public class TaskSyncContext {
                 .build();
     }
 
-    public TaskSyncEvent buildTaskSyncEvent() {
-        return buildTaskSyncEvent(MessageTypeEnum.REGULAR);
-    }
-
-    public TaskSyncEvent buildTaskSyncEvent(MessageTypeEnum messageType) {
+    public TaskSyncEvent buildCurrentTaskSyncEvent() {
         return TaskSyncEvent.builder().epochOffset(this.epochOffsetHolder.getEpochOffset()).taskStates(
                 this.getAllTaskStates())
                 .taskUid(this.getTaskUid())
                 .consumerId(this.getConsumerId())
                 .rebalanceGenerationId(this.getRebalanceGenerationId())
                 .messageTimestamp(this.getCreatedTimestamp())
-                .messageType(messageType)
+                .messageType(MessageTypeEnum.REGULAR)
                 .databaseSchemaTimestamp(databaseSchemaTimestamp)
                 .build();
     }

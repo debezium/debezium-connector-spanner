@@ -22,6 +22,7 @@ import org.slf4j.Logger;
 
 import io.debezium.connector.spanner.kafka.internal.model.PartitionState;
 import io.debezium.connector.spanner.kafka.internal.model.PartitionStateEnum;
+import io.debezium.connector.spanner.kafka.internal.model.RebalanceState;
 import io.debezium.connector.spanner.kafka.internal.model.TaskState;
 import io.debezium.connector.spanner.kafka.internal.model.TaskSyncEvent;
 
@@ -35,58 +36,66 @@ public class SyncEventMerger {
     private SyncEventMerger() {
     }
 
-    public static TaskSyncContext mergeIncrementalTaskSyncEvent(TaskSyncContext context, TaskSyncEvent inSync) {
-        Map<String, TaskState> newTaskStatesMap = inSync.getTaskStates();
-        debug(LOGGER, "merge: state before {}, \nIncoming states: {}", context, newTaskStatesMap);
+    // Apply the deltas from the new message onto the current task state.
+    public static TaskSyncContext mergeIncrementalTaskSyncEvent(TaskSyncContext currentContext, TaskSyncEvent newMessage) {
+        Map<String, TaskState> newTaskStatesMap = newMessage.getTaskStates();
+        debug(LOGGER, "merge: state before {}, \nIncoming states: {}", currentContext, newTaskStatesMap);
 
-        var builder = context.toBuilder();
+        var builder = currentContext.toBuilder();
 
-        Set<String> updatedStatesUids = new HashSet<>();
-
-        TaskState publishingTask = inSync.getTaskStates().get(inSync.getTaskUid());
-        if (publishingTask == null) {
-            LOGGER.warn("The rebalance answer {} did not contain the task's UID: {}", inSync, inSync.getTaskUid());
+        TaskState newTask = newMessage.getTaskStates().get(newMessage.getTaskUid());
+        if (newTask == null) {
+            LOGGER.warn("The incremental message {} did not contain the task's UID: {}", newMessage, newMessage.getTaskUid());
             return builder.build();
         }
 
-        TaskState currentTask = context.getTaskStates().get(inSync.getTaskUid());
+        // We only update our internal copy of the other task's state.
+        TaskState currentTask = currentContext.getTaskStates().get(newMessage.getTaskUid());
         // We only update our internal copy of another task's state, if the state timestamp
         // in the sync event message is greater than the state timestamp of our internal
         // copy of the other task's state.
-        if (currentTask == null || publishingTask.getStateTimestamp() > currentTask.getStateTimestamp()) {
-            Map<String, TaskState> taskStates = new HashMap<>(context.getTaskStates());
-            taskStates.remove(inSync.getTaskUid());
 
-            // Get the newly owned partitions, newly removed owned partitions, newly shared partitions,
+        if (currentTask == null || newTask.getStateTimestamp() > currentTask.getStateTimestamp()) {
+
+            // Remove the new message's task state from our current task state.
+            Map<String, TaskState> currentTaskStates = new HashMap<>(currentContext.getTaskStates());
+            currentTaskStates.remove(newMessage.getTaskUid());
+
+            // Get the updated owned partitions, newly removed owned partitions, newly shared partitions,
             // newly removed shared partitions from the sync event message.
-            List<PartitionState> newOwnedPartitions = publishingTask.getPartitions().stream()
+            List<PartitionState> updatedOwnedPartitions = newTask.getPartitions().stream()
                     .filter(partitionState -> !partitionState.getState().equals(PartitionStateEnum.REMOVED))
                     .collect(Collectors.toList());
-            List<PartitionState> removedOwnedPartitions = publishingTask.getPartitions().stream()
+            List<PartitionState> removedOwnedPartitions = newTask.getPartitions().stream()
                     .filter(partitionState -> partitionState.getState().equals(PartitionStateEnum.REMOVED))
                     .collect(Collectors.toList());
-            List<PartitionState> newSharedPartitions = publishingTask.getSharedPartitions().stream()
+            List<PartitionState> newSharedPartitions = newTask.getSharedPartitions().stream()
                     .filter(partitionState -> !partitionState.getState().equals(PartitionStateEnum.REMOVED))
                     .collect(Collectors.toList());
-            List<PartitionState> removedSharedPartitions = publishingTask.getSharedPartitions().stream()
+            List<PartitionState> removedSharedPartitions = newTask.getSharedPartitions().stream()
                     .filter(partitionState -> partitionState.getState().equals(PartitionStateEnum.REMOVED))
                     .collect(Collectors.toList());
 
-            // Only add the partitions from the current task sync context, if it was not newly modified
-            // or removed.
+            // Compute the final owned partitions for this task.
             List<PartitionState> finalOwnedPartitions = new ArrayList<>();
             for (PartitionState currentPartition : currentTask.getPartitions()) {
-                if (!removedOwnedPartitions.contains(currentPartition) && !newOwnedPartitions.contains(currentPartition)) {
+                // Only add the partitions from the current task sync context, if it was not newly
+                // modified or removed.
+                if (!removedOwnedPartitions.contains(currentPartition) &&
+                        !updatedOwnedPartitions.contains(currentPartition)) {
                     finalOwnedPartitions.add(currentPartition);
                 }
             }
             // Add all the newly modified partitions.
-            finalOwnedPartitions.addAll(newOwnedPartitions);
-            // Only add the shared partitions from the current task context, if it was not newly
-            // shared.
+            finalOwnedPartitions.addAll(updatedOwnedPartitions);
+
+            // Compute the final shared partitions.
             List<PartitionState> finalSharedPartitions = new ArrayList<>();
             for (PartitionState currentPartition : currentTask.getSharedPartitions()) {
-                if (!removedSharedPartitions.contains(currentPartition) && !newSharedPartitions.contains(currentPartition)) {
+                // Only add the partitions from the current task sync context, if it was not newly
+                // shared or removed.
+                if (!removedSharedPartitions.contains(currentPartition) &&
+                        !newSharedPartitions.contains(currentPartition)) {
                     finalSharedPartitions.add(currentPartition);
                 }
             }
@@ -94,13 +103,17 @@ public class SyncEventMerger {
             finalSharedPartitions.addAll(newSharedPartitions);
 
             // build from the new sync context.
-            TaskState finalTaskState = publishingTask.builder().partitions(finalOwnedPartitions).sharedPartitions(finalSharedPartitions).build();
-            taskStates.put(inSync.getTaskUid(), finalTaskState);
-            builder.taskStates(taskStates)
-                    .createdTimestamp(Long.max(context.getCreatedTimestamp(), inSync.getMessageTimestamp()));
+            TaskState finalTaskState = newTask.builder().partitions(finalOwnedPartitions)
+                    .sharedPartitions(finalSharedPartitions).build();
+            currentTaskStates.put(currentContext.getTaskUid(), finalTaskState);
+            builder.taskStates(currentTaskStates)
+                    .createdTimestamp(Long.max(currentContext.getCreatedTimestamp(),
+                            newMessage.getMessageTimestamp()));
             TaskSyncContext result = builder
                     .build();
-            LOGGER.info("Processed rebalance answer {} from task {} for rebalance generation id {}", inSync, inSync.getTaskUid(), inSync.getRebalanceGenerationId());
+            LOGGER.debug("Processed incremental answer {} from task {} for " +
+                    "rebalance generation id {}", newMessage, newMessage.getTaskUid(),
+                    newMessage.getRebalanceGenerationId());
             return result;
         }
         LOGGER.debug("merge: final state is not changed");
@@ -108,33 +121,36 @@ public class SyncEventMerger {
         return builder.build();
     }
 
-    public static TaskSyncContext mergeRebalanceAnswer(TaskSyncContext context, TaskSyncEvent inSync) {
-        Map<String, TaskState> newTaskStatesMap = inSync.getTaskStates();
-        debug(LOGGER, "merge: state before {}, \nIncoming states: {}", context, newTaskStatesMap);
+    // Take in the new task's snapshot.
+    public static TaskSyncContext mergeRebalanceAnswer(TaskSyncContext currentContext, TaskSyncEvent newMessage) {
+        Map<String, TaskState> newTaskStatesMap = newMessage.getTaskStates();
+        debug(LOGGER, "merge: state before {}, \nIncoming states: {}", currentContext, newTaskStatesMap);
 
-        var builder = context.toBuilder();
+        var builder = currentContext.toBuilder();
 
-        Set<String> updatedStatesUids = new HashSet<>();
-
-        TaskState publishingTask = inSync.getTaskStates().get(inSync.getTaskUid());
-        if (publishingTask == null) {
-            LOGGER.warn("The rebalance answer {} did not contain the task's UID: {}", inSync, inSync.getTaskUid());
+        TaskState newTask = newMessage.getTaskStates().get(newMessage.getTaskUid());
+        if (newTask == null) {
+            LOGGER.warn("The rebalance answer {} did not contain the task's UID: {}", newMessage, newMessage.getTaskUid());
             return builder.build();
         }
 
-        TaskState rebalanceTaskState = context.getTaskStates().get(inSync.getTaskUid());
+        // We only retrieve the task state belonging to the rebalance answer.
+        TaskState currentTask = currentContext.getTaskStates().get(newMessage.getTaskUid());
+
         // We only update our internal copy of another task's state, if the state timestamp
         // in the sync event message is greater than the state timestamp of our internal
         // copy of the other task's state.
-        if (rebalanceTaskState == null || publishingTask.getStateTimestamp() > rebalanceTaskState.getStateTimestamp()) {
-            Map<String, TaskState> taskStates = new HashMap<>(context.getTaskStates());
-            taskStates.remove(inSync.getTaskUid());
-            taskStates.put(inSync.getTaskUid(), publishingTask);
+        if (currentTask == null || newTask.getStateTimestamp() > currentTask.getStateTimestamp()) {
+            Map<String, TaskState> taskStates = new HashMap<>(currentContext.getTaskStates());
+            taskStates.remove(newMessage.getTaskUid());
+            taskStates.put(newMessage.getTaskUid(), newTask);
             builder.taskStates(taskStates)
-                    .createdTimestamp(Long.max(context.getCreatedTimestamp(), inSync.getMessageTimestamp()));
+                    .createdTimestamp(Long.max(currentContext.getCreatedTimestamp(),
+                            newMessage.getMessageTimestamp()));
             TaskSyncContext result = builder
                     .build();
-            LOGGER.info("Processed rebalance answer {} from task {} for rebalance generation id {}", inSync, inSync.getTaskUid(), inSync.getRebalanceGenerationId());
+            LOGGER.info("Processed rebalance answer {} from task {} for rebalance generation id {}", newMessage, newMessage.getTaskUid(),
+                    newMessage.getRebalanceGenerationId());
             return result;
         }
         LOGGER.debug("merge: final state is not changed");
@@ -142,34 +158,36 @@ public class SyncEventMerger {
         return builder.build();
     }
 
-    public static TaskSyncContext mergeEpochUpdate(TaskSyncContext context, TaskSyncEvent inSync) {
-        Map<String, TaskState> newTaskStatesMap = inSync.getTaskStates();
-        debug(LOGGER, "merge: state before {}, \nIncoming states: {}", context, newTaskStatesMap);
+    // For UPDATE_EPOCH messages, we only update a task's state if the new message contains
+    // the same message for the task which had a higher state timestamp.
+    public static TaskSyncContext mergeEpochUpdate(TaskSyncContext currentContext, TaskSyncEvent newMessage) {
+        Map<String, TaskState> newTaskStatesMap = newMessage.getTaskStates();
+        debug(LOGGER, "merge: state before {}, \nIncoming states: {}", currentContext, newTaskStatesMap);
 
-        var builder = context.toBuilder();
+        var builder = currentContext.toBuilder();
 
         Set<String> updatedStatesUids = new HashSet<>();
 
         // We only update our internal copies of other task states from received sync event messages.
         // We do not update our own internal task state from received sync event messages, since
         // we have the most up-to-date version of our own task state.
-        for (TaskState inTaskState : newTaskStatesMap.values()) {
+        for (TaskState newTaskState : newTaskStatesMap.values()) {
 
-            if (inTaskState.getTaskUid().equals(context.getTaskUid())) {
+            if (newTaskState.getTaskUid().equals(currentContext.getTaskUid())) {
                 continue;
             }
 
-            TaskState currentTaskState = context.getTaskStates().get(inTaskState.getTaskUid());
+            TaskState currentTaskState = currentContext.getTaskStates().get(newTaskState.getTaskUid());
             // We only update our internal copy of another task's state, if the state timestamp
             // in the sync event message is greater than the state timestamp of our internal
             // copy of the other task's state.
-            if (currentTaskState == null || inTaskState.getStateTimestamp() > currentTaskState.getStateTimestamp()) {
-                updatedStatesUids.add(inTaskState.getTaskUid());
+            if (currentTaskState == null || newTaskState.getStateTimestamp() > currentTaskState.getStateTimestamp()) {
+                updatedStatesUids.add(newTaskState.getTaskUid());
             }
         }
 
         if (!updatedStatesUids.isEmpty()) {
-            var oldStatesStream = context.getTaskStates().entrySet().stream()
+            var oldStatesStream = currentContext.getTaskStates().entrySet().stream()
                     .filter(e -> !updatedStatesUids.contains(e.getKey()));
 
             var updatedStatesStream = newTaskStatesMap.entrySet().stream()
@@ -179,7 +197,7 @@ public class SyncEventMerger {
                     .collect(toUnmodifiableMap(Map.Entry::getKey, Map.Entry::getValue));
 
             builder.taskStates(mergedTaskStates)
-                    .createdTimestamp(Long.max(context.getCreatedTimestamp(), inSync.getMessageTimestamp()));
+                    .createdTimestamp(Long.max(currentContext.getCreatedTimestamp(), newMessage.getMessageTimestamp()));
 
             TaskSyncContext result = builder
                     .build();
@@ -194,4 +212,22 @@ public class SyncEventMerger {
         return builder.build();
     }
 
+    // Take in an entire snapshot.
+    public static TaskSyncContext mergeNewEpoch(TaskSyncContext currentContext, TaskSyncEvent newMessage) {
+        var builder = currentContext.toBuilder();
+        Map<String, TaskState> newTaskStates = new HashMap<>(newMessage.getTaskStates());
+        newTaskStates.remove(currentContext.getTaskUid());
+        // When we receive NEW_EPOCH messages, we clear all task states belonging to tasks
+        // other than the current task state, and replace them with entries from the
+        // NEW_EPOCH message.
+        builder.rebalanceState(RebalanceState.NEW_EPOCH_STARTED)
+                .createdTimestamp(newMessage.getMessageTimestamp())
+                .taskStates(newTaskStates)
+                // update timestamp for the current task state
+                .currentTaskState(currentContext.getCurrentTaskState()
+                        .toBuilder()
+                        .stateTimestamp(newMessage.getMessageTimestamp())
+                        .build());
+        return builder.build();
+    }
 }
