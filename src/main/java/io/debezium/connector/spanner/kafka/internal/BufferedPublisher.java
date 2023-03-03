@@ -81,27 +81,35 @@ public class BufferedPublisher<V> {
             List<String> newlyOwnedPartitions = toMergeTask.getPartitions().stream()
                     .map(partitionState -> partitionState.getToken())
                     .collect(Collectors.toList());
+
             // Get a list of partition tokens that are newly shared by new message
             List<String> newlySharedPartitions = toMergeTask.getSharedPartitions().stream()
                     .map(partitionState -> partitionState.getToken())
                     .collect(Collectors.toList());
 
-            // Get a list of partition tokens that were modified by old message.
+            // Get a list of partition tokens that the old message contained that the new message
+            // didn't
             List<PartitionState> previouslyOwnedPartitions = existingTask.getPartitions().stream()
-                    .filter(partitionState -> newlyOwnedPartitions.contains(partitionState.getToken()))
+                    .filter(partitionState -> !newlyOwnedPartitions.contains(
+                            partitionState.getToken()))
                     .collect(Collectors.toList());
-            // Get a list of partition tokens that were shared by old message.
+            // Get a list of shared partition tokens that the old message contained that the
+            // new message didn't
             List<PartitionState> previouslySharedPartitions = existingTask.getSharedPartitions().stream()
-                    .filter(partitionState -> newlySharedPartitions.contains(partitionState.getToken()))
+                    .filter(partitionState -> !newlySharedPartitions.contains(
+                            partitionState.getToken()))
                     .collect(Collectors.toList());
 
             // Get the total list of shared + modified tokens.
-            List<PartitionState> finalOwnedPartitions = toMergeTask.getPartitions().stream().collect(Collectors.toList());
+            List<PartitionState> finalOwnedPartitions = toMergeTask.getPartitions().stream()
+                    .collect(Collectors.toList());
             finalOwnedPartitions.addAll(previouslyOwnedPartitions);
-            List<PartitionState> finalSharedPartitions = toMergeTask.getSharedPartitions().stream().collect(Collectors.toList());
+            List<PartitionState> finalSharedPartitions = toMergeTask.getSharedPartitions().stream()
+                    .collect(Collectors.toList());
             finalSharedPartitions.addAll(previouslySharedPartitions);
             // Put the total list of shared + modified tokens into the final task state.
-            TaskState finalTaskState = toMergeTask.builder().partitions(finalOwnedPartitions).sharedPartitions(finalSharedPartitions).build();
+            TaskState finalTaskState = toMergeTask.builder().partitions(finalOwnedPartitions)
+                    .sharedPartitions(finalSharedPartitions).build();
 
             Map<String, TaskState> taskStates = new HashMap<>(toMerge.getTaskStates());
             taskStates.remove(toMergeTask.getTaskUid());
