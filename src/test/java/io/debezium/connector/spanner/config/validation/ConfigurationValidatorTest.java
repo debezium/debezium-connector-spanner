@@ -8,6 +8,7 @@ package io.debezium.connector.spanner.config.validation;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 
+import io.debezium.config.Configuration;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.HashMap;
@@ -15,7 +16,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-
 import org.apache.kafka.common.config.Config;
 import org.apache.kafka.common.config.ConfigValue;
 import org.junit.jupiter.api.Assertions;
@@ -23,8 +23,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
-
-import io.debezium.config.Configuration;
 
 class ConfigurationValidatorTest {
 
@@ -36,25 +34,27 @@ class ConfigurationValidatorTest {
         return Stream.of(
                 Arguments.of(
                         Map.of(
-                                "gcp.spanner.project.id", "boxwood-weaver-353315",
-                                "gcp.spanner.instance.id", "kafka-connector",
-                                "gcp.spanner.database.id", "kafkaspan",
-                                "gcp.spanner.change.stream", "TestStream",
-                                "gcp.spanner.start.time", startTime,
-                                "gcp.spanner.end.time", endTime,
-                                "heartbeat.interval.ms", "300000",
-                                "gcp.spanner.credentials.path", "no_path",
-                                "heartbeat.topics.prefix", "heartbeat"),
+                            "gcp.spanner.project.id", "boxwood-weaver-353315",
+                            "gcp.spanner.instance.id", "kafka-connector",
+                            "gcp.spanner.database.id", "kafkaspan",
+                            "gcp.spanner.database.role", "test-role",
+                            "gcp.spanner.change.stream", "TestStream",
+                            "gcp.spanner.start.time", startTime,
+                            "gcp.spanner.end.time", endTime,
+                            "heartbeat.interval.ms", "300000",
+                            "gcp.spanner.credentials.path", "no_path",
+                            "heartbeat.topics.prefix", "heartbeat"),
                         List.of("The 'gcp.spanner.credentials.path' value is invalid: path field is incorrect")),
                 Arguments.of(
                         Map.of(
-                                "gcp.spanner.instance.id", "kafka-connector",
-                                "gcp.spanner.database.id", "kafkaspan",
-                                "gcp.spanner.change.stream", "TestStream",
-                                "gcp.spanner.start.time", startTime,
-                                "gcp.spanner.end.time", endTime,
-                                "heartbeat.interval.ms", "300000",
-                                "heartbeat.topics.prefix", "heartbeat"),
+                            "gcp.spanner.instance.id", "kafka-connector",
+                            "gcp.spanner.database.id", "kafkaspan",
+                            "gcp.spanner.change.stream", "TestStream",
+                            "gcp.spanner.database.role", "test-role",
+                            "gcp.spanner.start.time", startTime,
+                            "gcp.spanner.end.time", endTime,
+                            "heartbeat.interval.ms", "300000",
+                            "heartbeat.topics.prefix", "heartbeat"),
                         List.of("The 'gcp.spanner.project.id' value is invalid: The field is not specified")),
                 Arguments.of(
                         Map.of(), List.of(

@@ -20,9 +20,11 @@ class SpannerChangeStreamFactoryTest {
     void testGetStream() {
         DaoFactory daoFactory = new DaoFactory(
                 new DatabaseClientFactory(
-                        "myproject", "42", "42", "Credentials Json", "Credentials Path", null));
-        SpannerChangeStreamFactory spannerChangeStreamFactory = new SpannerChangeStreamFactory(daoFactory, new MetricsEventPublisher(), "test-connector");
-        SpannerChangeStream stream = spannerChangeStreamFactory.getStream("stream1", Duration.ofMillis(100), 1);
+                        "myproject", "42", "42", "Credentials Json", "Credentials Path", null, "test-role"));
+        SpannerChangeStreamFactory spannerChangeStreamFactory = new SpannerChangeStreamFactory(
+                daoFactory, new MetricsEventPublisher(), "test-connector");
+        SpannerChangeStream stream = spannerChangeStreamFactory.getStream("stream1",
+                Duration.ofMillis(100), 1);
         assertNotNull(stream);
     }
 }
