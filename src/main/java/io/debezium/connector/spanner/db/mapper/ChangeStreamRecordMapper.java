@@ -113,14 +113,6 @@ public class ChangeStreamRecordMapper {
             .collect(Collectors.toList());
     }
 
-    public List<ChangeStreamEvent> toChangeStreamEvents(
-        Partition partition, Struct row, ChangeStreamResultSetMetadata resultSetMetadata) {
-        // In GoogleSQL, change stream records are returned as an array of structs.
-        return row.getStructList(0).stream()
-            .flatMap(struct -> toStreamEvent(partition, struct, resultSetMetadata))
-            .collect(Collectors.toList());
-    }
-
     Stream<ChangeStreamEvent> toStreamEvent(Partition partition, Struct row,
                                             ChangeStreamResultSetMetadata resultSetMetadata) {
         final Stream<DataChangeEvent> dataChangeEvents = row.getStructList(DATA_CHANGE_RECORD_COLUMN).stream()

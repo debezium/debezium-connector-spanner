@@ -22,6 +22,7 @@ import com.google.cloud.Timestamp;
 import com.google.cloud.spanner.Dialect;
 import com.google.cloud.spanner.Struct;
 import com.google.cloud.spanner.Type;
+import io.debezium.connector.spanner.db.dao.ChangeStreamResultSet;
 import io.debezium.connector.spanner.db.dao.ChangeStreamResultSetMetadata;
 import io.debezium.connector.spanner.db.model.ChildPartition;
 import io.debezium.connector.spanner.db.model.Mod;
@@ -51,8 +52,11 @@ class ChangeStreamRecordMapperTest {
         Struct struct = mock(Struct.class);
         when(struct.getStructList(anyInt())).thenReturn(new ArrayList<>());
 
+        ChangeStreamResultSet resultSet = mock(ChangeStreamResultSet.class);
+        when(resultSet.getCurrentRowAsStruct()).thenReturn(struct);
+
         assertTrue(changeStreamRecordMapper
-                .toChangeStreamEvents(partition, struct, mock(ChangeStreamResultSetMetadata.class)).isEmpty());
+                .toChangeStreamEvents(partition, resultSet, mock(ChangeStreamResultSetMetadata.class)).isEmpty());
         verify(struct).getStructList(anyInt());
     }
 
@@ -71,8 +75,11 @@ class ChangeStreamRecordMapperTest {
         Struct row = mock(Struct.class);
         when(row.getStructList(anyInt())).thenReturn(structList);
 
+        ChangeStreamResultSet resultSet = mock(ChangeStreamResultSet.class);
+        when(resultSet.getCurrentRowAsStruct()).thenReturn(row);
+
         assertTrue(changeStreamRecordMapper
-                .toChangeStreamEvents(partition, row, mock(ChangeStreamResultSetMetadata.class)).isEmpty());
+                .toChangeStreamEvents(partition, resultSet, mock(ChangeStreamResultSetMetadata.class)).isEmpty());
 
         verify(row).getStructList(anyInt());
         verify(struct, atLeast(1)).getStructList(any());
@@ -97,8 +104,11 @@ class ChangeStreamRecordMapperTest {
         Struct row = mock(Struct.class);
         when(row.getStructList(anyInt())).thenReturn(structList);
 
+        ChangeStreamResultSet resultSet = mock(ChangeStreamResultSet.class);
+        when(resultSet.getCurrentRowAsStruct()).thenReturn(row);
+
         assertTrue(changeStreamRecordMapper
-                .toChangeStreamEvents(partition, row, mock(ChangeStreamResultSetMetadata.class)).isEmpty());
+                .toChangeStreamEvents(partition, resultSet, mock(ChangeStreamResultSetMetadata.class)).isEmpty());
 
         verify(row).getStructList(anyInt());
         verify(struct1, atLeast(1)).getStructList(any());
@@ -107,7 +117,7 @@ class ChangeStreamRecordMapperTest {
 
     @Test
     void testToChangeStreamEvents4() {
-        ChangeStreamRecordMapper changeStreamRecordMapper = new ChangeStreamRecordMapper();
+        ChangeStreamRecordMapper changeStreamRecordMapper = new ChangeStreamRecordMapper(Dialect.GOOGLE_STANDARD_SQL);
         HashSet<String> parentTokens = new HashSet<>();
         Timestamp startTimestamp = Timestamp.ofTimeMicroseconds(1L);
         Partition partition = new Partition("token", parentTokens, startTimestamp, Timestamp.ofTimeMicroseconds(1L), "originPartition");
@@ -127,8 +137,11 @@ class ChangeStreamRecordMapperTest {
         Struct row = mock(Struct.class);
         when(row.getStructList(anyInt())).thenReturn(structList);
 
+        ChangeStreamResultSet resultSet = mock(ChangeStreamResultSet.class);
+        when(resultSet.getCurrentRowAsStruct()).thenReturn(row);
+
         assertThrows(IllegalArgumentException.class, () -> changeStreamRecordMapper
-                .toChangeStreamEvents(partition, row, mock(ChangeStreamResultSetMetadata.class)));
+                .toChangeStreamEvents(partition, resultSet, mock(ChangeStreamResultSetMetadata.class)));
 
         verify(row).getStructList(anyInt());
         verify(struct2).getStructList(any());
@@ -143,8 +156,11 @@ class ChangeStreamRecordMapperTest {
 
         Struct struct = mock(Struct.class);
         when(struct.getStructList(anyInt())).thenReturn(new ArrayList<>());
+
+        ChangeStreamResultSet resultSet = mock(ChangeStreamResultSet.class);
+        when(resultSet.getCurrentRowAsStruct()).thenReturn(struct);
         assertTrue(changeStreamRecordMapper.toChangeStreamEvents(
-                partition, struct, mock(ChangeStreamResultSetMetadata.class)).isEmpty());
+                partition, resultSet, mock(ChangeStreamResultSetMetadata.class)).isEmpty());
         verify(struct).getStructList(anyInt());
     }
 
@@ -162,8 +178,10 @@ class ChangeStreamRecordMapperTest {
         structList.add(struct);
         Struct struct1 = mock(Struct.class);
         when(struct1.getStructList(anyInt())).thenReturn(structList);
+        ChangeStreamResultSet resultSet = mock(ChangeStreamResultSet.class);
+        when(resultSet.getCurrentRowAsStruct()).thenReturn(struct1);
         assertTrue(changeStreamRecordMapper.toChangeStreamEvents(
-                partition, struct1, mock(ChangeStreamResultSetMetadata.class)).isEmpty());
+                partition, resultSet, mock(ChangeStreamResultSetMetadata.class)).isEmpty());
         verify(struct1).getStructList(anyInt());
         verify(struct, atLeast(1)).getStructList(any());
     }
@@ -185,8 +203,10 @@ class ChangeStreamRecordMapperTest {
         structList.add(struct);
         Struct struct2 = mock(Struct.class);
         when(struct2.getStructList(anyInt())).thenReturn(structList);
+        ChangeStreamResultSet resultSet = mock(ChangeStreamResultSet.class);
+        when(resultSet.getCurrentRowAsStruct()).thenReturn(struct2);
         assertTrue(changeStreamRecordMapper.toChangeStreamEvents(
-                partition, struct2, mock(ChangeStreamResultSetMetadata.class)).isEmpty());
+                partition, resultSet, mock(ChangeStreamResultSetMetadata.class)).isEmpty());
         verify(struct2).getStructList(anyInt());
         verify(struct1, atLeast(1)).getStructList(any());
         verify(struct, atLeast(1)).getStructList(any());
@@ -212,8 +232,10 @@ class ChangeStreamRecordMapperTest {
         structList.add(struct);
         Struct struct3 = mock(Struct.class);
         when(struct3.getStructList(anyInt())).thenReturn(structList);
+        ChangeStreamResultSet resultSet = mock(ChangeStreamResultSet.class);
+        when(resultSet.getCurrentRowAsStruct()).thenReturn(struct3);
         assertThrows(IllegalArgumentException.class, () -> changeStreamRecordMapper.toChangeStreamEvents(partition,
-                struct3, mock(ChangeStreamResultSetMetadata.class)));
+            resultSet, mock(ChangeStreamResultSetMetadata.class)));
         verify(struct3).getStructList(anyInt());
         verify(struct2).getStructList(any());
     }
@@ -227,6 +249,10 @@ class ChangeStreamRecordMapperTest {
 
         Struct struct = mock(Struct.class);
         when(struct.getStructList(any())).thenReturn(new ArrayList<>());
+
+        ChangeStreamResultSet resultSet = mock(ChangeStreamResultSet.class);
+        when(resultSet.getCurrentRowAsStruct()).thenReturn(struct);
+
         changeStreamRecordMapper.toStreamEvent(partition, struct, mock(ChangeStreamResultSetMetadata.class));
         verify(struct, atLeast(1)).getStructList(any());
     }
@@ -240,6 +266,10 @@ class ChangeStreamRecordMapperTest {
 
         Struct struct = mock(Struct.class);
         when(struct.getStructList(any())).thenThrow(new IllegalArgumentException());
+
+        ChangeStreamResultSet resultSet = mock(ChangeStreamResultSet.class);
+        when(resultSet.getCurrentRowAsStruct()).thenReturn(struct);
+
         assertThrows(IllegalArgumentException.class,
                 () -> changeStreamRecordMapper.toStreamEvent(partition, struct, mock(ChangeStreamResultSetMetadata.class)));
         verify(struct).getStructList(any());
