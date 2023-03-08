@@ -7,6 +7,7 @@ package io.debezium.connector.spanner.config.validation;
 
 import static io.debezium.connector.spanner.config.BaseSpannerConnectorConfig.CHANGE_STREAM_NAME;
 import static io.debezium.connector.spanner.config.BaseSpannerConnectorConfig.DATABASE_ID;
+import static io.debezium.connector.spanner.config.BaseSpannerConnectorConfig.DATABASE_ROLE;
 import static io.debezium.connector.spanner.config.BaseSpannerConnectorConfig.INSTANCE_ID;
 import static io.debezium.connector.spanner.config.BaseSpannerConnectorConfig.PROJECT_ID;
 import static io.debezium.connector.spanner.config.BaseSpannerConnectorConfig.SPANNER_CREDENTIALS_JSON;
@@ -14,13 +15,12 @@ import static io.debezium.connector.spanner.config.BaseSpannerConnectorConfig.SP
 import static io.debezium.connector.spanner.config.BaseSpannerConnectorConfig.SPANNER_HOST;
 import static org.slf4j.LoggerFactory.getLogger;
 
-import org.slf4j.Logger;
-
 import com.google.cloud.spanner.DatabaseClient;
+import com.google.cloud.spanner.Dialect;
 import com.google.cloud.spanner.Statement;
 import com.google.common.annotations.VisibleForTesting;
-
 import io.debezium.connector.spanner.db.DatabaseClientFactory;
+import org.slf4j.Logger;
 
 /**
  * Used to validate the Spanner Change Stream provided in configuration
@@ -61,12 +61,14 @@ public class ChangeStreamValidator implements ConfigurationValidator.Validator {
 
         String changeStreamName = context.getString(CHANGE_STREAM_NAME);
 
-        DatabaseClientFactory databaseClientFactory = new DatabaseClientFactory(context.getString(PROJECT_ID),
-                context.getString(INSTANCE_ID),
-                context.getString(DATABASE_ID),
-                context.getString(SPANNER_CREDENTIALS_JSON),
-                context.getString(SPANNER_CREDENTIALS_PATH),
-                context.getString(SPANNER_HOST));
+        DatabaseClientFactory databaseClientFactory = new DatabaseClientFactory(
+            context.getString(PROJECT_ID),
+            context.getString(INSTANCE_ID),
+            context.getString(DATABASE_ID),
+            context.getString(SPANNER_CREDENTIALS_JSON),
+            context.getString(SPANNER_CREDENTIALS_PATH),
+            context.getString(SPANNER_HOST),
+            context.getString(DATABASE_ROLE));
 
         this.result = isStreamExist(databaseClientFactory.getDatabaseClient(), changeStreamName);
 
@@ -86,12 +88,23 @@ public class ChangeStreamValidator implements ConfigurationValidator.Validator {
      */
     @VisibleForTesting
     boolean isStreamExist(DatabaseClient databaseClient, String streamName) {
-        Statement statement = Statement.newBuilder("select change_stream_name " +
-                "from information_schema.change_streams cs " +
-                "where cs.change_stream_name = @streamname")
+        Statement statement;
+        if (databaseClient.getDialect() == Dialect.POSTGRESQL) {
+            statement = Statement.newBuilder("select change_stream_name " +
+                    "from information_schema.change_streams cs " +
+                    "where cs.change_stream_name = $1")
+                .bind("p1")
+                .to(streamName)
+                .build();
+        } else {
+            statement = Statement.newBuilder("select change_stream_name " +
+                    "from information_schema.change_streams cs " +
+                    "where cs.change_stream_name = @streamname")
                 .bind("streamName")
                 .to(streamName)
                 .build();
+        }
+
         return databaseClient.singleUse().executeQuery(statement).next();
     }
 }

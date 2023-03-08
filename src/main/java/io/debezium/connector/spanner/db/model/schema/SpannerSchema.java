@@ -5,13 +5,13 @@
  */
 package io.debezium.connector.spanner.db.model.schema;
 
+import com.google.cloud.spanner.Dialect;
+import io.debezium.connector.spanner.db.metadata.TableId;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-
-import io.debezium.connector.spanner.db.metadata.TableId;
 
 /**
  * Contains schema for each DB table
@@ -41,18 +41,19 @@ public class SpannerSchema {
         private SpannerSchemaBuilder() {
         }
 
-        public void addColumn(String tableName, String columnName, String type, long ordinalPosition,
-                              boolean primaryKey, boolean nullable) {
+        public void addColumn(String tableName, String columnName, String type,
+            long ordinalPosition,
+            boolean primaryKey, boolean nullable, Dialect dialect) {
             List<Column> columns;
             if (tableMap.containsKey(tableName)) {
                 columns = tableMap.get(tableName);
-            }
-            else {
+            } else {
                 columns = new ArrayList<>();
                 tableMap.put(tableName, columns);
             }
             if (!columns.stream().anyMatch(column -> column.getName().equals(columnName))) {
-                columns.add(Column.create(columnName, type, primaryKey, ordinalPosition, nullable));
+                columns.add(Column.create(columnName, type, primaryKey, ordinalPosition, nullable,
+                    dialect));
             }
         }
 

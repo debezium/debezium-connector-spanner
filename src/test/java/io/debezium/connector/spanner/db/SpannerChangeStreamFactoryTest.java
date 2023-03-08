@@ -19,7 +19,8 @@ class SpannerChangeStreamFactoryTest {
     void testGetStream() {
         DaoFactory daoFactory = new DaoFactory(
             new DatabaseClientFactory(
-                "myproject", "42", "42", "Credentials Json", "Credentials Path", null));
+                "myproject", "42", "42", "Credentials Json", "Credentials Path", null,
+                "test-role"));
         SpannerChangeStreamFactory spannerChangeStreamFactory = new SpannerChangeStreamFactory(
             daoFactory, new MetricsEventPublisher(), "test-connector",
             Dialect.GOOGLE_STANDARD_SQL);

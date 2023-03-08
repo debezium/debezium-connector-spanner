@@ -127,8 +127,9 @@ public class ChangeStreamRecordMapper {
                 .filter(this::isNonNullDataChangeRecord)
                 .map(struct -> toDataChangeEvent(partition, struct, resultSetMetadata));
 
-        final Stream<HeartbeatEvent> heartbeatEvents = row.getStructList(HEARTBEAT_RECORD_COLUMN).stream()
-                .filter(this::isNonNullHeartbeatRecord)
+        final Stream<HeartbeatEvent> heartbeatEvents = row.getStructList(HEARTBEAT_RECORD_COLUMN)
+            .stream()
+            .filter(this::isNonNullHeartbeatRecord)
             .map(struct -> toHeartbeatEvent(partition, struct, resultSetMetadata));
 
         final Stream<ChildPartitionsEvent> childPartitionsEvents = row.getStructList(
@@ -251,10 +252,10 @@ public class ChangeStreamRecordMapper {
             row.getString(SERVER_TRANSACTION_ID_COLUMN),
             row.getBoolean(IS_LAST_RECORD_IN_TRANSACTION_IN_PARTITION_COLUMN),
             row.getString(RECORD_SEQUENCE_COLUMN),
-                row.getString(TABLE_NAME_COLUMN),
-                row.getStructList(COLUMN_TYPES_COLUMN).stream()
-                        .map(this::columnTypeFrom)
-                        .collect(Collectors.toList()),
+            row.getString(TABLE_NAME_COLUMN),
+            row.getStructList(COLUMN_TYPES_COLUMN).stream()
+                .map(this::columnTypeFrom)
+                .collect(Collectors.toList()),
             modListFrom(row.getStructList(MODS_COLUMN)),
             ModType.valueOf(row.getString(MOD_TYPE_COLUMN)),
             ValueCaptureType.valueOf(row.getString(VALUE_CAPTURE_TYPE_COLUMN)),

@@ -15,7 +15,9 @@ import com.google.cloud.spanner.TimestampBound;
 import io.debezium.connector.spanner.db.model.schema.ChangeStreamSchema;
 import io.debezium.connector.spanner.db.model.schema.SpannerSchema;
 import java.util.Collection;
+import java.util.Objects;
 import java.util.stream.Collectors;
+import org.slf4j.LoggerFactory;
 
 /**
  * Provides functionality to read Spanner DB table and stream schema
@@ -23,6 +25,8 @@ import java.util.stream.Collectors;
 public class SchemaDao {
 
     private final DatabaseClient databaseClient;
+
+    private static final org.slf4j.Logger LOGGER = LoggerFactory.getLogger(SchemaDao.class);
 
     public SchemaDao(DatabaseClient databaseClient) {
         this.databaseClient = databaseClient;
@@ -45,22 +49,31 @@ public class SchemaDao {
                 boolean primaryKey = resultSet.getBoolean(4);
                 boolean nullable = resultSet.getBoolean(5);
 
-                builder.addColumn(tableName, columnName, type, ordinalPosition, primaryKey, nullable);
+                builder.addColumn(tableName, columnName, type, ordinalPosition, primaryKey,
+                    nullable, this.databaseClient.getDialect());
             }
         }
         return builder.build();
     }
 
+    private boolean isAllTables(ResultSet resultSet) {
+        if (isPostgres()) {
+            return Objects.equals(resultSet.getString(0), "NO");
+        }
+        return resultSet.getBoolean(0);
+    }
+
     public ChangeStreamSchema getStream(Timestamp timestamp, String streamName) {
         ChangeStreamSchema.Builder builder = ChangeStreamSchema.builder()
-                .name(streamName);
+            .name(streamName);
         boolean exist = false;
-        try (ReadOnlyTransaction tx = databaseClient.readOnlyTransaction(TimestampBound.ofReadTimestamp(timestamp))) {
+        try (ReadOnlyTransaction tx = databaseClient.readOnlyTransaction(
+            TimestampBound.ofReadTimestamp(timestamp))) {
             ResultSet resultSet = readChangeStreamInfo(tx, streamName);
 
             while (resultSet.next()) {
                 exist = true;
-                boolean allTables = resultSet.getBoolean(0);
+                boolean allTables = isAllTables(resultSet);
                 builder.allTables(allTables);
                 if (!allTables) {
                     String tableName = resultSet.getString(1);
@@ -81,25 +94,25 @@ public class SchemaDao {
         Statement statement;
         if (isPostgres()) {
             statement = Statement.newBuilder("SELECT"
-                + "  s.table_name,"
-                + "  s.column_name,"
-                + "  s.spanner_type,"
-                + "  s.ordinal_position,"
-                + "CASE WHEN inx.index_name = 'PRIMARY_KEY' THEN TRUE ELSE FALSE END AS primary_key,\n"
-                + "CASE WHEN s.is_nullable = 'YES' THEN TRUE ELSE FALSE END AS is_nullable\n"
-                + "FROM\n"
-                + "  information_schema.COLUMNS AS s\n"
-                + "LEFT JOIN\n"
-                + "  information_schema.index_columns inx\n"
-                + "ON\n"
-                + "  s.table_name = inx.table_name\n"
-                + "  AND s.column_name = inx.column_name\n"
-                + "WHERE\n"
-                + "  s.table_schema = 'public'\n"
-                + "  AND \n"
-                + "  s.table_name = ANY (Array["
-                + tables.stream().map(s -> "'" + s + "'").collect(Collectors.joining(","))
-                + "])").build();
+                    + "  s.table_name,"
+                    + "  s.column_name,"
+                    + "  s.spanner_type,"
+                    + "  s.ordinal_position,"
+                    + "CASE WHEN inx.index_name = 'PRIMARY_KEY' THEN TRUE ELSE FALSE END AS primary_key,\n"
+                    + "CASE WHEN s.is_nullable = 'YES' THEN TRUE ELSE FALSE END AS is_nullable\n"
+                    + "FROM\n"
+                    + "  information_schema.COLUMNS AS s\n"
+                    + "LEFT JOIN\n"
+                    + "  information_schema.index_columns inx\n"
+                    + "ON\n"
+                    + "  s.table_name = inx.table_name\n"
+                    + "  AND s.column_name = inx.column_name\n"
+                    + "WHERE\n"
+                    + "  s.table_schema = 'public'\n"
+                    + (tables == null ? ""
+                    : " AND s.table_name = ANY(Array[" + tables.stream().map(s -> "'" + s + "'")
+                        .collect(Collectors.joining(",")) + "])"))
+                .build();
         } else {
             statement = Statement.newBuilder("SELECT" +
                     "  s.table_name," +
