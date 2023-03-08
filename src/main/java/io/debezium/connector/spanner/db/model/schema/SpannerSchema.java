@@ -11,6 +11,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import com.google.cloud.spanner.Dialect;
+
 import io.debezium.connector.spanner.db.metadata.TableId;
 
 /**
@@ -41,8 +43,9 @@ public class SpannerSchema {
         private SpannerSchemaBuilder() {
         }
 
-        public void addColumn(String tableName, String columnName, String type, long ordinalPosition,
-                              boolean primaryKey, boolean nullable) {
+        public void addColumn(String tableName, String columnName, String type,
+                              long ordinalPosition,
+                              boolean primaryKey, boolean nullable, Dialect dialect) {
             List<Column> columns;
             if (tableMap.containsKey(tableName)) {
                 columns = tableMap.get(tableName);
@@ -52,7 +55,8 @@ public class SpannerSchema {
                 tableMap.put(tableName, columns);
             }
             if (!columns.stream().anyMatch(column -> column.getName().equals(columnName))) {
-                columns.add(Column.create(columnName, type, primaryKey, ordinalPosition, nullable));
+                columns.add(Column.create(columnName, type, primaryKey, ordinalPosition, nullable,
+                        dialect));
             }
         }
 
