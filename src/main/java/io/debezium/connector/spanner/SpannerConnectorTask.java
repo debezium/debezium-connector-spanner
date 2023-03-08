@@ -5,7 +5,18 @@
  */
 package io.debezium.connector.spanner;
 
+import java.time.Instant;
+import java.util.List;
+import java.util.stream.Collectors;
+
+import org.apache.kafka.connect.errors.ConnectException;
+import org.apache.kafka.connect.errors.RetriableException;
+import org.apache.kafka.connect.source.SourceRecord;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.google.cloud.spanner.Dialect;
+
 import io.debezium.config.Configuration;
 import io.debezium.connector.base.ChangeEventQueue;
 import io.debezium.connector.spanner.config.SpannerTableFilter;
@@ -38,14 +49,6 @@ import io.debezium.schema.DataCollectionFilters;
 import io.debezium.schema.DefaultTopicNamingStrategy;
 import io.debezium.schema.SchemaNameAdjuster;
 import io.debezium.spi.topic.TopicNamingStrategy;
-import java.time.Instant;
-import java.util.List;
-import java.util.stream.Collectors;
-import org.apache.kafka.connect.errors.ConnectException;
-import org.apache.kafka.connect.errors.RetriableException;
-import org.apache.kafka.connect.source.SourceRecord;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /** Spanner implementation for Debezium's CDC SourceTask */
 public class SpannerConnectorTask extends SpannerBaseSourceTask {
@@ -76,27 +79,27 @@ public class SpannerConnectorTask extends SpannerBaseSourceTask {
         final SpannerConnectorConfig connectorConfig = new SpannerConnectorConfig(configuration);
 
         this.taskUid = TaskUid.generateTaskUid(connectorConfig.getConnectorName(),
-            connectorConfig.getTaskId());
+                connectorConfig.getTaskId());
 
         LOGGER.info("Starting task with uid: {}", taskUid);
 
         final DatabaseClientFactory databaseClientFactory = getDatabaseClientFactory(
-            connectorConfig);
+                connectorConfig);
 
         final DaoFactory daoFactory = new DaoFactory(databaseClientFactory);
 
         final Dialect dialect = databaseClientFactory.getDatabaseClient().getDialect();
 
         final SpannerSourceTaskContext taskContext = new SpannerSourceTaskContext(connectorConfig,
-            () -> spannerMeter.getCapturedTables());
+                () -> spannerMeter.getCapturedTables());
 
         queue = new ChangeEventQueue.Builder<DataChangeEvent>()
-            .pollInterval(connectorConfig.getPollInterval())
-            .maxBatchSize(connectorConfig.getMaxBatchSize())
-            .maxQueueSize(connectorConfig.getMaxQueueSize())
-            .maxQueueSizeInBytes(connectorConfig.getMaxQueueSizeInBytes())
-            .loggingContextSupplier(() -> taskContext.configureLoggingContext(CONTEXT_NAME))
-            .build();
+                .pollInterval(connectorConfig.getPollInterval())
+                .maxBatchSize(connectorConfig.getMaxBatchSize())
+                .maxQueueSize(connectorConfig.getMaxQueueSize())
+                .maxQueueSizeInBytes(connectorConfig.getMaxQueueSizeInBytes())
+                .loggingContextSupplier(() -> taskContext.configureLoggingContext(CONTEXT_NAME))
+                .build();
 
         final SpannerErrorHandler errorHandler = new SpannerErrorHandler(this, queue);
 
@@ -133,10 +136,10 @@ public class SpannerConnectorTask extends SpannerBaseSourceTask {
                 event -> this.synchronizationTaskContext.publishEvent(event));
 
         final SpannerChangeStreamFactory spannerChangeStreamFactory = new SpannerChangeStreamFactory(
-            daoFactory,
-            spannerMeter.getMetricsEventPublisher(),
-            connectorConfig.getConnectorName(),
-            dialect);
+                daoFactory,
+                spannerMeter.getMetricsEventPublisher(),
+                connectorConfig.getConnectorName(),
+                dialect);
 
         this.changeStream = spannerChangeStreamFactory.getStream(
                 connectorConfig.changeStreamName(),

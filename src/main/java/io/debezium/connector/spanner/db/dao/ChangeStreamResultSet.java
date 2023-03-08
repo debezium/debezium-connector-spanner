@@ -5,10 +5,11 @@
  */
 package io.debezium.connector.spanner.db.dao;
 
+import org.joda.time.Duration;
+
 import com.google.cloud.Timestamp;
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.Struct;
-import org.joda.time.Duration;
 
 /**
  * Wrapper on top of Spanner result set,
@@ -59,10 +60,10 @@ public class ChangeStreamResultSet implements AutoCloseable {
         return new ChangeStreamResultSetMetadata(
                 queryStartedAt,
                 recordStreamStartedAt,
-            recordStreamEndedAt,
-            recordReadAt,
-            totalStreamDuration,
-            numberOfRecordsRead);
+                recordStreamEndedAt,
+                recordReadAt,
+                totalStreamDuration,
+                numberOfRecordsRead);
     }
 
     @Override

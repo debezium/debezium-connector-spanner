@@ -10,8 +10,8 @@ package io.debezium.connector.spanner.db.model;
  * https://cloud.google.com/spanner/docs/change-streams#value-capture-type.
  */
 public enum ValueCaptureType {
-  OLD_AND_NEW_VALUES,
-  NEW_ROW,
-  NEW_VALUES,
-  UNKNOWN
+    OLD_AND_NEW_VALUES,
+    NEW_ROW,
+    NEW_VALUES,
+    UNKNOWN
 }

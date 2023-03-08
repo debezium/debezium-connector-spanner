@@ -5,6 +5,10 @@
  */
 package io.debezium.connector.spanner.db.dao;
 
+import java.util.Collection;
+import java.util.Objects;
+import java.util.stream.Collectors;
+
 import com.google.cloud.Timestamp;
 import com.google.cloud.spanner.DatabaseClient;
 import com.google.cloud.spanner.Dialect;
@@ -12,11 +16,9 @@ import com.google.cloud.spanner.ReadOnlyTransaction;
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.TimestampBound;
+
 import io.debezium.connector.spanner.db.model.schema.ChangeStreamSchema;
 import io.debezium.connector.spanner.db.model.schema.SpannerSchema;
-import java.util.Collection;
-import java.util.Objects;
-import java.util.stream.Collectors;
 
 /**
  * Provides functionality to read Spanner DB table and stream schema
@@ -126,9 +128,9 @@ public class SchemaDao {
                     "  s.table_catalog = ''" +
                     "  AND s.table_schema = ''" +
                     (tables == null ? "" : "  AND s.table_name in UNNEST(@tables)"))
-                .bind("tables")
-                .toStringArray(tables)
-                .build();
+                    .bind("tables")
+                    .toStringArray(tables)
+                    .build();
         }
         return tx.executeQuery(statement);
     }
@@ -153,10 +155,11 @@ public class SchemaDao {
                     "  csc.change_stream_name = cs.change_stream_name\n" +
                     "  and csc.table_name = cst.table_name\n" +
                     "where cs.change_stream_name = $1")
-                .bind("p1")
-                .to(streamName)
-                .build();
-        } else {
+                    .bind("p1")
+                    .to(streamName)
+                    .build();
+        }
+        else {
             statement = Statement.newBuilder("select" +
                     "  cs.all," +
                     "  cst.table_name," +
@@ -174,9 +177,9 @@ public class SchemaDao {
                     "  csc.change_stream_name = cs.change_stream_name\n" +
                     "  and csc.table_name = cst.table_name\n" +
                     "where cs.change_stream_name = @streamName")
-                .bind("streamName")
-                .to(streamName)
-                .build();
+                    .bind("streamName")
+                    .to(streamName)
+                    .build();
         }
         return tx.executeQuery(statement);
     }
