@@ -14,25 +14,23 @@ import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import io.debezium.config.Configuration;
+import io.debezium.config.Field;
+import io.debezium.connector.spanner.SpannerConnectorConfig;
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
-
 import org.apache.kafka.common.config.ConfigDef;
 import org.junit.jupiter.api.Test;
-
-import io.debezium.config.Configuration;
-import io.debezium.config.Field;
-import io.debezium.connector.spanner.SpannerConnectorConfig;
 
 class BaseSpannerConnectorConfigTest {
     @Test
     void testConfigDef() {
         ConfigDef actualConfigDefResult = BaseSpannerConnectorConfig.configDef();
         Map<String, ConfigDef.ConfigKey> configKeysResult = actualConfigDefResult.configKeys();
-        assertEquals(51, configKeysResult.size());
+        assertEquals(52, configKeysResult.size());
         List<String> groupsResult = actualConfigDefResult.groups();
         assertEquals(3, groupsResult.size());
         assertEquals("Spanner", groupsResult.get(0));
@@ -57,7 +55,7 @@ class BaseSpannerConnectorConfigTest {
         assertNull(getResult.validator);
         assertEquals(ConfigDef.Type.STRING, getResult.type);
         assertNull(getResult.recommender);
-        assertEquals(3, getResult.orderInGroup);
+        assertEquals(4, getResult.orderInGroup);
         assertEquals("gcp.spanner.change.stream", getResult.name);
         assertFalse(getResult.internalConfig);
         assertEquals(ConfigDef.Importance.HIGH, getResult.importance);
@@ -93,7 +91,7 @@ class BaseSpannerConnectorConfigTest {
         assertNull(getResult4.validator);
         assertEquals(ConfigDef.Type.STRING, getResult4.type);
         assertNull(getResult4.recommender);
-        assertEquals(4, getResult4.orderInGroup);
+        assertEquals(5, getResult4.orderInGroup);
         assertEquals("gcp.spanner.start.time", getResult4.name);
         assertFalse(getResult4.internalConfig);
         assertEquals(ConfigDef.Importance.MEDIUM, getResult4.importance);
@@ -105,7 +103,7 @@ class BaseSpannerConnectorConfigTest {
         assertNull(getResult5.validator);
         assertEquals(ConfigDef.Type.STRING, getResult5.type);
         assertNull(getResult5.recommender);
-        assertEquals(5, getResult5.orderInGroup);
+        assertEquals(6, getResult5.orderInGroup);
         assertEquals("gcp.spanner.end.time", getResult5.name);
         assertFalse(getResult5.internalConfig);
         assertEquals(ConfigDef.Importance.MEDIUM, getResult5.importance);

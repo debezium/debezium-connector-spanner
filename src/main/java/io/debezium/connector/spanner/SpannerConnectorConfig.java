@@ -7,24 +7,21 @@ package io.debezium.connector.spanner;
 
 import static org.apache.commons.lang3.StringUtils.substringAfter;
 
+import com.google.cloud.Timestamp;
+import io.debezium.config.Configuration;
+import io.debezium.connector.SourceInfoStructMaker;
+import io.debezium.connector.spanner.config.BaseSpannerConnectorConfig;
+import io.debezium.connector.spanner.context.source.SourceInfo;
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
 import java.util.AbstractMap;
 import java.util.Map;
 import java.util.Properties;
 import java.util.stream.Collectors;
-
 import org.apache.commons.lang3.StringUtils;
 import org.apache.kafka.clients.CommonClientConfigs;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.google.cloud.Timestamp;
-
-import io.debezium.config.Configuration;
-import io.debezium.connector.SourceInfoStructMaker;
-import io.debezium.connector.spanner.config.BaseSpannerConnectorConfig;
-import io.debezium.connector.spanner.context.source.SourceInfo;
 
 /**
  * Configuration API for the Spanner connector
@@ -115,6 +112,10 @@ public class SpannerConnectorConfig extends BaseSpannerConnectorConfig {
 
     public String databaseId() {
         return getConfig().getString(GCP_SPANNER_DATABASE_ID_PROPERTY_NAME);
+    }
+
+    public String databaseRole() {
+        return getConfig().getString(GCP_SPANNER_DATABASE_ROLE_PROPERTY_NAME);
     }
 
     public String spannerHost() {
