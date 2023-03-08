@@ -21,6 +21,7 @@ import org.junit.jupiter.api.Test;
 import com.google.cloud.Timestamp;
 import com.google.cloud.spanner.AsyncResultSet;
 import com.google.cloud.spanner.DatabaseClient;
+import com.google.cloud.spanner.Dialect;
 import com.google.cloud.spanner.ForwardingAsyncResultSet;
 import com.google.cloud.spanner.ReadOnlyTransaction;
 import com.google.cloud.spanner.ResultSet;
@@ -44,6 +45,7 @@ class SchemaDaoTest {
         DatabaseClient databaseClient = mock(DatabaseClient.class);
         ReadOnlyTransaction readOnlyTransaction = mock(ReadOnlyTransaction.class);
         when(databaseClient.readOnlyTransaction(any())).thenReturn(readOnlyTransaction);
+        when(databaseClient.getDialect()).thenReturn(Dialect.GOOGLE_STANDARD_SQL);
 
         ResultSet resultSet = mock(ResultSet.class);
         when(resultSet.getString(0)).thenReturn("tableName");

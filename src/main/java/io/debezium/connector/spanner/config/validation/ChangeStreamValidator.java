@@ -18,6 +18,7 @@ import static org.slf4j.LoggerFactory.getLogger;
 import org.slf4j.Logger;
 
 import com.google.cloud.spanner.DatabaseClient;
+import com.google.cloud.spanner.Dialect;
 import com.google.cloud.spanner.Statement;
 import com.google.common.annotations.VisibleForTesting;
 
@@ -88,12 +89,23 @@ public class ChangeStreamValidator implements ConfigurationValidator.Validator {
      */
     @VisibleForTesting
     boolean isStreamExist(DatabaseClient databaseClient, String streamName) {
-        Statement statement = Statement.newBuilder("select change_stream_name " +
-                "from information_schema.change_streams cs " +
-                "where cs.change_stream_name = @streamname")
-                .bind("streamName")
-                .to(streamName)
-                .build();
+        Statement statement;
+        if (databaseClient.getDialect() == Dialect.POSTGRESQL) {
+            statement = Statement.newBuilder("select change_stream_name " +
+                    "from information_schema.change_streams cs " +
+                    "where cs.change_stream_name = $1")
+                    .bind("p1")
+                    .to(streamName)
+                    .build();
+        }
+        else {
+            statement = Statement.newBuilder("select change_stream_name " +
+                    "from information_schema.change_streams cs " +
+                    "where cs.change_stream_name = @streamname")
+                    .bind("streamName")
+                    .to(streamName)
+                    .build();
+        }
         return databaseClient.singleUse().executeQuery(statement).next();
     }
 }
