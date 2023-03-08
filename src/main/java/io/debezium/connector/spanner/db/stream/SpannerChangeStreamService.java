@@ -5,6 +5,13 @@
  */
 package io.debezium.connector.spanner.db.stream;
 
+import java.time.Duration;
+import java.time.Instant;
+import java.util.List;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import io.debezium.connector.spanner.db.dao.ChangeStreamDao;
 import io.debezium.connector.spanner.db.dao.ChangeStreamResultSet;
 import io.debezium.connector.spanner.db.mapper.ChangeStreamRecordMapper;
@@ -15,11 +22,6 @@ import io.debezium.connector.spanner.db.model.event.FinishPartitionEvent;
 import io.debezium.connector.spanner.db.model.event.HeartbeatEvent;
 import io.debezium.connector.spanner.metrics.MetricsEventPublisher;
 import io.debezium.connector.spanner.metrics.event.DelayChangeStreamEventsMetricEvent;
-import java.time.Duration;
-import java.time.Instant;
-import java.util.List;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * This class queries the change stream, sends child partitions to SynchronizedPartitionManager,
@@ -59,8 +61,8 @@ public class SpannerChangeStreamService {
                 long delay = now() - start;
 
                 List<ChangeStreamEvent> events = changeStreamRecordMapper.toChangeStreamEvents(
-                    partition,
-                    resultSet, resultSet.getMetadata());
+                        partition,
+                        resultSet, resultSet.getMetadata());
                 LOGGER.debug("Events receive from stream: {}", events);
 
                 if (!events.isEmpty() && (events.get(0) instanceof HeartbeatEvent)) {
