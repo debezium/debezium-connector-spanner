@@ -13,6 +13,8 @@ import java.util.List;
 
 import org.junit.jupiter.api.Test;
 
+import com.google.cloud.spanner.Dialect;
+
 import io.debezium.connector.spanner.db.model.schema.Column;
 import io.debezium.connector.spanner.db.model.schema.TableSchema;
 
@@ -30,7 +32,7 @@ class SchemaValidatorTest {
         TableSchema schemaTable = new TableSchema("Name1", new ArrayList<>());
         TableSchema watchedTable = new TableSchema("Name2", new ArrayList<>());
         List<Column> rowTypes = new ArrayList<>();
-        rowTypes.add(Column.create("name1", "BOOL", true, 1L, false));
+        rowTypes.add(Column.create("name1", "BOOL", true, 1L, false, Dialect.GOOGLE_STANDARD_SQL));
         assertFalse(SchemaValidator.validate(schemaTable, watchedTable, rowTypes));
     }
 }

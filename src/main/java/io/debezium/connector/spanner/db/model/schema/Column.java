@@ -5,6 +5,8 @@
  */
 package io.debezium.connector.spanner.db.model.schema;
 
+import com.google.cloud.spanner.Dialect;
+
 /**
  * DTO for Spanner DB column
  */
@@ -44,46 +46,86 @@ public class Column {
         return nullable;
     }
 
-    public static Column create(String name, String spannerType, boolean primaryKey, long ordinalPosition, boolean nullable) {
-        return new Column(name, parseColumnType(spannerType), primaryKey, ordinalPosition, nullable);
+    public static Column create(String name, String spannerType, boolean primaryKey,
+                                long ordinalPosition, boolean nullable, Dialect dialect) {
+        return new Column(name, parseColumnType(spannerType, dialect), primaryKey, ordinalPosition,
+                nullable);
     }
 
-    private static ColumnType parseColumnType(String spannerType) {
+    private static ColumnType parseColumnType(String spannerType, Dialect dialect) {
         spannerType = spannerType.toUpperCase();
-        if ("BOOL".equals(spannerType)) {
-            return new ColumnType(DataType.BOOL);
+        switch (dialect) {
+            case GOOGLE_STANDARD_SQL:
+                if ("BOOL".equals(spannerType)) {
+                    return new ColumnType(DataType.BOOL);
+                }
+                if ("INT64".equals(spannerType)) {
+                    return new ColumnType(DataType.INT64);
+                }
+                if ("FLOAT64".equals(spannerType)) {
+                    return new ColumnType(DataType.FLOAT64);
+                }
+                if (spannerType.startsWith("STRING")) {
+                    return new ColumnType(DataType.STRING);
+                }
+                if (spannerType.startsWith("BYTES")) {
+                    return new ColumnType(DataType.BYTES);
+                }
+                if ("TIMESTAMP".equals(spannerType)) {
+                    return new ColumnType(DataType.TIMESTAMP);
+                }
+                if ("DATE".equals(spannerType)) {
+                    return new ColumnType(DataType.DATE);
+                }
+                if ("NUMERIC".equals(spannerType)) {
+                    return new ColumnType(DataType.NUMERIC);
+                }
+                if ("JSON".equals(spannerType)) {
+                    return new ColumnType(DataType.JSON);
+                }
+                if (spannerType.startsWith("ARRAY")) {
+                    // Substring "ARRAY<xxx>"
+                    String spannerArrayType = spannerType.substring(6, spannerType.length() - 1);
+                    ColumnType itemType = parseColumnType(spannerArrayType, dialect);
+                    return new ColumnType(DataType.ARRAY, itemType);
+                }
+                throw new IllegalArgumentException("Unknown spanner type " + spannerType);
+            case POSTGRESQL:
+                if (spannerType.endsWith("[]")) {
+                    // Substring "xxx[]"
+                    // Must check array type first
+                    String spannerArrayType = spannerType.substring(0, spannerType.length() - 2);
+                    ColumnType itemType = parseColumnType(spannerArrayType, dialect);
+                    return new ColumnType(DataType.ARRAY, itemType);
+                }
+                if ("BOOLEAN".equals(spannerType)) {
+                    return new ColumnType(DataType.BOOL);
+                }
+                if ("BIGINT".equals(spannerType)) {
+                    return new ColumnType(DataType.INT64);
+                }
+                if ("DOUBLE PRECISION".equals(spannerType)) {
+                    return new ColumnType(DataType.FLOAT64);
+                }
+                if (spannerType.startsWith("CHARACTER VARYING") || "TEXT".equals(spannerType)) {
+                    return new ColumnType(DataType.STRING);
+                }
+                if ("BYTEA".equals(spannerType)) {
+                    return new ColumnType(DataType.BYTES);
+                }
+                if ("TIMESTAMP WITH TIME ZONE".equals(spannerType)) {
+                    return new ColumnType(DataType.TIMESTAMP);
+                }
+                if ("DATE".equals(spannerType)) {
+                    return new ColumnType(DataType.DATE);
+                }
+                if (spannerType.startsWith("NUMERIC")) {
+                    return new ColumnType(DataType.NUMERIC);
+                }
+                throw new IllegalArgumentException("Unknown spanner type " + spannerType);
+            default:
+                throw new IllegalArgumentException("Unrecognized dialect: " + dialect.name());
         }
-        if ("INT64".equals(spannerType)) {
-            return new ColumnType(DataType.INT64);
-        }
-        if ("FLOAT64".equals(spannerType)) {
-            return new ColumnType(DataType.FLOAT64);
-        }
-        if (spannerType.startsWith("STRING")) {
-            return new ColumnType(DataType.STRING);
-        }
-        if (spannerType.startsWith("BYTES")) {
-            return new ColumnType(DataType.BYTES);
-        }
-        if ("TIMESTAMP".equals(spannerType)) {
-            return new ColumnType(DataType.TIMESTAMP);
-        }
-        if ("DATE".equals(spannerType)) {
-            return new ColumnType(DataType.DATE);
-        }
-        if ("NUMERIC".equals(spannerType)) {
-            return new ColumnType(DataType.NUMERIC);
-        }
-        if ("JSON".equals(spannerType)) {
-            return new ColumnType(DataType.JSON);
-        }
-        if (spannerType.startsWith("ARRAY")) {
-            // Substring "ARRAY<xxx>"
-            String spannerArrayType = spannerType.substring(6, spannerType.length() - 1);
-            ColumnType itemType = parseColumnType(spannerArrayType);
-            return new ColumnType(DataType.ARRAY, itemType);
-        }
-        throw new IllegalArgumentException("Unknown spanner type " + spannerType);
     }
 
 }
