@@ -7,20 +7,17 @@ package io.debezium.connector.spanner.db;
 
 import static org.apache.commons.lang3.StringUtils.isNotEmpty;
 
-import java.io.ByteArrayInputStream;
-import java.io.FileInputStream;
-import java.io.IOException;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import com.google.auth.oauth2.GoogleCredentials;
 import com.google.cloud.spanner.DatabaseClient;
 import com.google.cloud.spanner.DatabaseId;
 import com.google.cloud.spanner.SpannerOptions;
 import com.google.common.annotations.VisibleForTesting;
-
 import io.debezium.connector.spanner.SpannerConnectorConfig;
+import java.io.ByteArrayInputStream;
+import java.io.FileInputStream;
+import java.io.IOException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Factory for {@code DatabaseClient}
@@ -37,15 +34,17 @@ public class DatabaseClientFactory {
 
     private DatabaseClient databaseClient;
 
-    public DatabaseClientFactory(String projectId, String instanceId, String databaseId, String credentialsJson,
-                                 String credentialsPath, String host) {
+    public DatabaseClientFactory(String projectId, String instanceId, String databaseId,
+        String credentialsJson,
+        String credentialsPath, String host, String databaseRole) {
         this.projectId = projectId;
         this.instanceId = instanceId;
         this.databaseId = databaseId;
 
         SpannerOptions.Builder builder = SpannerOptions.newBuilder();
 
-        GoogleCredentials googleCredentials = getGoogleCredentials(credentialsJson, credentialsPath);
+        GoogleCredentials googleCredentials = getGoogleCredentials(credentialsJson,
+            credentialsPath);
         if (googleCredentials != null) {
             builder.setCredentials(googleCredentials);
         }
@@ -53,13 +52,17 @@ public class DatabaseClientFactory {
         if (isNotEmpty(host)) {
             builder.setHost(host);
         }
+        if (isNotEmpty(databaseRole)) {
+            builder.setDatabaseRole(databaseRole);
+        }
 
         this.options = builder.build();
     }
 
     public DatabaseClientFactory(SpannerConnectorConfig config) {
         this(config.projectId(), config.instanceId(), config.databaseId(),
-                config.gcpSpannerCredentialsJson(), config.gcpSpannerCredentialsPath(), config.spannerHost());
+            config.gcpSpannerCredentialsJson(), config.gcpSpannerCredentialsPath(),
+            config.spannerHost(), config.databaseRole());
     }
 
     @VisibleForTesting
