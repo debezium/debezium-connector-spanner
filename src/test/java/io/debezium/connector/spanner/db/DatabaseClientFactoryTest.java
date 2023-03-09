@@ -11,9 +11,11 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.google.cloud.spanner.DatabaseClient;
-import io.debezium.connector.spanner.SpannerConnectorConfig;
 import org.junit.jupiter.api.Test;
+
+import com.google.cloud.spanner.DatabaseClient;
+
+import io.debezium.connector.spanner.SpannerConnectorConfig;
 
 class DatabaseClientFactoryTest {
 
@@ -36,21 +38,21 @@ class DatabaseClientFactoryTest {
     @Test
     void testGetGoogleCredentials() {
         assertNull(new DatabaseClientFactory("myproject", "42", "42", "Credentials Json",
-            "Credentials Path", null, "test-role")
-            .getGoogleCredentials("Credentials Json", "Credentials Path"));
+                "Credentials Path", null, "test-role")
+                .getGoogleCredentials("Credentials Json", "Credentials Path"));
         assertNull(new DatabaseClientFactory("myproject", "42", "42", "Credentials Json",
-            "Credentials Path", null, "test-role")
-            .getGoogleCredentials(null, null));
+                "Credentials Path", null, "test-role")
+                .getGoogleCredentials(null, null));
         assertNull(new DatabaseClientFactory("myproject", "42", "42", "Credentials Json",
-            "Credentials Path", null, "test-role")
-            .getGoogleCredentials(null, "Credentials Path"));
+                "Credentials Path", null, "test-role")
+                .getGoogleCredentials(null, "Credentials Path"));
 
     }
 
     @Test
     void testGetDatabaseClient() {
         DatabaseClientFactory databaseClientFactory = new DatabaseClientFactory("myproject", "42",
-            "42", "Credentials Json", "Credentials Path", null, "test-role");
+                "42", "Credentials Json", "Credentials Path", null, "test-role");
 
         DatabaseClient actualDatabaseClient = databaseClientFactory.getDatabaseClient();
         assertNotNull(actualDatabaseClient);

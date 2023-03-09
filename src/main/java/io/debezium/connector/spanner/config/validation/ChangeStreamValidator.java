@@ -7,12 +7,12 @@ package io.debezium.connector.spanner.config.validation;
 
 import static io.debezium.connector.spanner.config.BaseSpannerConnectorConfig.CHANGE_STREAM_NAME;
 import static io.debezium.connector.spanner.config.BaseSpannerConnectorConfig.DATABASE_ID;
+import static io.debezium.connector.spanner.config.BaseSpannerConnectorConfig.DATABASE_ROLE;
 import static io.debezium.connector.spanner.config.BaseSpannerConnectorConfig.INSTANCE_ID;
 import static io.debezium.connector.spanner.config.BaseSpannerConnectorConfig.PROJECT_ID;
 import static io.debezium.connector.spanner.config.BaseSpannerConnectorConfig.SPANNER_CREDENTIALS_JSON;
 import static io.debezium.connector.spanner.config.BaseSpannerConnectorConfig.SPANNER_CREDENTIALS_PATH;
 import static io.debezium.connector.spanner.config.BaseSpannerConnectorConfig.SPANNER_HOST;
-import static io.debezium.connector.spanner.config.BaseSpannerConnectorConfig.DATABASE_ROLE;
 import static org.slf4j.LoggerFactory.getLogger;
 
 import org.slf4j.Logger;
