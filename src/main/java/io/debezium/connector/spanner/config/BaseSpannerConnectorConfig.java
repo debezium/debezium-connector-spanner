@@ -5,6 +5,14 @@
  */
 package io.debezium.connector.spanner.config;
 
+import java.time.Instant;
+import java.time.format.DateTimeFormatter;
+
+import org.apache.kafka.common.config.ConfigDef;
+import org.apache.kafka.common.config.ConfigDef.Importance;
+import org.apache.kafka.common.config.ConfigDef.Type;
+import org.apache.kafka.common.config.ConfigDef.Width;
+
 import io.debezium.config.CommonConnectorConfig;
 import io.debezium.config.ConfigDefinition;
 import io.debezium.config.Configuration;
@@ -12,12 +20,6 @@ import io.debezium.config.Field;
 import io.debezium.connector.spanner.config.validation.FieldValidator;
 import io.debezium.heartbeat.Heartbeat;
 import io.debezium.schema.AbstractTopicNamingStrategy;
-import java.time.Instant;
-import java.time.format.DateTimeFormatter;
-import org.apache.kafka.common.config.ConfigDef;
-import org.apache.kafka.common.config.ConfigDef.Importance;
-import org.apache.kafka.common.config.ConfigDef.Type;
-import org.apache.kafka.common.config.ConfigDef.Width;
 
 /**
  * Provides all configuration properties for Spanner connector
@@ -132,31 +134,31 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
             .withDescription("Spanner instance id");
 
     public static final Field DATABASE_ID = Field.create(GCP_SPANNER_DATABASE_ID_PROPERTY_NAME)
-        .withDisplayName("DatabaseId")
-        .withType(Type.STRING)
-        .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR, 5))
-        .withWidth(Width.SHORT)
-        .withImportance(Importance.HIGH)
-        .withValidation(FieldValidator::isNotBlank)
-        .withDescription("Spanner database id");
+            .withDisplayName("DatabaseId")
+            .withType(Type.STRING)
+            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR, 5))
+            .withWidth(Width.SHORT)
+            .withImportance(Importance.HIGH)
+            .withValidation(FieldValidator::isNotBlank)
+            .withDescription("Spanner database id");
 
     public static final Field DATABASE_ROLE = Field.create(GCP_SPANNER_DATABASE_ROLE_PROPERTY_NAME)
-        .withDisplayName("DatabaseRole")
-        .withType(Type.STRING)
-        .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR, 5))
-        .withWidth(Width.SHORT)
-        .withImportance(Importance.HIGH)
-        .withDescription("Spanner database role");
+            .withDisplayName("DatabaseRole")
+            .withType(Type.STRING)
+            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR, 5))
+            .withWidth(Width.SHORT)
+            .withImportance(Importance.HIGH)
+            .withDescription("Spanner database role");
 
     public static final Field CHANGE_STREAM_NAME = Field.create(
             GCP_SPANNER_CHANGE_STREAM_PROPERTY_NAME)
-        .withDisplayName("Change stream name")
-        .withType(Type.STRING)
-        .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR, 6))
-        .withWidth(Width.MEDIUM)
-        .withImportance(Importance.HIGH)
-        .withValidation(FieldValidator::isNotBlank)
-        .withDescription("Spanner change stream name");
+            .withDisplayName("Change stream name")
+            .withType(Type.STRING)
+            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR, 6))
+            .withWidth(Width.MEDIUM)
+            .withImportance(Importance.HIGH)
+            .withValidation(FieldValidator::isNotBlank)
+            .withDescription("Spanner change stream name");
 
     public static final Field SPANNER_HOST = Field.create(GCP_SPANNER_HOST_PROPERTY_NAME)
             .withDisplayName("SpannerHost")
@@ -529,18 +531,18 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
             .name("Spanner")
             .type(PROJECT_ID)
             .connector(INSTANCE_ID,
-                DATABASE_ID,
-                DATABASE_ROLE,
-                CHANGE_STREAM_NAME,
-                START_TIME,
-                END_TIME,
-                SPANNER_CREDENTIALS_PATH,
-                SPANNER_CREDENTIALS_JSON,
-                SPANNER_HOST,
-                STREAM_EVENT_QUEUE_CAPACITY,
-                TASK_STATE_CHANGE_EVENT_QUEUE_CAPACITY,
-                VALUE_CAPTURE_MODE,
-                SPANNER_HEART_BEAT_INTERVAL,
+                    DATABASE_ID,
+                    DATABASE_ROLE,
+                    CHANGE_STREAM_NAME,
+                    START_TIME,
+                    END_TIME,
+                    SPANNER_CREDENTIALS_PATH,
+                    SPANNER_CREDENTIALS_JSON,
+                    SPANNER_HOST,
+                    STREAM_EVENT_QUEUE_CAPACITY,
+                    TASK_STATE_CHANGE_EVENT_QUEUE_CAPACITY,
+                    VALUE_CAPTURE_MODE,
+                    SPANNER_HEART_BEAT_INTERVAL,
                     TOPIC_DEFAULT_AUTO_CREATION_PARTITIONS_FIELD,
 
                     MAX_BATCH_SIZE,

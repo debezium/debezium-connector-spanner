@@ -14,16 +14,18 @@ import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import io.debezium.config.Configuration;
-import io.debezium.config.Field;
-import io.debezium.connector.spanner.SpannerConnectorConfig;
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+
 import org.apache.kafka.common.config.ConfigDef;
 import org.junit.jupiter.api.Test;
+
+import io.debezium.config.Configuration;
+import io.debezium.config.Field;
+import io.debezium.connector.spanner.SpannerConnectorConfig;
 
 class BaseSpannerConnectorConfigTest {
     @Test
