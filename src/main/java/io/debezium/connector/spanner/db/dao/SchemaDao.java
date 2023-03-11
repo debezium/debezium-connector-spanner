@@ -57,7 +57,7 @@ public class SchemaDao {
 
     private boolean isAllTables(ResultSet resultSet) {
         if (isPostgres()) {
-            return Objects.equals(resultSet.getString(0), "NO");
+            return Objects.equals(resultSet.getString(0), "YES");
         }
         return resultSet.getBoolean(0);
     }
