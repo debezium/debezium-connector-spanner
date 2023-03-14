@@ -5,6 +5,7 @@
  */
 package io.debezium.connector.spanner.kafka.internal.proto;
 
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -80,12 +81,16 @@ public class SyncEventFromProtoMapper {
 
         return new PartitionState(
                 partitionState.getToken(),
-                Timestamp.parseTimestamp(partitionState.getStartTimestamp()),
+                !PartitionStateEnum.valueOf(partitionState.getState().name()).equals(PartitionStateEnum.REMOVED)
+                        ? Timestamp.parseTimestamp(partitionState.getStartTimestamp())
+                        : null,
                 partitionState.getEndTimestamp() != null && !partitionState.getEndTimestamp().isEmpty()
                         ? Timestamp.parseTimestamp(partitionState.getEndTimestamp())
                         : null,
                 PartitionStateEnum.valueOf(partitionState.getState().name()),
-                new HashSet<>(partitionState.getParentsList()),
+                new HashSet<>(!PartitionStateEnum.valueOf(partitionState.getState().name()).equals(PartitionStateEnum.REMOVED)
+                        ? partitionState.getParentsList()
+                        : Collections.emptyList()),
                 partitionState.getAssigneeTaskUid(),
                 partitionState.getFinishedTimestamp() != null && !partitionState.getFinishedTimestamp().isEmpty()
                         ? Timestamp.parseTimestamp(partitionState.getFinishedTimestamp())

@@ -49,13 +49,30 @@ public class SyncEventMerger {
             return builder.build();
         }
 
+        if (newTask.getTaskUid().equals(currentContext.getTaskUid())) {
+            return builder.build();
+        }
+
         // We only update our internal copy of the other task's state.
         TaskState currentTask = currentContext.getTaskStates().get(newMessage.getTaskUid());
         // We only update our internal copy of another task's state, if the state timestamp
         // in the sync event message is greater than the state timestamp of our internal
         // copy of the other task's state.
 
-        if (currentTask == null || newTask.getStateTimestamp() > currentTask.getStateTimestamp()) {
+        if (currentTask == null) {
+            Map<String, TaskState> currentTaskStates = new HashMap<>(currentContext.getTaskStates());
+            currentTaskStates.put(newMessage.getTaskUid(), newTask);
+            builder.taskStates(currentTaskStates)
+                    .createdTimestamp(Long.max(currentContext.getCreatedTimestamp(),
+                            newMessage.getMessageTimestamp()));
+            TaskSyncContext result = builder.build();
+            LOGGER.debug("Processed incremental answer {} from task {} for " +
+                    "rebalance generation id {}", newMessage, newMessage.getTaskUid(),
+                    newMessage.getRebalanceGenerationId());
+            LOGGER.info("Processed incremental answer {} to get {}", newMessage, result);
+            return result;
+        }
+        else if (newTask.getStateTimestamp() > currentTask.getStateTimestamp()) {
 
             // Remove the new message's task state from our current task state.
             Map<String, TaskState> currentTaskStates = new HashMap<>(currentContext.getTaskStates());
@@ -66,14 +83,24 @@ public class SyncEventMerger {
             List<PartitionState> updatedOwnedPartitions = newTask.getPartitions().stream()
                     .filter(partitionState -> !partitionState.getState().equals(PartitionStateEnum.REMOVED))
                     .collect(Collectors.toList());
-            List<PartitionState> removedOwnedPartitions = newTask.getPartitions().stream()
+            List<String> updatedOwnedPartitionTokens = newTask.getPartitions().stream()
+                    .filter(partitionState -> !partitionState.getState().equals(PartitionStateEnum.REMOVED))
+                    .map(partitionState -> partitionState.getToken())
+                    .collect(Collectors.toList());
+            List<String> removedOwnedPartitionTokens = newTask.getPartitions().stream()
                     .filter(partitionState -> partitionState.getState().equals(PartitionStateEnum.REMOVED))
+                    .map(partitionState -> partitionState.getToken())
                     .collect(Collectors.toList());
             List<PartitionState> newSharedPartitions = newTask.getSharedPartitions().stream()
                     .filter(partitionState -> !partitionState.getState().equals(PartitionStateEnum.REMOVED))
                     .collect(Collectors.toList());
-            List<PartitionState> removedSharedPartitions = newTask.getSharedPartitions().stream()
+            List<String> newSharedPartitionTokens = newTask.getSharedPartitions().stream()
+                    .filter(partitionState -> !partitionState.getState().equals(PartitionStateEnum.REMOVED))
+                    .map(partitionState -> partitionState.getToken())
+                    .collect(Collectors.toList());
+            List<String> removedSharedPartitionTokens = newTask.getSharedPartitions().stream()
                     .filter(partitionState -> partitionState.getState().equals(PartitionStateEnum.REMOVED))
+                    .map(partitionState -> partitionState.getToken())
                     .collect(Collectors.toList());
 
             // Compute the final owned partitions for this task.
@@ -81,8 +108,8 @@ public class SyncEventMerger {
             for (PartitionState currentPartition : currentTask.getPartitions()) {
                 // Only add the partitions from the current task sync context, if it was not newly
                 // modified or removed.
-                if (!removedOwnedPartitions.contains(currentPartition) &&
-                        !updatedOwnedPartitions.contains(currentPartition)) {
+                if (!removedOwnedPartitionTokens.contains(currentPartition.getToken()) &&
+                        !updatedOwnedPartitionTokens.contains(currentPartition.getToken())) {
                     finalOwnedPartitions.add(currentPartition);
                 }
             }
@@ -94,8 +121,8 @@ public class SyncEventMerger {
             for (PartitionState currentPartition : currentTask.getSharedPartitions()) {
                 // Only add the partitions from the current task sync context, if it was not newly
                 // shared or removed.
-                if (!removedSharedPartitions.contains(currentPartition) &&
-                        !newSharedPartitions.contains(currentPartition)) {
+                if (!removedSharedPartitionTokens.contains(currentPartition.getToken()) &&
+                        !newSharedPartitionTokens.contains(currentPartition.getToken())) {
                     finalSharedPartitions.add(currentPartition);
                 }
             }
@@ -103,17 +130,15 @@ public class SyncEventMerger {
             finalSharedPartitions.addAll(newSharedPartitions);
 
             // build from the new sync context.
-            TaskState finalTaskState = newTask.builder().partitions(finalOwnedPartitions)
+            TaskState finalTaskState = newTask.toBuilder().partitions(finalOwnedPartitions)
                     .sharedPartitions(finalSharedPartitions).build();
-            currentTaskStates.put(currentContext.getTaskUid(), finalTaskState);
+            currentTaskStates.put(newMessage.getTaskUid(), finalTaskState);
             builder.taskStates(currentTaskStates)
                     .createdTimestamp(Long.max(currentContext.getCreatedTimestamp(),
                             newMessage.getMessageTimestamp()));
             TaskSyncContext result = builder
                     .build();
-            LOGGER.debug("Processed incremental answer {} from task {} for " +
-                    "rebalance generation id {}", newMessage, newMessage.getTaskUid(),
-                    newMessage.getRebalanceGenerationId());
+            LOGGER.info("Processed incremental answer {} to get {}", newMessage, result);
             return result;
         }
         LOGGER.debug("merge: final state is not changed");
@@ -131,6 +156,10 @@ public class SyncEventMerger {
         TaskState newTask = newMessage.getTaskStates().get(newMessage.getTaskUid());
         if (newTask == null) {
             LOGGER.warn("The rebalance answer {} did not contain the task's UID: {}", newMessage, newMessage.getTaskUid());
+            return builder.build();
+        }
+
+        if (newTask.getTaskUid().equals(currentContext.getTaskUid())) {
             return builder.build();
         }
 

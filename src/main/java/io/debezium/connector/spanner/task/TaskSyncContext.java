@@ -6,6 +6,7 @@
 package io.debezium.connector.spanner.task;
 
 import static java.util.Collections.emptyList;
+import static org.slf4j.LoggerFactory.getLogger;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -13,6 +14,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+
+import org.slf4j.Logger;
 
 import com.google.cloud.Timestamp;
 
@@ -30,6 +33,8 @@ import io.debezium.connector.spanner.kafka.internal.model.TaskSyncEvent;
  * the Sync Topic
  */
 public class TaskSyncContext {
+    private static final Logger LOGGER = getLogger(TaskSyncContext.class);
+
     private final String taskUid;
     private final RebalanceState rebalanceState;
     private final String consumerId;
@@ -70,6 +75,14 @@ public class TaskSyncContext {
                                                              List<String> removedOwnedPartitions,
                                                              List<String> removedSharedPartitions,
                                                              List<String> modifiedOwnedPartitions) {
+        // Remove all owned partitions that were also modified.
+        updatedOwnedPartitions.removeAll(modifiedOwnedPartitions);
+        // Remove all owned / modified patiitons that were removed
+        updatedOwnedPartitions.removeAll(removedOwnedPartitions);
+        modifiedOwnedPartitions.removeAll(removedOwnedPartitions);
+
+        // Remove all shared partitions that were removed.
+        updatedSharedPartitions.removeAll(removedSharedPartitions);
         // Add all partitions that are newly owned by this task.
         List<PartitionState> newOwnedPartitions = currentTaskState.getPartitions().stream()
                 .filter(partitionState -> updatedOwnedPartitions.contains(
@@ -89,6 +102,7 @@ public class TaskSyncContext {
         ownedPartitionsToAdd.addAll(newOwnedPartitions);
         ownedPartitionsToAdd.addAll(newRemovedOwnedPartitions);
         ownedPartitionsToAdd.addAll(newModifiedOwnedPartitions);
+        LOGGER.info("Final list of owned partitions to add: {}", ownedPartitionsToAdd);
 
         // Add all partitions that are newly shared by this task.
         List<PartitionState> newSharedPartitions = currentTaskState.getSharedPartitions().stream()

@@ -97,6 +97,10 @@ public class CheckPartitionDuplicationOperation implements Operation {
                         || PartitionStateEnum.SCHEDULED.equals(entry.getValue().getState()))
                 .map(Map.Entry::getKey).collect(Collectors.toSet());
 
+        LOGGER.info("Conflict resolver with current task Uid: {}, tasks {}, fulltasks {}", currentTaskUid, tasks, taskUidPartitionState);
+        if (tasks == null) {
+            return false;
+        }
         return !ConflictResolver.hasPriority(currentTaskUid, tasks);
     }
 

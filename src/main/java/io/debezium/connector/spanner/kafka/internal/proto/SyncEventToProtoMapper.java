@@ -11,6 +11,7 @@ import java.util.List;
 
 import io.debezium.connector.spanner.kafka.event.proto.SyncEventProtos;
 import io.debezium.connector.spanner.kafka.internal.model.PartitionState;
+import io.debezium.connector.spanner.kafka.internal.model.PartitionStateEnum;
 import io.debezium.connector.spanner.kafka.internal.model.TaskSyncEvent;
 
 /**
@@ -61,11 +62,15 @@ public class SyncEventToProtoMapper {
     private static SyncEventProtos.PartitionState mapPartition(PartitionState partitionState) {
         SyncEventProtos.PartitionState.Builder builder = SyncEventProtos.PartitionState.newBuilder()
                 .setToken(partitionState.getToken())
-                .addAllParents(partitionState.getParents())
-                .setStartTimestamp(partitionState.getStartTimestamp().toString())
-                .setState(SyncEventProtos.State.forNumber(partitionState.getState().ordinal()))
-                .setAssigneeTaskUid(partitionState.getAssigneeTaskUid());
+                .setState(SyncEventProtos.State.forNumber(partitionState.getState().ordinal()));
 
+        if (!partitionState.getState().equals(PartitionStateEnum.REMOVED)) {
+            builder.addAllParents(partitionState.getParents());
+            builder.setStartTimestamp(partitionState.getStartTimestamp().toString());
+            builder.setAssigneeTaskUid(partitionState.getAssigneeTaskUid());
+        }
+        // Need to figure out how to handle this corner case here.
+        // For REMOVED partitions, we can probabyl choose to ignore the parents / start timestamp / assignee task UID rather than populate fake values.
         if (partitionState.getOriginParent() != null) {
             builder.setOriginParent(partitionState.getOriginParent());
         }

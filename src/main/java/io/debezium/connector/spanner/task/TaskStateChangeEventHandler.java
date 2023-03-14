@@ -174,20 +174,43 @@ public class TaskStateChangeEventHandler {
                         publishTaskSyncEvent.set(true);
                     }
                     if (!operation.updatedOwnedPartitions().isEmpty()) {
-                        ownedPartitions.addAll(operation.updatedOwnedPartitions());
-                    }
-                    if (!operation.updatedSharedPartitions().isEmpty()) {
-                        sharedPartitions.addAll(operation.updatedSharedPartitions());
-                    }
-                    if (!operation.removedOwnedPartitions().isEmpty()) {
-                        removedOwnedPartitions.addAll(operation.removedOwnedPartitions());
-                    }
-                    if (!operation.removedSharedPartitions().isEmpty()) {
-                        removedSharedPartitions.addAll(operation.removedSharedPartitions());
+                        for (String updatedOwnedPartition : operation.updatedOwnedPartitions()) {
+                            if (!ownedPartitions.contains(updatedOwnedPartition)) {
+                                ownedPartitions.add(updatedOwnedPartition);
+                            }
+                        }
                     }
 
                     if (!operation.modifiedOwnedPartitions().isEmpty()) {
-                        modifiedOwnedPartitions.addAll(operation.modifiedOwnedPartitions());
+                        for (String modifiedOwnedPartition : operation.modifiedOwnedPartitions()) {
+                            if (!modifiedOwnedPartitions.contains(modifiedOwnedPartition)) {
+                                modifiedOwnedPartitions.add(modifiedOwnedPartition);
+                            }
+                        }
+                    }
+
+                    if (!operation.removedOwnedPartitions().isEmpty()) {
+                        for (String removedOwnedPartition : operation.removedOwnedPartitions()) {
+                            if (!removedOwnedPartitions.contains(removedOwnedPartition)) {
+                                removedOwnedPartitions.add(removedOwnedPartition);
+                            }
+                        }
+                    }
+
+                    if (!operation.updatedSharedPartitions().isEmpty()) {
+                        for (String updatedSharedPartition : operation.updatedSharedPartitions()) {
+                            if (!sharedPartitions.contains(updatedSharedPartition)) {
+                                sharedPartitions.add(updatedSharedPartition);
+                            }
+                        }
+                    }
+
+                    if (!operation.removedSharedPartitions().isEmpty()) {
+                        for (String removedSharedPartition : operation.removedSharedPartitions()) {
+                            if (!removedSharedPartitions.contains(removedSharedPartition)) {
+                                removedSharedPartitions.add(removedSharedPartition);
+                            }
+                        }
                     }
                 }
                 return newContext;
@@ -198,7 +221,7 @@ public class TaskStateChangeEventHandler {
         }
 
         if (publishTaskSyncEvent.get()) {
-            LOGGER.debug("Task {} - send sync event", taskSyncContext.getTaskUid());
+            LOGGER.info("Task {} - send sync event", taskSyncContext.getTaskUid());
             taskSyncPublisher.send(taskSyncContext.buildIncrementalTaskSyncEvent(
                     ownedPartitions, sharedPartitions, removedOwnedPartitions, removedSharedPartitions,
                     modifiedOwnedPartitions));

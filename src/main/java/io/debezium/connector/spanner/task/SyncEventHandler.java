@@ -189,6 +189,7 @@ public class SyncEventHandler {
         catch (Exception e) {
             LOGGER.error("Exception during processing task message {}, {}", inSync, e);
         }
+        LOGGER.info("Processed message {} to get {}", inSync, taskSyncContextHolder.get());
     }
 
     private boolean skipFromPreviousGeneration(TaskSyncEvent inSync) {

@@ -86,7 +86,7 @@ public class MetricsEventPublisher {
 
         Long lowWatermarkLag = LatencyCalculator.getLowWatermarkLag(sourceRecord);
         if (lowWatermarkLag != null && lowWatermarkLag > 300000) {
-            LOGGER.debug("Published very high lowWatermarkLag latency for source record {}:{}", sourceRecord, lowWatermarkLag);
+            LOGGER.info("Published very high lowWatermarkLag latency for source record {}:{}", sourceRecord, lowWatermarkLag);
         }
 
         this.publishMetricEvent(new LatencyMetricEvent(totalLatency, readToEmitLatency, spannerLatency,

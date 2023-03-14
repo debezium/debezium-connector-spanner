@@ -139,7 +139,7 @@ public class LowWatermarkCalculator {
 
         monitorOffsets(offsets);
 
-        return allPartitions.values().stream()
+        Timestamp lowWatermarkTimestamp = allPartitions.values().stream()
                 .map(
                         partitionState -> {
                             Timestamp timestamp = offsets.get(partitionState.getToken());
@@ -153,15 +153,23 @@ public class LowWatermarkCalculator {
                                     LOGGER.warn(
                                             "Partition has a very old start timestamp, lag: {}, token: {}",
                                             lag,
-                                            partitionState.getStartTimestamp());
+                                            partitionState);
                                 }
                                 return partitionState.getStartTimestamp();
                             }
+                            LOGGER.warn("lastCommitTimestamp or startTimestamp are not specified or offsets are empty");
                             throw new IllegalStateException(
                                     "lastCommitTimestamp or startTimestamp are not specified or offsets are empty");
                         })
                 .min(Timestamp::compareTo)
                 .orElse(spannerConnectorConfig.startTime());
+        final long currentTime = new Date().getTime();
+        long currentLag = currentTime - lowWatermarkTimestamp.toDate().getTime();
+        if (currentLag > OFFSET_MONITORING_LAG_MAX_MS) {
+            LOGGER.warn("Very old watermark is being calculated {} with current lag {} all partitions {} and connector start time {} for task sync context {}",
+                    lowWatermarkTimestamp, currentLag, allPartitions, spannerConnectorConfig.startTime(), taskSyncContextHolder.get());
+        }
+        return lowWatermarkTimestamp;
     }
 
     private void monitorOffsets(Map<String, Timestamp> offsets) {
