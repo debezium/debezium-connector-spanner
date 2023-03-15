@@ -5,6 +5,7 @@
  */
 package io.debezium.connector.spanner.db.model;
 
+import java.util.Objects;
 import java.util.Set;
 
 /**
@@ -13,6 +14,23 @@ import java.util.Set;
 public class ChildPartition {
 
     private final String token;
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        ChildPartition that = (ChildPartition) o;
+        return Objects.equals(token, that.token) && Objects.equals(parentTokens, that.parentTokens);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(token, parentTokens);
+    }
 
     private final Set<String> parentTokens;
 

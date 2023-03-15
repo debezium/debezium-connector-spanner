@@ -5,6 +5,8 @@
  */
 package io.debezium.connector.spanner.db.model;
 
+import java.util.Objects;
+
 import com.fasterxml.jackson.databind.JsonNode;
 
 import io.debezium.connector.spanner.db.model.event.DataChangeEvent;
@@ -105,5 +107,37 @@ public class Mod {
                 ", newValuesJsonNode=" + newValuesJsonNode +
                 ", modNumber=" + modNumber +
                 '}';
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+
+        Mod mod = (Mod) o;
+
+        if (modNumber != mod.modNumber) {
+            return false;
+        }
+        if (!Objects.equals(keysJsonNode, mod.keysJsonNode)) {
+            return false;
+        }
+        if (!Objects.equals(oldValuesJsonNode, mod.oldValuesJsonNode)) {
+            return false;
+        }
+        return Objects.equals(newValuesJsonNode, mod.newValuesJsonNode);
+    }
+
+    @Override
+    public int hashCode() {
+        int result = keysJsonNode != null ? keysJsonNode.hashCode() : 0;
+        result = 31 * result + (oldValuesJsonNode != null ? oldValuesJsonNode.hashCode() : 0);
+        result = 31 * result + (newValuesJsonNode != null ? newValuesJsonNode.hashCode() : 0);
+        result = 31 * result + modNumber;
+        return result;
     }
 }

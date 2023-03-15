@@ -85,17 +85,11 @@ public class ChangeStreamRecordMapper {
 
     private static final String SYSTEM_TRANSACTION = "is_system_transaction";
 
-    private Dialect dialect;
+    private final Dialect dialect;
 
     public ChangeStreamRecordMapper(Dialect dialect) {
         this.dialect = dialect;
 
-        this.printer = JsonFormat.printer().preservingProtoFieldNames()
-                .omittingInsignificantWhitespace();
-        this.parser = JsonFormat.parser().ignoringUnknownFields();
-    }
-
-    public ChangeStreamRecordMapper() {
         this.printer = JsonFormat.printer().preservingProtoFieldNames()
                 .omittingInsignificantWhitespace();
         this.parser = JsonFormat.parser().ignoringUnknownFields();
@@ -107,7 +101,7 @@ public class ChangeStreamRecordMapper {
         if (this.isPostgres()) {
             // In PostgresQL, change stream records are returned as JsonB.
             return Collections.singletonList(
-                    toChangeStreamRecordJson(partition, resultSet.getPgJsonb(0), resultSetMetadata));
+                    toStreamEventJson(partition, resultSet.getPgJsonb(0), resultSetMetadata));
         }
         // In GoogleSQL, change stream records are returned as an array of structs.
         return resultSet.getCurrentRowAsStruct().getStructList(0).stream()
@@ -134,8 +128,8 @@ public class ChangeStreamRecordMapper {
                 Stream.concat(dataChangeEvents, heartbeatEvents), childPartitionsEvents);
     }
 
-    ChangeStreamEvent toChangeStreamRecordJson(
-                                               Partition partition, String row, ChangeStreamResultSetMetadata resultSetMetadata) {
+    ChangeStreamEvent toStreamEventJson(
+                                        Partition partition, String row, ChangeStreamResultSetMetadata resultSetMetadata) {
         Value.Builder valueBuilder = Value.newBuilder();
         try {
             this.parser.merge(row, valueBuilder);
@@ -328,7 +322,7 @@ public class ChangeStreamRecordMapper {
     private Column columnTypeJsonFrom(Value row) {
         Map<String, Value> valueMap = row.getStructValue().getFieldsMap();
         try {
-            final String type = this.printer.print(
+            String type = this.printer.print(
                     Optional.ofNullable(valueMap.get(TYPE_COLUMN))
                             .orElseThrow(IllegalArgumentException::new));
             final ColumnType columnType = ColumnTypeParser.parse(type);
