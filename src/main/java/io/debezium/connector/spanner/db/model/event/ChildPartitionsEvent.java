@@ -6,6 +6,7 @@
 package io.debezium.connector.spanner.db.model.event;
 
 import java.util.List;
+import java.util.Objects;
 
 import com.google.cloud.Timestamp;
 
@@ -22,6 +23,38 @@ public class ChildPartitionsEvent implements ChangeStreamEvent {
     private final String recordSequence;
     private final List<ChildPartition> childPartitions;
     private final StreamEventMetadata metadata;
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+
+        ChildPartitionsEvent that = (ChildPartitionsEvent) o;
+
+        if (!Objects.equals(startTimestamp, that.startTimestamp)) {
+            return false;
+        }
+        if (!Objects.equals(recordSequence, that.recordSequence)) {
+            return false;
+        }
+        if (!Objects.equals(childPartitions, that.childPartitions)) {
+            return false;
+        }
+        return Objects.equals(metadata, that.metadata);
+    }
+
+    @Override
+    public int hashCode() {
+        int result = startTimestamp != null ? startTimestamp.hashCode() : 0;
+        result = 31 * result + (recordSequence != null ? recordSequence.hashCode() : 0);
+        result = 31 * result + (childPartitions != null ? childPartitions.hashCode() : 0);
+        result = 31 * result + (metadata != null ? metadata.hashCode() : 0);
+        return result;
+    }
 
     /**
      * Constructs a child partitions record containing one or more child partitions.

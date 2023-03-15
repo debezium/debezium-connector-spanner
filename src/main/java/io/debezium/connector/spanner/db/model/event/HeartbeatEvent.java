@@ -5,6 +5,8 @@
  */
 package io.debezium.connector.spanner.db.model.event;
 
+import java.util.Objects;
+
 import com.google.cloud.Timestamp;
 
 import io.debezium.connector.spanner.db.model.StreamEventMetadata;
@@ -15,6 +17,23 @@ import io.debezium.connector.spanner.db.model.StreamEventMetadata;
 public class HeartbeatEvent implements ChangeStreamEvent {
 
     private final Timestamp timestamp;
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        HeartbeatEvent that = (HeartbeatEvent) o;
+        return Objects.equals(timestamp, that.timestamp) && Objects.equals(metadata, that.metadata);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(timestamp, metadata);
+    }
 
     private final StreamEventMetadata metadata;
 

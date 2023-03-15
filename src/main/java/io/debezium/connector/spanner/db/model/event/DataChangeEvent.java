@@ -6,6 +6,7 @@
 package io.debezium.connector.spanner.db.model.event;
 
 import java.util.List;
+import java.util.Objects;
 
 import com.google.cloud.Timestamp;
 
@@ -21,6 +22,50 @@ import io.debezium.connector.spanner.db.model.schema.Column;
 public class DataChangeEvent implements ChangeStreamEvent {
 
     private final String partitionToken;
+
+    @Override
+    public boolean equals(@javax.annotation.Nullable Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (!(o instanceof DataChangeEvent)) {
+            return false;
+        }
+        DataChangeEvent that = (DataChangeEvent) o;
+        return isLastRecordInTransactionInPartition == that.isLastRecordInTransactionInPartition
+                && numberOfRecordsInTransaction == that.numberOfRecordsInTransaction
+                && numberOfPartitionsInTransaction == that.numberOfPartitionsInTransaction
+                && Objects.equals(transactionTag, that.transactionTag)
+                && isSystemTransaction == that.isSystemTransaction
+                && Objects.equals(partitionToken, that.partitionToken)
+                && Objects.equals(commitTimestamp, that.commitTimestamp)
+                && Objects.equals(serverTransactionId, that.serverTransactionId)
+                && Objects.equals(recordSequence, that.recordSequence)
+                && Objects.equals(tableName, that.tableName)
+                && Objects.equals(rowType, that.rowType)
+                && Objects.equals(mods, that.mods)
+                && modType == that.modType
+                && valueCaptureType == that.valueCaptureType;
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(
+                partitionToken,
+                commitTimestamp,
+                serverTransactionId,
+                isLastRecordInTransactionInPartition,
+                recordSequence,
+                tableName,
+                rowType,
+                mods,
+                modType,
+                valueCaptureType,
+                numberOfRecordsInTransaction,
+                numberOfPartitionsInTransaction,
+                transactionTag,
+                isSystemTransaction);
+    }
 
     private final Timestamp commitTimestamp;
 

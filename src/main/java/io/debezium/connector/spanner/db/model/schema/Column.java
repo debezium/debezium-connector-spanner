@@ -6,6 +6,7 @@
 package io.debezium.connector.spanner.db.model.schema;
 
 import com.google.cloud.spanner.Dialect;
+import com.google.common.base.Objects;
 
 /**
  * DTO for Spanner DB column
@@ -128,4 +129,21 @@ public class Column {
         }
     }
 
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        Column column = (Column) o;
+        return primaryKey == column.primaryKey && ordinalPosition == column.ordinalPosition
+                && Objects.equal(name, column.name) && Objects.equal(type, column.type);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hashCode(name, type, primaryKey, ordinalPosition);
+    }
 }
