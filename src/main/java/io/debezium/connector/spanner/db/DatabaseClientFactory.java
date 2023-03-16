@@ -5,8 +5,6 @@
  */
 package io.debezium.connector.spanner.db;
 
-import static org.apache.commons.lang3.StringUtils.isNotEmpty;
-
 import java.io.ByteArrayInputStream;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -21,6 +19,7 @@ import com.google.cloud.spanner.SpannerOptions;
 import com.google.common.annotations.VisibleForTesting;
 
 import io.debezium.connector.spanner.SpannerConnectorConfig;
+import io.debezium.util.Strings;
 
 /**
  * Factory for {@code DatabaseClient}
@@ -52,10 +51,10 @@ public class DatabaseClientFactory {
             builder.setCredentials(googleCredentials);
         }
         builder.setProjectId(this.projectId);
-        if (isNotEmpty(host)) {
+        if (!Strings.isNullOrEmpty(host)) {
             builder.setHost(host);
         }
-        if (isNotEmpty(databaseRole)) {
+        if (!Strings.isNullOrEmpty(databaseRole)) {
             builder.setDatabaseRole(databaseRole);
         }
 
