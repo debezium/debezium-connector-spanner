@@ -123,6 +123,9 @@ public class Column {
                 if (spannerType.startsWith("NUMERIC")) {
                     return new ColumnType(DataType.NUMERIC);
                 }
+                if ("SPANNER.COMMIT_TIMESTAMP".equals(spannerType)) {
+                    return new ColumnType(DataType.TIMESTAMP);
+                }
                 throw new IllegalArgumentException("Unknown spanner type " + spannerType);
             default:
                 throw new IllegalArgumentException("Unrecognized dialect: " + dialect.name());

@@ -248,8 +248,8 @@ public class ChangeStreamRecordMapper {
                         .map(this::columnTypeFrom)
                         .collect(Collectors.toList()),
                 modListFrom(row.getStructList(MODS_COLUMN)),
-                ModType.valueOf(row.getString(MOD_TYPE_COLUMN)),
-                ValueCaptureType.valueOf(row.getString(VALUE_CAPTURE_TYPE_COLUMN)),
+                modTypeFrom(row.getString(MOD_TYPE_COLUMN)),
+                valueCaptureTypeFrom(row.getString(VALUE_CAPTURE_TYPE_COLUMN)),
                 row.getLong(NUMBER_OF_RECORDS_IN_TRANSACTION_COLUMN),
                 row.getLong(NUMBER_OF_PARTITIONS_IN_TRANSACTION_COLUMN),
                 row.getString(TRANSACTION_TAG),
