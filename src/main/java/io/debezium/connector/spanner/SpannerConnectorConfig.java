@@ -294,4 +294,8 @@ public class SpannerConnectorConfig extends BaseSpannerConnectorConfig {
     public int getTopicNumPartitions() {
         return getConfig().getInteger(TOPIC_DEFAULT_AUTO_CREATION_PARTITIONS_FIELD);
     }
+
+    public String syncTopicMaxMessageSize() {
+        return getConfig().getString(SYNC_TOPIC_MAX_MESSAGE_BYTES);
+    }
 }
