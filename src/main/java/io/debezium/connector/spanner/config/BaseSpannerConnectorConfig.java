@@ -35,6 +35,8 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
     private static final String TOPIC_DEFAULT_AUTO_CREATION_PARTITIONS_PROPERTY_NAME = "topic.creation.default.partitions";
 
     protected static final String GCP_SPANNER_PROJECT_ID_PROPERTY_NAME = "gcp.spanner.project.id";
+
+    protected static final String GCP_SPANNER_DATABASE_ROLE_PROPERTY_NAME = "gcp.spanner.database.role";
     protected static final String GCP_SPANNER_INSTANCE_ID_PROPERTY_NAME = "gcp.spanner.instance.id";
     protected static final String GCP_SPANNER_DATABASE_ID_PROPERTY_NAME = "gcp.spanner.database.id";
     protected static final String GCP_SPANNER_HOST_PROPERTY_NAME = "gcp.spanner.host";
@@ -140,7 +142,16 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
             .withValidation(FieldValidator::isNotBlank)
             .withDescription("Spanner database id");
 
-    public static final Field CHANGE_STREAM_NAME = Field.create(GCP_SPANNER_CHANGE_STREAM_PROPERTY_NAME)
+    public static final Field DATABASE_ROLE = Field.create(GCP_SPANNER_DATABASE_ROLE_PROPERTY_NAME)
+            .withDisplayName("DatabaseRole")
+            .withType(Type.STRING)
+            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR, 5))
+            .withWidth(Width.SHORT)
+            .withImportance(Importance.HIGH)
+            .withDescription("Spanner database role");
+
+    public static final Field CHANGE_STREAM_NAME = Field.create(
+            GCP_SPANNER_CHANGE_STREAM_PROPERTY_NAME)
             .withDisplayName("Change stream name")
             .withType(Type.STRING)
             .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR, 6))
@@ -521,6 +532,7 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
             .type(PROJECT_ID)
             .connector(INSTANCE_ID,
                     DATABASE_ID,
+                    DATABASE_ROLE,
                     CHANGE_STREAM_NAME,
                     START_TIME,
                     END_TIME,

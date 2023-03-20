@@ -7,6 +7,7 @@ package io.debezium.connector.spanner.config.validation;
 
 import static io.debezium.connector.spanner.config.BaseSpannerConnectorConfig.CHANGE_STREAM_NAME;
 import static io.debezium.connector.spanner.config.BaseSpannerConnectorConfig.DATABASE_ID;
+import static io.debezium.connector.spanner.config.BaseSpannerConnectorConfig.DATABASE_ROLE;
 import static io.debezium.connector.spanner.config.BaseSpannerConnectorConfig.INSTANCE_ID;
 import static io.debezium.connector.spanner.config.BaseSpannerConnectorConfig.PROJECT_ID;
 import static io.debezium.connector.spanner.config.BaseSpannerConnectorConfig.SPANNER_CREDENTIALS_JSON;
@@ -66,7 +67,8 @@ public class ChangeStreamValidator implements ConfigurationValidator.Validator {
                 context.getString(DATABASE_ID),
                 context.getString(SPANNER_CREDENTIALS_JSON),
                 context.getString(SPANNER_CREDENTIALS_PATH),
-                context.getString(SPANNER_HOST));
+                context.getString(SPANNER_HOST),
+                context.getString(DATABASE_ROLE));
 
         this.result = isStreamExist(databaseClientFactory.getDatabaseClient(), changeStreamName);
 

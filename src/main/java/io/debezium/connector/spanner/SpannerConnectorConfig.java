@@ -117,6 +117,10 @@ public class SpannerConnectorConfig extends BaseSpannerConnectorConfig {
         return getConfig().getString(GCP_SPANNER_DATABASE_ID_PROPERTY_NAME);
     }
 
+    public String databaseRole() {
+        return getConfig().getString(GCP_SPANNER_DATABASE_ROLE_PROPERTY_NAME);
+    }
+
     public String spannerHost() {
         return getConfig().getString(GCP_SPANNER_HOST_PROPERTY_NAME);
     }

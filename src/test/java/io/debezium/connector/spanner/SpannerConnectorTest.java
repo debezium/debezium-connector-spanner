@@ -132,7 +132,7 @@ class SpannerConnectorTest {
     void testConfig() {
         ConfigDef actualConfigResult = new SpannerConnector().config();
         Map<String, ConfigDef.ConfigKey> configKeysResult = actualConfigResult.configKeys();
-        assertEquals(51, configKeysResult.size());
+        assertEquals(52, configKeysResult.size());
         List<String> groupsResult = actualConfigResult.groups();
         assertEquals(3, groupsResult.size());
         assertEquals("Spanner", groupsResult.get(0));
@@ -157,7 +157,7 @@ class SpannerConnectorTest {
         assertNull(getResult.validator);
         assertEquals(ConfigDef.Type.STRING, getResult.type);
         assertNull(getResult.recommender);
-        assertEquals(3, getResult.orderInGroup);
+        assertEquals(4, getResult.orderInGroup);
         assertEquals("gcp.spanner.change.stream", getResult.name);
         assertFalse(getResult.internalConfig);
         assertEquals(ConfigDef.Importance.HIGH, getResult.importance);
@@ -165,6 +165,18 @@ class SpannerConnectorTest {
         assertEquals("Spanner change stream name", getResult.documentation);
         assertEquals("Change stream name", getResult.displayName);
         assertNull(getResult.defaultValue);
+        ConfigDef.ConfigKey getResultDBRole = configKeysResult.get("gcp.spanner.database.role");
+        assertNull(getResultDBRole.validator);
+        assertEquals(ConfigDef.Type.STRING, getResultDBRole.type);
+        assertNull(getResultDBRole.recommender);
+        assertEquals(3, getResultDBRole.orderInGroup);
+        assertEquals("gcp.spanner.database.role", getResultDBRole.name);
+        assertFalse(getResultDBRole.internalConfig);
+        assertEquals(ConfigDef.Importance.HIGH, getResultDBRole.importance);
+        assertEquals("Connector", getResultDBRole.group);
+        assertEquals("Spanner database role", getResultDBRole.documentation);
+        assertEquals("DatabaseRole", getResultDBRole.displayName);
+        assertNull(getResultDBRole.defaultValue);
         ConfigDef.ConfigKey getResult2 = configKeysResult.get("gcp.spanner.database.id");
         assertNull(getResult2.validator);
         assertEquals(ConfigDef.Type.STRING, getResult2.type);
@@ -193,7 +205,7 @@ class SpannerConnectorTest {
         assertNull(getResult4.validator);
         assertEquals(ConfigDef.Type.STRING, getResult4.type);
         assertNull(getResult4.recommender);
-        assertEquals(4, getResult4.orderInGroup);
+        assertEquals(5, getResult4.orderInGroup);
         assertEquals("gcp.spanner.start.time", getResult4.name);
         assertFalse(getResult4.internalConfig);
         assertEquals(ConfigDef.Importance.MEDIUM, getResult4.importance);
@@ -205,7 +217,7 @@ class SpannerConnectorTest {
         assertNull(getResult5.validator);
         assertEquals(ConfigDef.Type.STRING, getResult5.type);
         assertNull(getResult5.recommender);
-        assertEquals(5, getResult5.orderInGroup);
+        assertEquals(6, getResult5.orderInGroup);
         assertEquals("gcp.spanner.end.time", getResult5.name);
         assertFalse(getResult5.internalConfig);
         assertEquals(ConfigDef.Importance.MEDIUM, getResult5.importance);

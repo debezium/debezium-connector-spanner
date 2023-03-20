@@ -5,8 +5,6 @@
  */
 package io.debezium.connector.spanner.db;
 
-import static org.apache.commons.lang3.StringUtils.isNotEmpty;
-
 import java.io.ByteArrayInputStream;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -21,6 +19,7 @@ import com.google.cloud.spanner.SpannerOptions;
 import com.google.common.annotations.VisibleForTesting;
 
 import io.debezium.connector.spanner.SpannerConnectorConfig;
+import io.debezium.util.Strings;
 
 /**
  * Factory for {@code DatabaseClient}
@@ -37,21 +36,26 @@ public class DatabaseClientFactory {
 
     private DatabaseClient databaseClient;
 
-    public DatabaseClientFactory(String projectId, String instanceId, String databaseId, String credentialsJson,
-                                 String credentialsPath, String host) {
+    public DatabaseClientFactory(String projectId, String instanceId, String databaseId,
+                                 String credentialsJson,
+                                 String credentialsPath, String host, String databaseRole) {
         this.projectId = projectId;
         this.instanceId = instanceId;
         this.databaseId = databaseId;
 
         SpannerOptions.Builder builder = SpannerOptions.newBuilder();
 
-        GoogleCredentials googleCredentials = getGoogleCredentials(credentialsJson, credentialsPath);
+        GoogleCredentials googleCredentials = getGoogleCredentials(credentialsJson,
+                credentialsPath);
         if (googleCredentials != null) {
             builder.setCredentials(googleCredentials);
         }
         builder.setProjectId(this.projectId);
-        if (isNotEmpty(host)) {
+        if (!Strings.isNullOrEmpty(host)) {
             builder.setHost(host);
+        }
+        if (!Strings.isNullOrEmpty(databaseRole)) {
+            builder.setDatabaseRole(databaseRole);
         }
 
         this.options = builder.build();
@@ -59,7 +63,8 @@ public class DatabaseClientFactory {
 
     public DatabaseClientFactory(SpannerConnectorConfig config) {
         this(config.projectId(), config.instanceId(), config.databaseId(),
-                config.gcpSpannerCredentialsJson(), config.gcpSpannerCredentialsPath(), config.spannerHost());
+                config.gcpSpannerCredentialsJson(), config.gcpSpannerCredentialsPath(),
+                config.spannerHost(), config.databaseRole());
     }
 
     @VisibleForTesting
