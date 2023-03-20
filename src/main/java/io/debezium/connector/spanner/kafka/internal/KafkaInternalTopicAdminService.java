@@ -62,6 +62,7 @@ public class KafkaInternalTopicAdminService {
                 topicProps.put(TopicConfig.RETENTION_MS_CONFIG, String.valueOf(config.syncRetentionMs()));
                 topicProps.put(TopicConfig.SEGMENT_MS_CONFIG, String.valueOf(config.syncSegmentMs()));
                 topicProps.put(TopicConfig.MIN_CLEANABLE_DIRTY_RATIO_CONFIG, config.syncMinCleanableDirtyRatio());
+                topicProps.put(TopicConfig.MAX_MESSAGE_BYTES_CONFIG, config.syncTopicMaxMessageSize());
 
                 createTopic(syncTopic, Optional.of(1), topicProps);
                 return;

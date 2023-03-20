@@ -97,6 +97,8 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
     private static final String TASKS_FAIL_OVERLOADED_PROPERTY_NAME = "tasks.fail.overloaded";
     private static final String TASKS_FAIL_OVERLOADED_CHECK_INTERVAL_PROPERTY_NAME = "tasks.fail.overloaded.check.interval";
 
+    private static final String CONNECTOR_SPANNER_SYNC_TOPIC_MAX_MESSAGE_BYTES_PROPERTY_NAME = "connector.spanner.sync.max.message.bytes";
+
     protected static final Field LOW_WATERMARK_ENABLED_FIELD = Field.create(LOW_WATERMARK_ENABLED)
             .withDisplayName(LOW_WATERMARK_ENABLED)
             .withType(Type.BOOLEAN)
@@ -526,6 +528,15 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
             .withImportance(Importance.LOW)
             .withDefault(10000)
             .withDescription("Percentage metrics clear interval");
+
+    protected static final Field SYNC_TOPIC_MAX_MESSAGE_BYTES = Field.create(CONNECTOR_SPANNER_SYNC_TOPIC_MAX_MESSAGE_BYTES_PROPERTY_NAME)
+            .withDisplayName("Sync topic max message size")
+            .withType(Type.STRING)
+            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR, 18))
+            .withWidth(Width.SHORT)
+            .withImportance(Importance.HIGH)
+            .withDefault("10485880")
+            .withDescription("Sync topic max message size");
 
     protected static final ConfigDefinition CONFIG_DEFINITION = ConfigDefinition.editor()
             .name("Spanner")
