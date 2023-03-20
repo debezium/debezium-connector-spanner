@@ -532,7 +532,7 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
     protected static final Field SYNC_TOPIC_MAX_MESSAGE_BYTES = Field.create(CONNECTOR_SPANNER_SYNC_TOPIC_MAX_MESSAGE_BYTES_PROPERTY_NAME)
             .withDisplayName("Sync topic max message size")
             .withType(Type.STRING)
-            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR, 18))
+            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR, 19))
             .withWidth(Width.SHORT)
             .withImportance(Importance.HIGH)
             .withDefault("10485880")
