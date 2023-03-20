@@ -24,7 +24,7 @@ public class BufferedPublisher<V> {
 
     private static final Logger LOGGER = getLogger(BufferedPublisher.class);
 
-    private final Thread thread;
+    private volatile Thread thread;
     private final AtomicReference<V> value = new AtomicReference<>();
     private final Predicate<V> publishImmediately;
     private final Consumer<V> onPublish;
@@ -81,8 +81,17 @@ public class BufferedPublisher<V> {
     }
 
     public void close() {
+        LOGGER.info(
+                "Stopping BufferedPublisher for Task Uid {}",
+                this.taskUid,
+                (this.value.get() == null));
         thread.interrupt();
         while (!thread.getState().equals(Thread.State.TERMINATED)) {
         }
+        this.thread = null;
+        LOGGER.info(
+                "Stopped BufferedPublisher for Task Uid {}",
+                this.taskUid,
+                (this.value.get() == null));
     }
 }

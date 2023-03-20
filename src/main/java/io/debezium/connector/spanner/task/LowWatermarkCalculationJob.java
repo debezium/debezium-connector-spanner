@@ -7,6 +7,7 @@ package io.debezium.connector.spanner.task;
 
 import static org.slf4j.LoggerFactory.getLogger;
 
+import java.util.Date;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -84,16 +85,27 @@ public class LowWatermarkCalculationJob {
 
     private Thread createCalculationThread() {
         Thread thread = new Thread(() -> {
+            long lastMonitoredTime = new Date().getTime();
+            boolean printOffsets = false;
             while (true) {
 
+                long now = new Date().getTime();
+                long lag = now - lastMonitoredTime;
+                if (lag > 60 * 1000) {
+                    // print offsets only every 10 minutes.
+                    printOffsets = true;
+                    lastMonitoredTime = now;
+                }
+                else {
+                    printOffsets = false;
+                }
                 try {
-                    getLowWatermark();
-
                     lock.lock();
                     try {
                         signal.await();
+                        getLowWatermark(printOffsets);
 
-                        getLowWatermark();
+                        // print out low watermark partitions here.
                     }
                     finally {
                         lock.unlock();
@@ -112,14 +124,14 @@ public class LowWatermarkCalculationJob {
         return thread;
     }
 
-    private void getLowWatermark() throws InterruptedException {
+    private void getLowWatermark(boolean printOffsets) throws InterruptedException {
         if (Thread.currentThread().isInterrupted()) {
             return;
         }
 
         Timestamp timestamp;
         do {
-            timestamp = lowWatermarkCalculator.calculateLowWatermark();
+            timestamp = lowWatermarkCalculator.calculateLowWatermark(printOffsets);
             if (timestamp == null) {
                 if (Thread.currentThread().isInterrupted()) {
                     return;
@@ -156,5 +168,4 @@ public class LowWatermarkCalculationJob {
             calculationThread = null;
         }
     }
-
 }

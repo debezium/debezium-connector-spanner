@@ -21,7 +21,7 @@ import org.slf4j.LoggerFactory;
 public class FinishPartitionWatchDog {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(FinishPartitionWatchDog.class);
-    private final Thread thread;
+    private volatile Thread thread;
 
     private final Map<String, Instant> partition = new HashMap<>();
 
@@ -30,7 +30,7 @@ public class FinishPartitionWatchDog {
         this.thread = new Thread(() -> {
 
             Instant lastUpdatedTime = Instant.now();
-            while (true) {
+            while (!Thread.currentThread().isInterrupted()) {
 
                 Set<String> pendingToFinish = finishingPartitionManager.getPendingFinishPartitions();
                 Set<String> pending = finishingPartitionManager.getPendingPartitions();
@@ -68,10 +68,12 @@ public class FinishPartitionWatchDog {
                 }
 
                 try {
-                    Thread.sleep(100);
+                    // Check again in 10 minutes.
+                    Thread.sleep(600000);
                 }
                 catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
+                    return;
                 }
             }
 
@@ -82,5 +84,8 @@ public class FinishPartitionWatchDog {
     public void stop() {
         LOGGER.info("Interrupting SpannerConnector-FinishingPartitionWatchDog");
         this.thread.interrupt();
+        while (!thread.getState().equals(Thread.State.TERMINATED)) {
+        }
+        this.thread = null;
     }
 }
