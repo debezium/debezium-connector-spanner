@@ -104,8 +104,6 @@ public class LowWatermarkCalculationJob {
                     try {
                         signal.await();
                         getLowWatermark(printOffsets);
-
-                        // print out low watermark partitions here.
                     }
                     finally {
                         lock.unlock();
