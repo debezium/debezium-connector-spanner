@@ -126,6 +126,9 @@ public class Column {
                 if ("SPANNER.COMMIT_TIMESTAMP".equals(spannerType)) {
                     return new ColumnType(DataType.TIMESTAMP);
                 }
+                if ("JSONB".equals(spannerType)) {
+                    return new ColumnType(DataType.JSON);
+                }
                 throw new IllegalArgumentException("Unknown spanner type " + spannerType);
             default:
                 throw new IllegalArgumentException("Unrecognized dialect: " + dialect.name());
