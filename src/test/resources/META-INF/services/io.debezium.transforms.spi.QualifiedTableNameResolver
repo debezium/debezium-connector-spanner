@@ -1,1 +1,0 @@
-io.debezium.connector.spanner.transforms.SpannerQualifiedTableNameResolver
