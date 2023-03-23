@@ -91,7 +91,6 @@ public class TaskSyncPublisher {
             lastTime = Instant.now();
         }
         catch (ExecutionException e) {
-            close();
             errorHandler.accept(new SpannerConnectorException("Error during publishing to the Sync Topic", e));
         }
         catch (InterruptedException e) {

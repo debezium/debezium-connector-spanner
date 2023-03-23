@@ -134,7 +134,7 @@ class SpannerStreamingChangeEventSourceTest {
         SynchronizedPartitionManager partitionManager = new SynchronizedPartitionManager(
                 (BlockingConsumer<TaskStateChangeEvent>) mock(BlockingConsumer.class));
         SpannerStreamingChangeEventSource spannerStreamingChangeEventSource = new SpannerStreamingChangeEventSource(
-                errorHandler, null, eventQueue, metricsEventPublisher, partitionManager, new SchemaRegistry("Stream Name",
+                connectorConfig2, errorHandler, null, eventQueue, metricsEventPublisher, partitionManager, new SchemaRegistry("Stream Name",
                         new SchemaDao(mock(DatabaseClient.class)), mock(Runnable.class)),
                 spannerEventDispatcher, true, mock(SpannerOffsetContextFactory.class));
         Configuration configuration5 = mock(Configuration.class);
@@ -253,7 +253,7 @@ class SpannerStreamingChangeEventSourceTest {
         doNothing().when(schemaRegistryDatabaseClient).checkSchema(any(), any(), any());
 
         SpannerStreamingChangeEventSource spannerStreamingChangeEventSource = new SpannerStreamingChangeEventSource(
-                errorHandler, null, eventQueue, metricsEventPublisher, partitionManager,
+                new SpannerConnectorConfig(configuration5), errorHandler, null, eventQueue, metricsEventPublisher, partitionManager,
                 schemaRegistryDatabaseClient, spannerEventDispatcher, true, offsetContextFactory);
         Timestamp commitTimestamp = Timestamp.ofTimeMicroseconds(1L);
         ArrayList<Column> rowType = new ArrayList<>();
@@ -270,7 +270,7 @@ class SpannerStreamingChangeEventSourceTest {
         SynchronizedPartitionManager partitionManager = spy(new SynchronizedPartitionManager((BlockingConsumer<TaskStateChangeEvent>) mock(BlockingConsumer.class)));
 
         SpannerStreamingChangeEventSource spannerStreamingChangeEventSource = new SpannerStreamingChangeEventSource(
-                null, null, null, null, partitionManager, new SchemaRegistry(
+                null, null, null, null, null, partitionManager, new SchemaRegistry(
                         "Stream Name", new SchemaDao(mock(DatabaseClient.class)), mock(Runnable.class)),
                 null, true, mock(SpannerOffsetContextFactory.class));
 
@@ -284,7 +284,7 @@ class SpannerStreamingChangeEventSourceTest {
         SynchronizedPartitionManager partitionManager = new SynchronizedPartitionManager((BlockingConsumer<TaskStateChangeEvent>) mock(BlockingConsumer.class));
 
         SpannerStreamingChangeEventSource spannerStreamingChangeEventSource = new SpannerStreamingChangeEventSource(
-                null, null, null, null, partitionManager, new SchemaRegistry(
+                null, null, null, null, null, partitionManager, new SchemaRegistry(
                         "Stream Name", new SchemaDao(mock(DatabaseClient.class)), mock(Runnable.class)),
                 null, true, mock(SpannerOffsetContextFactory.class));
 

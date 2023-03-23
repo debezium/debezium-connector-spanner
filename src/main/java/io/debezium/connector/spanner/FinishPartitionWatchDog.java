@@ -18,19 +18,27 @@ import java.util.function.Consumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import io.debezium.util.Clock;
+import io.debezium.util.Metronome;
+
 public class FinishPartitionWatchDog {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(FinishPartitionWatchDog.class);
-    private final Thread thread;
-
+    private volatile Thread thread;
     private final Map<String, Instant> partition = new HashMap<>();
+    private final Duration pollInterval = Duration.ofMillis(60000);
+    private final Duration sleepInterval = Duration.ofMillis(1000);
+    private final Clock clock;
 
     public FinishPartitionWatchDog(FinishingPartitionManager finishingPartitionManager, Duration timeout, Consumer<List<String>> errorHandler) {
+        this.clock = Clock.system();
 
         this.thread = new Thread(() -> {
 
+            final Metronome metronome = Metronome.sleeper(pollInterval, clock);
+
             Instant lastUpdatedTime = Instant.now();
-            while (true) {
+            while (!Thread.currentThread().isInterrupted()) {
 
                 Set<String> pendingToFinish = finishingPartitionManager.getPendingFinishPartitions();
                 Set<String> pending = finishingPartitionManager.getPendingPartitions();
@@ -68,10 +76,12 @@ public class FinishPartitionWatchDog {
                 }
 
                 try {
-                    Thread.sleep(100);
+                    // Sleep for pollInterval.
+                    metronome.pause();
                 }
                 catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
+                    return;
                 }
             }
 
@@ -82,5 +92,16 @@ public class FinishPartitionWatchDog {
     public void stop() {
         LOGGER.info("Interrupting SpannerConnector-FinishingPartitionWatchDog");
         this.thread.interrupt();
+        final Metronome metronome = Metronome.sleeper(sleepInterval, clock);
+        while (!thread.getState().equals(Thread.State.TERMINATED)) {
+            try {
+                // Sleep for sleepInterval.
+                metronome.pause();
+            }
+            catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }
+        this.thread = null;
     }
 }

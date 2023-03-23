@@ -71,9 +71,12 @@ public class SpannerStreamingChangeEventSource implements CommittingRecordsStrea
 
     private final SpannerOffsetContextFactory offsetContextFactory;
 
+    private final SpannerConnectorConfig connectorConfig;
+
     private volatile Thread thread;
 
-    public SpannerStreamingChangeEventSource(ErrorHandler errorHandler,
+    public SpannerStreamingChangeEventSource(SpannerConnectorConfig connectorConfig,
+                                             ErrorHandler errorHandler,
                                              ChangeStream stream,
                                              StreamEventQueue eventQueue,
                                              MetricsEventPublisher metricsEventPublisher,
@@ -82,6 +85,7 @@ public class SpannerStreamingChangeEventSource implements CommittingRecordsStrea
                                              SpannerEventDispatcher spannerEventDispatcher,
                                              boolean finishingAfterCommit,
                                              SpannerOffsetContextFactory offsetContextFactory) {
+        this.connectorConfig = connectorConfig;
         this.offsetContextFactory = offsetContextFactory;
         this.errorHandler = errorHandler;
         this.eventQueue = eventQueue;
@@ -90,7 +94,7 @@ public class SpannerStreamingChangeEventSource implements CommittingRecordsStrea
         this.partitionManager = partitionManager;
         this.schemaRegistry = schemaRegistry;
         this.spannerEventDispatcher = spannerEventDispatcher;
-        this.finishingPartitionManager = new FinishingPartitionManager(partitionManager::updateToFinished);
+        this.finishingPartitionManager = new FinishingPartitionManager(connectorConfig, partitionManager::updateToFinished);
         this.finishPartitionWatchDog = new FinishPartitionWatchDog(finishingPartitionManager, FINISHING_PARTITION_TIMEOUT, tokens -> {
             processFailure(new FinishingPartitionTimeout(tokens));
         });

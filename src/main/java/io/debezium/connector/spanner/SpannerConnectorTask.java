@@ -136,6 +136,7 @@ public class SpannerConnectorTask extends SpannerBaseSourceTask {
                 event -> this.synchronizationTaskContext.publishEvent(event));
 
         final SpannerChangeStreamFactory spannerChangeStreamFactory = new SpannerChangeStreamFactory(
+                this.taskUid,
                 daoFactory,
                 spannerMeter.getMetricsEventPublisher(),
                 connectorConfig.getConnectorName(),

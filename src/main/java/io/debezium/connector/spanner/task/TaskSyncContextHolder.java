@@ -19,6 +19,8 @@ import io.debezium.connector.spanner.kafka.internal.model.RebalanceState;
 import io.debezium.connector.spanner.metrics.MetricsEventPublisher;
 import io.debezium.connector.spanner.metrics.event.TaskSyncContextMetricEvent;
 import io.debezium.connector.spanner.task.utils.TimeoutMeter;
+import io.debezium.util.Clock;
+import io.debezium.util.Metronome;
 
 /**
  * Holds the current state of the connector's task.
@@ -35,8 +37,12 @@ public class TaskSyncContextHolder {
 
     private final AtomicReference<TaskSyncContext> taskSyncContextRef = new AtomicReference<>();
 
+    private final Duration sleepInterval = Duration.ofMillis(1000);
+    private final Clock clock;
+
     public TaskSyncContextHolder(MetricsEventPublisher metricsEventPublisher) {
         this.metricsEventPublisher = metricsEventPublisher;
+        this.clock = Clock.system();
     }
 
     public final void init(TaskSyncContext taskSyncContext) {
@@ -96,6 +102,15 @@ public class TaskSyncContextHolder {
             if (Thread.interrupted()) {
                 Thread.currentThread().interrupt();
                 return;
+            }
+            final Metronome metronome = Metronome.sleeper(sleepInterval, clock);
+
+            try {
+                // Sleep for sleepInterval.
+                metronome.pause();
+            }
+            catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
             }
         }
     }
