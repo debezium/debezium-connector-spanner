@@ -37,7 +37,7 @@ public class TaskSyncContextHolder {
 
     private final AtomicReference<TaskSyncContext> taskSyncContextRef = new AtomicReference<>();
 
-    private final Duration sleepInterval = Duration.ofMillis(1000);
+    private final Duration sleepInterval = Duration.ofMillis(100);
     private final Clock clock;
 
     public TaskSyncContextHolder(MetricsEventPublisher metricsEventPublisher) {

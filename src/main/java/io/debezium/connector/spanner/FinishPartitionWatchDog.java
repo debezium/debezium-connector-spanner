@@ -27,7 +27,7 @@ public class FinishPartitionWatchDog {
     private volatile Thread thread;
     private final Map<String, Instant> partition = new HashMap<>();
     private final Duration pollInterval = Duration.ofMillis(60000);
-    private final Duration sleepInterval = Duration.ofMillis(1000);
+    private final Duration sleepInterval = Duration.ofMillis(100);
     private final Clock clock;
 
     public FinishPartitionWatchDog(FinishingPartitionManager finishingPartitionManager, Duration timeout, Consumer<List<String>> errorHandler) {
