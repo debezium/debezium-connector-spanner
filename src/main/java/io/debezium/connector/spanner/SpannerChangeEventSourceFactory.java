@@ -68,7 +68,7 @@ public class SpannerChangeEventSourceFactory implements ChangeEventSourceFactory
 
         SpannerOffsetContextFactory offsetContextFactory = new SpannerOffsetContextFactory(sourceInfoFactory);
 
-        return new SpannerStreamingChangeEventSource(errorHandler,
+        return new SpannerStreamingChangeEventSource(connectorConfig, errorHandler,
                 changeStream,
                 streamEventQueue,
                 spannerMeter.getMetricsEventPublisher(),

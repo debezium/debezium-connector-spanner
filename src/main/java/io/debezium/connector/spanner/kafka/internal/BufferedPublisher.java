@@ -15,6 +15,9 @@ import java.util.function.Predicate;
 
 import org.slf4j.Logger;
 
+import io.debezium.util.Clock;
+import io.debezium.util.Metronome;
+
 /**
  * This class allows to publish the latest buffered value
  * once per time period, except the case: if the value is required
@@ -24,16 +27,20 @@ public class BufferedPublisher<V> {
 
     private static final Logger LOGGER = getLogger(BufferedPublisher.class);
 
-    private final Thread thread;
+    private volatile Thread thread;
     private final AtomicReference<V> value = new AtomicReference<>();
     private final Predicate<V> publishImmediately;
     private final Consumer<V> onPublish;
     private final String taskUid;
 
+    private final Duration sleepInterval = Duration.ofMillis(1000);
+    private final Clock clock;
+
     public BufferedPublisher(String taskUid, String name, long timeout, Predicate<V> publishImmediately, Consumer<V> onPublish) {
         this.publishImmediately = publishImmediately;
         this.onPublish = onPublish;
         this.taskUid = taskUid;
+        this.clock = Clock.system();
 
         this.thread = new Thread(() -> {
             Instant lastUpdatedTime = Instant.now();
@@ -81,8 +88,23 @@ public class BufferedPublisher<V> {
     }
 
     public void close() {
+        LOGGER.info(
+                "Stopping BufferedPublisher for Task Uid {}",
+                this.taskUid,
+                (this.value.get() == null));
         thread.interrupt();
-        while (!thread.getState().equals(Thread.State.TERMINATED)) {
+        final Metronome metronome = Metronome.sleeper(sleepInterval, clock);
+        try {
+            // Sleep for sleepInterval.
+            metronome.pause();
         }
+        catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+        this.thread = null;
+        LOGGER.info(
+                "Stopped BufferedPublisher for Task Uid {}",
+                this.taskUid,
+                (this.value.get() == null));
     }
 }

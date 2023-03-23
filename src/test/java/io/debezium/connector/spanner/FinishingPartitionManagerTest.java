@@ -15,8 +15,9 @@ class FinishingPartitionManagerTest {
     @Test
     void commitRecord() throws InterruptedException {
         BlockingConsumer<String> consumer = Mockito.mock(BlockingConsumer.class);
+        SpannerConnectorConfig config = Mockito.mock(SpannerConnectorConfig.class);
 
-        FinishingPartitionManager finishingPartitionManager = new FinishingPartitionManager(consumer);
+        FinishingPartitionManager finishingPartitionManager = new FinishingPartitionManager(config, consumer);
 
         finishingPartitionManager.registerPartition("testToken");
 
@@ -32,8 +33,9 @@ class FinishingPartitionManagerTest {
     @Test
     void onPartitionFinishEvent() throws InterruptedException {
         BlockingConsumer<String> consumer = Mockito.mock(BlockingConsumer.class);
+        SpannerConnectorConfig config = Mockito.mock(SpannerConnectorConfig.class);
 
-        FinishingPartitionManager finishingPartitionManager = new FinishingPartitionManager(consumer);
+        FinishingPartitionManager finishingPartitionManager = new FinishingPartitionManager(config, consumer);
 
         finishingPartitionManager.registerPartition("testToken");
 
@@ -50,7 +52,8 @@ class FinishingPartitionManagerTest {
     void forceFinish() throws InterruptedException {
         BlockingConsumer<String> consumer = Mockito.mock(BlockingConsumer.class);
 
-        FinishingPartitionManager finishingPartitionManager = new FinishingPartitionManager(consumer);
+        SpannerConnectorConfig config = Mockito.mock(SpannerConnectorConfig.class);
+        FinishingPartitionManager finishingPartitionManager = new FinishingPartitionManager(config, consumer);
 
         finishingPartitionManager.registerPartition("testToken");
 
@@ -64,8 +67,9 @@ class FinishingPartitionManagerTest {
     @Test
     void withoutRegistration() throws InterruptedException {
         BlockingConsumer<String> consumer = Mockito.mock(BlockingConsumer.class);
+        SpannerConnectorConfig config = Mockito.mock(SpannerConnectorConfig.class);
 
-        FinishingPartitionManager finishingPartitionManager = new FinishingPartitionManager(consumer);
+        FinishingPartitionManager finishingPartitionManager = new FinishingPartitionManager(config, consumer);
 
         finishingPartitionManager.newRecord("testToken");
 
@@ -81,8 +85,9 @@ class FinishingPartitionManagerTest {
     @Test
     void multipleCommitFinishEventFirst() throws InterruptedException {
         BlockingConsumer<String> consumer = Mockito.mock(BlockingConsumer.class);
+        SpannerConnectorConfig config = Mockito.mock(SpannerConnectorConfig.class);
 
-        FinishingPartitionManager finishingPartitionManager = new FinishingPartitionManager(consumer);
+        FinishingPartitionManager finishingPartitionManager = new FinishingPartitionManager(config, consumer);
 
         finishingPartitionManager.registerPartition("testToken");
 
@@ -110,8 +115,9 @@ class FinishingPartitionManagerTest {
     @Test
     void multipleCommitCommitFirst1() throws InterruptedException {
         BlockingConsumer<String> consumer = Mockito.mock(BlockingConsumer.class);
+        SpannerConnectorConfig config = Mockito.mock(SpannerConnectorConfig.class);
 
-        FinishingPartitionManager finishingPartitionManager = new FinishingPartitionManager(consumer);
+        FinishingPartitionManager finishingPartitionManager = new FinishingPartitionManager(config, consumer);
 
         finishingPartitionManager.registerPartition("testToken");
 
@@ -139,8 +145,9 @@ class FinishingPartitionManagerTest {
     @Test
     void multipleCommitCommitFirst2() throws InterruptedException {
         BlockingConsumer<String> consumer = Mockito.mock(BlockingConsumer.class);
+        SpannerConnectorConfig config = Mockito.mock(SpannerConnectorConfig.class);
 
-        FinishingPartitionManager finishingPartitionManager = new FinishingPartitionManager(consumer);
+        FinishingPartitionManager finishingPartitionManager = new FinishingPartitionManager(config, consumer);
 
         finishingPartitionManager.registerPartition("testToken");
 
@@ -168,8 +175,9 @@ class FinishingPartitionManagerTest {
     @Test
     void multipleCommitCommitOutOfOrder() throws InterruptedException {
         BlockingConsumer<String> consumer = Mockito.mock(BlockingConsumer.class);
+        SpannerConnectorConfig config = Mockito.mock(SpannerConnectorConfig.class);
 
-        FinishingPartitionManager finishingPartitionManager = new FinishingPartitionManager(consumer);
+        FinishingPartitionManager finishingPartitionManager = new FinishingPartitionManager(config, consumer);
 
         finishingPartitionManager.registerPartition("testToken");
 
@@ -195,8 +203,9 @@ class FinishingPartitionManagerTest {
     @Test
     void multipleCommitNoEvents() throws InterruptedException {
         BlockingConsumer<String> consumer = Mockito.mock(BlockingConsumer.class);
+        SpannerConnectorConfig config = Mockito.mock(SpannerConnectorConfig.class);
 
-        FinishingPartitionManager finishingPartitionManager = new FinishingPartitionManager(consumer);
+        FinishingPartitionManager finishingPartitionManager = new FinishingPartitionManager(config, consumer);
 
         finishingPartitionManager.registerPartition("testToken");
 
@@ -212,8 +221,9 @@ class FinishingPartitionManagerTest {
     @Test
     void multipleCommitNoEventsWithWrongCommitCall() throws InterruptedException {
         BlockingConsumer<String> consumer = Mockito.mock(BlockingConsumer.class);
+        SpannerConnectorConfig config = Mockito.mock(SpannerConnectorConfig.class);
 
-        FinishingPartitionManager finishingPartitionManager = new FinishingPartitionManager(consumer);
+        FinishingPartitionManager finishingPartitionManager = new FinishingPartitionManager(config, consumer);
 
         finishingPartitionManager.registerPartition("testToken");
 
@@ -231,8 +241,9 @@ class FinishingPartitionManagerTest {
     @Test
     void multipleCommitNoEventsWithWrongCommitCallOnly() throws InterruptedException {
         BlockingConsumer<String> consumer = Mockito.mock(BlockingConsumer.class);
+        SpannerConnectorConfig config = Mockito.mock(SpannerConnectorConfig.class);
 
-        FinishingPartitionManager finishingPartitionManager = new FinishingPartitionManager(consumer);
+        FinishingPartitionManager finishingPartitionManager = new FinishingPartitionManager(config, consumer);
 
         finishingPartitionManager.registerPartition("testToken");
 

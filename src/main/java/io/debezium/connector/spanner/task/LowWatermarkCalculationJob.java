@@ -7,6 +7,7 @@ package io.debezium.connector.spanner.task;
 
 import static org.slf4j.LoggerFactory.getLogger;
 
+import java.time.Duration;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -17,6 +18,7 @@ import org.slf4j.Logger;
 import com.google.cloud.Timestamp;
 
 import io.debezium.connector.spanner.SpannerConnectorConfig;
+import io.debezium.util.Stopwatch;
 
 /**
  * Creates threads form watermark calculations
@@ -26,6 +28,8 @@ public class LowWatermarkCalculationJob {
     private volatile Thread mainThread;
 
     private volatile Thread calculationThread;
+
+    private final Duration pollInterval = Duration.ofMillis(60000);
 
     private final Consumer<Throwable> errorHandler;
     private final boolean enabled;
@@ -85,15 +89,24 @@ public class LowWatermarkCalculationJob {
     private Thread createCalculationThread() {
         Thread thread = new Thread(() -> {
             while (true) {
-
+                Stopwatch sw = Stopwatch.accumulating().start();
                 try {
-                    getLowWatermark();
-
                     lock.lock();
                     try {
                         signal.await();
 
-                        getLowWatermark();
+                        final Duration totalDuration = sw.stop().durations().statistics().getTotal();
+                        boolean printOffsets = false;
+                        if (totalDuration.toMillis() >= pollInterval.toMillis()) {
+                            // Restart the stopwatch.
+                            printOffsets = true;
+                            sw = Stopwatch.accumulating().start();
+                        }
+                        else {
+                            // Resume the existing stop watch, we haven't met the criteria yet.
+                            sw.start();
+                        }
+                        getLowWatermark(printOffsets);
                     }
                     finally {
                         lock.unlock();
@@ -112,14 +125,14 @@ public class LowWatermarkCalculationJob {
         return thread;
     }
 
-    private void getLowWatermark() throws InterruptedException {
+    private void getLowWatermark(boolean printOffsets) throws InterruptedException {
         if (Thread.currentThread().isInterrupted()) {
             return;
         }
 
         Timestamp timestamp;
         do {
-            timestamp = lowWatermarkCalculator.calculateLowWatermark();
+            timestamp = lowWatermarkCalculator.calculateLowWatermark(printOffsets);
             if (timestamp == null) {
                 if (Thread.currentThread().isInterrupted()) {
                     return;

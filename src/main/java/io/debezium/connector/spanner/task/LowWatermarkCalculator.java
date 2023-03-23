@@ -44,7 +44,7 @@ public class LowWatermarkCalculator {
         this.partitionOffsetProvider = partitionOffsetProvider;
     }
 
-    public Timestamp calculateLowWatermark() {
+    public Timestamp calculateLowWatermark(boolean printOffsets) {
 
         TaskSyncContext taskSyncContext = taskSyncContextHolder.get();
 
@@ -137,7 +137,9 @@ public class LowWatermarkCalculator {
             return null;
         }
 
-        monitorOffsets(offsets);
+        if (printOffsets) {
+            monitorOffsets(offsets, allPartitions);
+        }
 
         return allPartitions.values().stream()
                 .map(
@@ -147,14 +149,6 @@ public class LowWatermarkCalculator {
                                 return timestamp;
                             }
                             if (partitionState.getStartTimestamp() != null) {
-                                final long now = new Date().getTime();
-                                long lag = now - partitionState.getStartTimestamp().toDate().getTime();
-                                if (lag > OFFSET_MONITORING_LAG_MAX_MS) {
-                                    LOGGER.warn(
-                                            "Partition has a very old start timestamp, lag: {}, token: {}",
-                                            lag,
-                                            partitionState.getStartTimestamp());
-                                }
                                 return partitionState.getStartTimestamp();
                             }
                             throw new IllegalStateException(
@@ -164,25 +158,30 @@ public class LowWatermarkCalculator {
                 .orElse(spannerConnectorConfig.startTime());
     }
 
-    private void monitorOffsets(Map<String, Timestamp> offsets) {
+    private void monitorOffsets(Map<String, Timestamp> offsets, Map<String, PartitionState> allPartitions) {
         if (offsets == null) {
             return;
         }
         final long now = new Date().getTime();
 
-        offsets
-                .entrySet()
-                .forEach(
-                        e -> {
-                            Timestamp timestamp = e.getValue();
-                            if (timestamp != null) {
-                                String token = e.getKey();
-                                long lag = now - timestamp.toDate().getTime();
-                                if (lag > OFFSET_MONITORING_LAG_MAX_MS) {
-                                    LOGGER.warn("Partition has a very old offset, lag: {}, token: {}", lag, token);
-                                }
-                            }
-                        });
+        allPartitions.values().forEach(
+                partitionState -> {
+                    Timestamp timestamp = offsets.get(partitionState.getToken());
+                    if (timestamp != null) {
+                        String token = partitionState.getToken();
+                        long lag = now - timestamp.toDate().getTime();
+                        if (lag > OFFSET_MONITORING_LAG_MAX_MS) {
+                            LOGGER.warn("Partition has a very old offset, lag: {}, token: {}", lag, token);
+                        }
+                    }
+                    else if (partitionState.getStartTimestamp() != null) {
+                        String token = partitionState.getToken();
+                        long lag = now - partitionState.getStartTimestamp().toDate().getTime();
+                        if (lag > OFFSET_MONITORING_LAG_MAX_MS) {
+                            LOGGER.warn("Partition has a very old start time, lag: {}, token: {}", lag, token);
+                        }
+                    }
+                });
     }
 
     private Set<String> checkDuplication(Map<String, List<PartitionState>> map) {

@@ -13,6 +13,7 @@ import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import io.debezium.connector.spanner.task.TaskUid;
 import io.debezium.function.BlockingConsumer;
 
 /**
@@ -24,14 +25,21 @@ public class FinishingPartitionManager {
     private static final Logger LOGGER = LoggerFactory.getLogger(FinishingPartitionManager.class);
 
     private final BlockingConsumer<String> finishedPartitionConsumer;
+    private final SpannerConnectorConfig connectorConfig;
 
     private final Map<String, String> lastEmittedRecord = new ConcurrentHashMap<>();
     private final Map<String, Boolean> partitionPendingFinish = new ConcurrentHashMap<>();
 
     private final Map<String, String> lastCommittedRecord = new ConcurrentHashMap<>();
+    private volatile String taskUid;
 
-    public FinishingPartitionManager(BlockingConsumer<String> finishedPartitionConsumer) {
+    public FinishingPartitionManager(SpannerConnectorConfig connectorConfig, BlockingConsumer<String> finishedPartitionConsumer) {
         this.finishedPartitionConsumer = finishedPartitionConsumer;
+        this.connectorConfig = connectorConfig;
+        this.taskUid = "";
+        if (connectorConfig != null) {
+            this.taskUid = TaskUid.generateTaskUid(connectorConfig.getConnectorName(), connectorConfig.getTaskId());
+        }
     }
 
     public String newRecord(String token) {
@@ -48,7 +56,7 @@ public class FinishingPartitionManager {
         Boolean pendingFinishFlag = partitionPendingFinish.get(token);
 
         if (pendingFinishFlag == null) {
-            LOGGER.warn("Partition has not been registered to finish or already finished {}", token);
+            LOGGER.warn("Task: {}, Partition has not been registered to finish or already finished {} for task {}", taskUid, token);
             return;
         }
 
@@ -65,30 +73,31 @@ public class FinishingPartitionManager {
         }
 
         if (lastEmittedRecord.get(token) == null || lastEmittedRecord.get(token).equals(recordUid)) {
-            LOGGER.info("Finished forcing the token to be finished {}", token);
+            LOGGER.info("Task: {}, Finished forcing the token to be finished {}", taskUid, token);
             forceFinish(token);
         }
     }
 
     public void onPartitionFinishEvent(String token) throws InterruptedException {
-        LOGGER.info("onPartitionFinishEvent: {}", token);
+        LOGGER.info("Task: {}, onPartitionFinishEvent: {}", taskUid, token);
 
         Boolean pendingFinishFlag = partitionPendingFinish.get(token);
 
         if (pendingFinishFlag == null) {
-            LOGGER.warn("Partition has not been registered to finish or already finished {}", token);
+            LOGGER.warn("Task: {}, Partition has not been registered to finish or already finished {}", taskUid, token);
             return;
         }
 
         if (lastEmittedRecord.get(token) == null || lastEmittedRecord.get(token).equals(lastCommittedRecord.get(token))) {
-            LOGGER.info("Forcing the token to be finished {}", token);
+            LOGGER.info("Task: {}, Forcing the token to be finished {}", taskUid, token);
             forceFinish(token);
-            LOGGER.info("Finished forcing the token to be finished {}", token);
+            LOGGER.info("Task: {}, Finished forcing the token to be finished {}", taskUid, token);
         }
         else {
             LOGGER.info(
-                    "Cannot finish the token {} due to lastCommittedRecord {} not being equal to"
+                    "Task: {}, Cannot finish the token {} due to lastCommittedRecord {} not being equal to"
                             + " lastEmittedRecord {}",
+                    taskUid,
                     token,
                     lastCommittedRecord.get(token),
                     lastEmittedRecord.get(token));

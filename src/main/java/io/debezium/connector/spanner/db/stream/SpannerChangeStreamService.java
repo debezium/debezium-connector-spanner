@@ -36,23 +36,25 @@ public class SpannerChangeStreamService {
 
     private final Duration heartbeatMillis;
     private final MetricsEventPublisher metricsEventPublisher;
+    private final String taskUid;
 
-    public SpannerChangeStreamService(ChangeStreamDao changeStreamDao, ChangeStreamRecordMapper changeStreamRecordMapper,
+    public SpannerChangeStreamService(String taskUid, ChangeStreamDao changeStreamDao, ChangeStreamRecordMapper changeStreamRecordMapper,
                                       Duration heartbeatMillis, MetricsEventPublisher metricsEventPublisher) {
         this.changeStreamDao = changeStreamDao;
         this.changeStreamRecordMapper = changeStreamRecordMapper;
         this.heartbeatMillis = heartbeatMillis;
         this.metricsEventPublisher = metricsEventPublisher;
+        this.taskUid = taskUid;
     }
 
     public void getEvents(Partition partition, ChangeStreamEventConsumer changeStreamEventConsumer,
                           PartitionEventListener partitionEventListener)
-            throws InterruptedException {
+            throws InterruptedException, Exception {
         final String token = partition.getToken();
 
         partitionEventListener.onRun(partition);
 
-        LOGGER.info("Streaming {} from {} to {}", token, partition.getStartTimestamp(), partition.getEndTimestamp());
+        LOGGER.info("Task: {}, Streaming {} from {} to {}", taskUid, token, partition.getStartTimestamp(), partition.getEndTimestamp());
         try (ChangeStreamResultSet resultSet = changeStreamDao.streamQuery(token, partition.getStartTimestamp(),
                 partition.getEndTimestamp(), heartbeatMillis.toMillis())) {
 
@@ -63,13 +65,13 @@ public class SpannerChangeStreamService {
                 List<ChangeStreamEvent> events = changeStreamRecordMapper.toChangeStreamEvents(
                         partition,
                         resultSet, resultSet.getMetadata());
-                LOGGER.debug("Events receive from stream: {}", events);
+                LOGGER.debug("Task: {}, Events receive from stream: {}", taskUid, events);
 
                 if (!events.isEmpty() && (events.get(0) instanceof HeartbeatEvent)) {
                     var heartbeatEvent = (HeartbeatEvent) events.get(0);
                     long heartbeatLag = System.currentTimeMillis() - heartbeatEvent.getRecordTimestamp().toSqlTimestamp().toInstant().toEpochMilli();
                     if (heartbeatLag > 60_000) {
-                        LOGGER.warn("heartbeat has very old timestamp, lag: {}, token: {}, event: {}", heartbeatLag,
+                        LOGGER.warn("Task: {}, heartbeat has very old timestamp, lag: {}, token: {}, event: {}", taskUid, heartbeatLag,
                                 heartbeatEvent.getMetadata().getPartitionToken(),
                                 heartbeatEvent);
                     }
@@ -83,6 +85,9 @@ public class SpannerChangeStreamService {
 
                 start = now();
             }
+        }
+        finally {
+            LOGGER.info("Task {}, Stopped streaming from partition", taskUid, token);
         }
 
         partitionEventListener.onFinish(partition);
@@ -101,9 +106,9 @@ public class SpannerChangeStreamService {
         for (final ChangeStreamEvent changeStreamEvent : events) {
             if (changeStreamEvent instanceof ChildPartitionsEvent) {
                 ChildPartitionsEvent childPartitionsEvent = (ChildPartitionsEvent) changeStreamEvent;
-                LOGGER.info("Received child partition from partition {}:{}", partition.getToken(), childPartitionsEvent);
+                LOGGER.info("Task: {}, Received child partition from partition {}:{}", taskUid, partition.getToken(), childPartitionsEvent);
             }
-            LOGGER.debug("Received record from partition {}: {}", partition.getToken(), changeStreamEvent);
+            LOGGER.debug("Task: {}, Received record from partition {}: {}", taskUid, partition.getToken(), changeStreamEvent);
 
             changeStreamEventConsumer.acceptChangeStreamEvent(changeStreamEvent);
         }
