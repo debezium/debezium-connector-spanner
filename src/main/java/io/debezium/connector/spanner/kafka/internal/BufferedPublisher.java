@@ -33,7 +33,7 @@ public class BufferedPublisher<V> {
     private final Consumer<V> onPublish;
     private final String taskUid;
 
-    private final Duration sleepInterval = Duration.ofMillis(1000);
+    private final Duration sleepInterval = Duration.ofMillis(100);
     private final Clock clock;
 
     public BufferedPublisher(String taskUid, String name, long timeout, Predicate<V> publishImmediately, Consumer<V> onPublish) {
@@ -94,12 +94,14 @@ public class BufferedPublisher<V> {
                 (this.value.get() == null));
         thread.interrupt();
         final Metronome metronome = Metronome.sleeper(sleepInterval, clock);
-        try {
-            // Sleep for sleepInterval.
-            metronome.pause();
-        }
-        catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
+        while (!thread.getState().equals(Thread.State.TERMINATED)) {
+            try {
+                // Sleep for sleepInterval.
+                metronome.pause();
+            }
+            catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
         }
         this.thread = null;
         LOGGER.info(
