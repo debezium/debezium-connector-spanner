@@ -87,11 +87,11 @@ public class SpannerChangeStreamService {
             }
         }
         finally {
-            LOGGER.info("Task {}, Stopped streaming from partition", taskUid, token);
+            LOGGER.info("Task {}, Stopped streaming from partition {}", taskUid, token);
         }
 
         partitionEventListener.onFinish(partition);
-        LOGGER.info("Finished consuming partition {}", partition);
+        LOGGER.info("Task {}, Finished consuming partition {}", taskUid, partition);
 
         changeStreamEventConsumer.acceptChangeStreamEvent(new FinishPartitionEvent(partition));
     }
