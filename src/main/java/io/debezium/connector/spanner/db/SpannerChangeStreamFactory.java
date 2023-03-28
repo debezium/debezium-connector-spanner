@@ -25,19 +25,13 @@ public class SpannerChangeStreamFactory {
     private final DaoFactory daoFactory;
     private final MetricsEventPublisher metricsEventPublisher;
     private final String connectorName;
-<<<<<<< HEAD
     private final Dialect dialect;
-
-    public SpannerChangeStreamFactory(
-                                      DaoFactory daoFactory, MetricsEventPublisher metricsEventPublisher, String connectorName,
-                                      Dialect dialect) {
-=======
     private final String taskUid;
 
-    public SpannerChangeStreamFactory(
-                                      String taskUid, DaoFactory daoFactory, MetricsEventPublisher metricsEventPublisher, String connectorName) {
+    public SpannerChangeStreamFactory(String taskUid,
+                                      DaoFactory daoFactory, MetricsEventPublisher metricsEventPublisher, String connectorName,
+                                      Dialect dialect) {
         this.taskUid = taskUid;
->>>>>>> 75d0fe2 (DBZ-6227 Reduce CPU usage and ensure critical logs have task Uid)
         this.daoFactory = daoFactory;
         this.metricsEventPublisher = metricsEventPublisher;
         this.connectorName = connectorName;
