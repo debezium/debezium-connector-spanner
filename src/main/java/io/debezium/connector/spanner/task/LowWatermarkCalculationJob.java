@@ -88,8 +88,8 @@ public class LowWatermarkCalculationJob {
 
     private Thread createCalculationThread() {
         Thread thread = new Thread(() -> {
+            Stopwatch sw = Stopwatch.accumulating().start();
             while (true) {
-                Stopwatch sw = Stopwatch.accumulating().start();
                 try {
                     lock.lock();
                     try {
