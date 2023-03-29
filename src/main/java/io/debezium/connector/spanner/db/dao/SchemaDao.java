@@ -38,18 +38,22 @@ public class SchemaDao {
     public SpannerSchema getSchema(Timestamp timestamp, Collection<String> tables) {
         SpannerSchema.SpannerSchemaBuilder builder = SpannerSchema.builder();
         try (ReadOnlyTransaction tx = databaseClient.readOnlyTransaction(TimestampBound.ofReadTimestamp(timestamp))) {
-            ResultSet resultSet = readTablesInfo(tx, tables);
+            ResultSet resultSet = readColumnsInfo(tx, tables);
+            ResultSet primaryColumnsResultSet = readPrimaryColumns(tx, tables);
+
+            while (primaryColumnsResultSet.next()) {
+                String tableName = primaryColumnsResultSet.getString(0);
+                String columnName = primaryColumnsResultSet.getString(1);
+                builder.addPrimaryColumn(tableName, columnName);
+            }
 
             while (resultSet.next()) {
                 String tableName = resultSet.getString(0);
                 String columnName = resultSet.getString(1);
                 String type = resultSet.getString(2);
                 long ordinalPosition = resultSet.getLong(3);
-                boolean primaryKey = resultSet.getBoolean(4);
-                boolean nullable = resultSet.getBoolean(5);
-
-                builder.addColumn(tableName, columnName, type, ordinalPosition, primaryKey,
-                        nullable, this.databaseClient.getDialect());
+                boolean nullable = resultSet.getBoolean(4);
+                builder.addColumn(tableName, columnName, type, ordinalPosition, nullable, this.databaseClient.getDialect());
             }
         }
         return builder.build();
@@ -88,46 +92,68 @@ public class SchemaDao {
         return exist ? builder.build() : null;
     }
 
-    private ResultSet readTablesInfo(ReadOnlyTransaction tx, Collection<String> tables) {
+    private ResultSet readColumnsInfo(ReadOnlyTransaction tx, Collection<String> tables) {
         Statement statement;
         if (isPostgres()) {
-            statement = Statement.newBuilder("SELECT"
-                    + "  s.table_name,"
-                    + "  s.column_name,"
-                    + "  s.spanner_type,"
-                    + "  s.ordinal_position,"
-                    + "CASE WHEN inx.index_name = 'PRIMARY_KEY' THEN TRUE ELSE FALSE END AS primary_key,\n"
-                    + "CASE WHEN s.is_nullable = 'YES' THEN TRUE ELSE FALSE END AS is_nullable\n"
-                    + "FROM\n"
-                    + "  information_schema.COLUMNS AS s\n"
-                    + "LEFT JOIN\n"
-                    + "  information_schema.index_columns inx\n"
-                    + "ON\n"
-                    + "  s.table_name = inx.table_name\n"
-                    + "  AND s.column_name = inx.column_name\n"
-                    + "WHERE\n"
-                    + "  s.table_schema = 'public'\n"
-                    + (tables == null ? ""
-                            : " AND s.table_name = ANY(Array[" + tables.stream().map(s -> "'" + s + "'")
+            statement = Statement.newBuilder("SELECT" +
+                    "  table_name," +
+                    "  column_name," +
+                    "  spanner_type," +
+                    "  ordinal_position," +
+                    "  CASE WHEN is_nullable = 'YES' THEN TRUE ELSE FALSE END AS is_nullable\n" +
+                    "FROM" +
+                    "  information_schema.COLUMNS \n" +
+                    "WHERE" +
+                    "  AND table_schema = 'public'" +
+                    (tables == null ? ""
+                            : " AND table_name = ANY(Array[" + tables.stream().map(s -> "'" + s + "'")
                                     .collect(Collectors.joining(",")) + "])"))
                     .build();
         }
         else {
             statement = Statement.newBuilder("SELECT" +
-                    "  s.table_name," +
-                    "  s.column_name," +
-                    "  s.spanner_type," +
-                    "  s.ordinal_position," +
-                    "  IF(inx.index_name = 'PRIMARY_KEY', true, false) AS primary_key," +
-                    "  IF(s.is_nullable = 'YES', true, false) AS is_nullable\n" +
+                    "  table_name," +
+                    "  column_name," +
+                    "  spanner_type," +
+                    "  ordinal_position," +
+                    "  IF(is_nullable = 'YES', true, false) AS is_nullable\n" +
                     "FROM" +
-                    "  information_schema.COLUMNS AS s\n" +
-                    "LEFT JOIN information_schema.index_columns inx on s.table_name = inx.table_name and s.column_name = inx.column_name\n"
-                    +
+                    "  information_schema.COLUMNS \n" +
                     "WHERE" +
-                    "  s.table_catalog = ''" +
-                    "  AND s.table_schema = ''" +
-                    (tables == null ? "" : "  AND s.table_name in UNNEST(@tables)"))
+                    "  table_catalog = ''" +
+                    "  AND table_schema = ''" +
+                    (tables == null ? "" : "  AND table_name in UNNEST(@tables)"))
+                    .bind("tables")
+                    .toStringArray(tables)
+                    .build();
+        }
+        return tx.executeQuery(statement);
+    }
+
+    private ResultSet readPrimaryColumns(ReadOnlyTransaction tx, Collection<String> tables) {
+        Statement statement;
+        if (isPostgres()) {
+            statement = Statement.newBuilder("SELECT" +
+                    "  table_name," +
+                    "  column_name\n" +
+                    "FROM" +
+                    "  information_schema.index_columns \n" +
+                    "WHERE" +
+                    "   index_name = 'PRIMARY_KEY'" +
+                    (tables == null ? ""
+                            : "  AND table_name = ANY(Array[" + tables.stream().map(s -> "'" + s + "'")
+                                    .collect(Collectors.joining(",")) + "])"))
+                    .build();
+        }
+        else {
+            statement = Statement.newBuilder("SELECT" +
+                    "  table_name," +
+                    "  column_name\n" +
+                    "FROM" +
+                    "  information_schema.index_columns \n" +
+                    "WHERE" +
+                    "   index_name = 'PRIMARY_KEY'" +
+                    (tables == null ? "" : "  AND table_name in UNNEST(@tables)"))
                     .bind("tables")
                     .toStringArray(tables)
                     .build();
