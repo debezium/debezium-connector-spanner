@@ -39,13 +39,12 @@ public class SpannerSchema {
 
     public static class SpannerSchemaBuilder {
         private final Map<String, List<Column>> tableMap = new HashMap<>();
+        private final Map<String, List<String>> tableToPrimaryColumnMap = new HashMap<>();
 
         private SpannerSchemaBuilder() {
         }
 
-        public void addColumn(String tableName, String columnName, String type,
-                              long ordinalPosition,
-                              boolean primaryKey, boolean nullable, Dialect dialect) {
+        public void addColumn(String tableName, String columnName, String type, long ordinalPosition, boolean nullable, Dialect dialect) {
             List<Column> columns;
             if (tableMap.containsKey(tableName)) {
                 columns = tableMap.get(tableName);
@@ -54,10 +53,19 @@ public class SpannerSchema {
                 columns = new ArrayList<>();
                 tableMap.put(tableName, columns);
             }
-            if (!columns.stream().anyMatch(column -> column.getName().equals(columnName))) {
-                columns.add(Column.create(columnName, type, primaryKey, ordinalPosition, nullable,
-                        dialect));
+            columns.add(Column.create(columnName, type, tableToPrimaryColumnMap.get(tableName).contains(columnName), ordinalPosition, nullable, dialect));
+        }
+
+        public void addPrimaryColumn(String tableName, String columnName) {
+            List<String> primaryColumns;
+            if (tableToPrimaryColumnMap.containsKey(tableName)) {
+                primaryColumns = tableToPrimaryColumnMap.get(tableName);
             }
+            else {
+                primaryColumns = new ArrayList<>();
+                tableToPrimaryColumnMap.put(tableName, primaryColumns);
+            }
+            primaryColumns.add(columnName);
         }
 
         public SpannerSchema build() {

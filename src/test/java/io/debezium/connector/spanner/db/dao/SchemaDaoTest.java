@@ -54,7 +54,7 @@ class SchemaDaoTest {
         when(resultSet.getLong(3)).thenReturn(10L);
         when(resultSet.getBoolean(4)).thenReturn(true);
         when(resultSet.getBoolean(5)).thenReturn(true);
-        when(resultSet.next()).thenReturn(true).thenReturn(false);
+        when(resultSet.next()).thenReturn(true).thenReturn(false).thenReturn(true).thenReturn(false);
         when(readOnlyTransaction.executeQuery(any())).thenReturn(resultSet);
 
         SchemaDao schemaDao = new SchemaDao(databaseClient);
