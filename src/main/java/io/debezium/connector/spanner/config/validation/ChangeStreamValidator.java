@@ -95,7 +95,7 @@ public class ChangeStreamValidator implements ConfigurationValidator.Validator {
                     "from information_schema.change_streams cs " +
                     "where cs.change_stream_name = $1")
                     .bind("p1")
-                    .to(streamName)
+                    .to(streamName.toLowerCase())
                     .build();
         }
         else {

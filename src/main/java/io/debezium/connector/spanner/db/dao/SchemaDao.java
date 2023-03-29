@@ -55,9 +55,9 @@ public class SchemaDao {
         return builder.build();
     }
 
-    private boolean isAllTables(ResultSet resultSet) {
+    private boolean isTrue(ResultSet resultSet, int index) {
         if (isPostgres()) {
-            return Objects.equals(resultSet.getString(0), "YES");
+            return Objects.equals(resultSet.getString(index), "YES");
         }
         return resultSet.getBoolean(0);
     }
@@ -71,11 +71,11 @@ public class SchemaDao {
 
             while (resultSet.next()) {
                 exist = true;
-                boolean allTables = isAllTables(resultSet);
+                boolean allTables = isTrue(resultSet, 0);
                 builder.allTables(allTables);
                 if (!allTables) {
                     String tableName = resultSet.getString(1);
-                    boolean allColumns = resultSet.getBoolean(2);
+                    boolean allColumns = isTrue(resultSet, 2);
                     builder.table(tableName, allColumns);
 
                     if (!allColumns) {
