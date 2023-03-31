@@ -5,11 +5,15 @@
  */
 package io.debezium.connector.spanner.kafka.internal;
 
+import static org.apache.commons.lang3.StringUtils.substringAfter;
+
+import java.util.AbstractMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ExecutionException;
+import java.util.stream.Collectors;
 
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.DescribeTopicsResult;
@@ -18,6 +22,7 @@ import org.apache.kafka.common.KafkaException;
 import org.apache.kafka.common.config.TopicConfig;
 
 import io.debezium.connector.spanner.SpannerConnectorConfig;
+import io.debezium.connector.spanner.config.BaseSpannerConnectorConfig;
 import io.debezium.connector.spanner.kafka.KafkaUtils;
 
 /**
@@ -63,6 +68,16 @@ public class KafkaInternalTopicAdminService {
                 topicProps.put(TopicConfig.SEGMENT_MS_CONFIG, String.valueOf(config.syncSegmentMs()));
                 topicProps.put(TopicConfig.MIN_CLEANABLE_DIRTY_RATIO_CONFIG, config.syncMinCleanableDirtyRatio());
                 topicProps.put(TopicConfig.MAX_MESSAGE_BYTES_CONFIG, config.syncTopicMaxMessageSize());
+
+                Map<String, String> syncTopicInternalProps = config.getConfig().asMap().entrySet()
+                        .stream()
+                        .filter(e -> e.getKey().startsWith(BaseSpannerConnectorConfig.CONNECTOR_SPANNER_SYNC_TOPIC_INTERNAL_PREFIX))
+                        .map(e -> new AbstractMap.SimpleEntry<>(substringAfter(e.getKey(), BaseSpannerConnectorConfig.CONNECTOR_SPANNER_SYNC_TOPIC_INTERNAL_PREFIX),
+                                e.getValue()))
+                        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+                if (!syncTopicInternalProps.isEmpty()) {
+                    topicProps.putAll(syncTopicInternalProps);
+                }
 
                 createTopic(syncTopic, Optional.of(1), topicProps);
                 return;
