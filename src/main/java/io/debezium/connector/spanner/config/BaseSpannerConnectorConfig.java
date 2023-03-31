@@ -71,6 +71,7 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
     private static final String CONNECTOR_SPANNER_SYNC_SEGMENT_MS_POLICY_PROPERTY_NAME = "connector.spanner.sync.segment.ms";
     private static final String CONNECTOR_SPANNER_SYNC_MIN_CLEANABLE_DIRTY_RATIO_PROPERTY_NAME = "connector.spanner.sync.min.cleanable.dirty.ratio";
     private static final String CONNECTOR_SPANNER_SYNC_KAFKA_BOOTSTRAP_SERVERS_PROPERTY_NAME = "connector.spanner.sync.kafka.bootstrap.servers";
+    public static final String CONNECTOR_SPANNER_SYNC_TOPIC_INTERNAL_PREFIX = "connector.spanner.sync.topic.internal.";
 
     private static final String CONNECTOR_SPANNER_PARTITION_FINISHING_AFTER_COMMIT_PROPERTY_NAME = "connector.spanner.partition.finishing.afterCommit";
 
