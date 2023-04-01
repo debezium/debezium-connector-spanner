@@ -59,7 +59,7 @@ public class SchemaDao {
         if (isPostgres()) {
             return Objects.equals(resultSet.getString(index), "YES");
         }
-        return resultSet.getBoolean(0);
+        return resultSet.getBoolean(index);
     }
 
     public ChangeStreamSchema getStream(Timestamp timestamp, String streamName) {
