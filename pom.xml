@@ -417,6 +417,7 @@
                 <configuration>
                     <repository>docker.io/${docker.repository.name}</repository>
                     <pushImage>true</pushImage>
+                    <skip>true</skip>
                     <images>
                         <image>
                             <name>${docker.repository.name}:${docker.tag.name}</name>
