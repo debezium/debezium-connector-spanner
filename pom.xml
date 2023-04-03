@@ -33,6 +33,7 @@
         <version.kafka.connect.maven.plugin>0.12.0</version.kafka.connect.maven.plugin>
         <version.protobuf-maven-plugin>0.6.1</version.protobuf-maven-plugin>
         <assembly.descriptor>connector-distribution-with-jsr310</assembly.descriptor>
+        <docker.tag.name>latest</docker.tag.name>
     </properties>
 
     <repositories>
@@ -418,7 +419,7 @@
                     <pushImage>true</pushImage>
                     <images>
                         <image>
-                            <name>spanconnector/kafka-spanner-connector:latest</name>
+                            <name>spanconnector/kafka-spanner-connector:${docker.tag.name}</name>
                             <build>
                                 <contextDir>${project.basedir}</contextDir>
                                 <dockerFile>${project.basedir}/src/test/docker/Dockerfile</dockerFile>
