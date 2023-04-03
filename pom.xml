@@ -415,11 +415,11 @@
                     </execution>
                 </executions>
                 <configuration>
-                    <repository>docker.io/spanconnector/kafka-spanner-connector</repository>
+                    <repository>docker.io/${docker.repository.name}</repository>
                     <pushImage>true</pushImage>
                     <images>
                         <image>
-                            <name>spanconnector/kafka-spanner-connector:${docker.tag.name}</name>
+                            <name>${docker.repository.name}:${docker.tag.name}</name>
                             <build>
                                 <contextDir>${project.basedir}</contextDir>
                                 <dockerFile>${project.basedir}/src/test/docker/Dockerfile</dockerFile>
