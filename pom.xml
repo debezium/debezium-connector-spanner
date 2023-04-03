@@ -34,6 +34,7 @@
         <version.protobuf-maven-plugin>0.6.1</version.protobuf-maven-plugin>
         <assembly.descriptor>connector-distribution-with-jsr310</assembly.descriptor>
         <docker.tag.name>latest</docker.tag.name>
+        <docker.skip.push>true</docker.skip.push>
     </properties>
 
     <repositories>
@@ -417,7 +418,7 @@
                 <configuration>
                     <repository>docker.io/${docker.repository.name}</repository>
                     <pushImage>true</pushImage>
-                    <skip>true</skip>
+                    <skip>${docker.skip.push}</skip>
                     <images>
                         <image>
                             <name>${docker.repository.name}:${docker.tag.name}</name>
