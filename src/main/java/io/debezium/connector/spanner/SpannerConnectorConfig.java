@@ -5,14 +5,10 @@
  */
 package io.debezium.connector.spanner;
 
-import static org.apache.commons.lang3.StringUtils.substringAfter;
-
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
-import java.util.AbstractMap;
 import java.util.Map;
 import java.util.Properties;
-import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.kafka.clients.CommonClientConfigs;
@@ -79,21 +75,17 @@ public class SpannerConnectorConfig extends BaseSpannerConnectorConfig {
 
     public Properties kafkaProps(Map<?, ?> props) {
         Properties properties = new Properties();
+        Map<String, String> spannerKafkaProps = this.getConfig()
+                .subset(KAFKA_INTERNAL_CLIENT_CONFIG_PREFIX, true).asMap();
+        if (!spannerKafkaProps.isEmpty()) {
+            properties.putAll(spannerKafkaProps);
+        }
         properties.setProperty(CommonClientConfigs.BOOTSTRAP_SERVERS_CONFIG, this.bootStrapServer());
         properties.put("max.request.size", 104858800);
         properties.put("max.partition.fetch.bytes", 104858800);
 
         properties.putAll(props);
 
-        Map<String, String> spannerKafkaProps = this.getConfig().asMap().entrySet()
-                .stream()
-                .filter(e -> e.getKey().startsWith(KAFKA_INTERNAL_CLIENT_CONFIG_PREFIX))
-                .map(e -> new AbstractMap.SimpleEntry<>(substringAfter(e.getKey(), KAFKA_INTERNAL_CLIENT_CONFIG_PREFIX), e.getValue()))
-                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
-
-        if (!spannerKafkaProps.isEmpty()) {
-            properties.putAll(spannerKafkaProps);
-        }
         return properties;
     }
 
