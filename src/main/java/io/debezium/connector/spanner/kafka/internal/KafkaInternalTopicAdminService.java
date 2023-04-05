@@ -5,15 +5,11 @@
  */
 package io.debezium.connector.spanner.kafka.internal;
 
-import static org.apache.commons.lang3.StringUtils.substringAfter;
-
-import java.util.AbstractMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ExecutionException;
-import java.util.stream.Collectors;
 
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.DescribeTopicsResult;
@@ -41,8 +37,10 @@ public class KafkaInternalTopicAdminService {
         try {
             String rebalancingTopic = config.rebalancingTopic();
             int maxTasks = config.getMaxTasks();
+            Map<String, String> rebalancingTopicPassThroughProps = config.getConfig()
+                    .subset(BaseSpannerConnectorConfig.CONNECTOR_SPANNER_REBALANCING_TOPIC_CONFIG_PREFIX, true).asMap();
             if (!topicExists(rebalancingTopic)) {
-                createTopic(rebalancingTopic, Optional.of(maxTasks), Map.of());
+                createTopic(rebalancingTopic, Optional.of(maxTasks), rebalancingTopicPassThroughProps);
                 return;
             }
 
@@ -69,14 +67,10 @@ public class KafkaInternalTopicAdminService {
                 topicProps.put(TopicConfig.MIN_CLEANABLE_DIRTY_RATIO_CONFIG, config.syncMinCleanableDirtyRatio());
                 topicProps.put(TopicConfig.MAX_MESSAGE_BYTES_CONFIG, config.syncTopicMaxMessageSize());
 
-                Map<String, String> syncTopicInternalProps = config.getConfig().asMap().entrySet()
-                        .stream()
-                        .filter(e -> e.getKey().startsWith(BaseSpannerConnectorConfig.CONNECTOR_SPANNER_SYNC_TOPIC_INTERNAL_PREFIX))
-                        .map(e -> new AbstractMap.SimpleEntry<>(substringAfter(e.getKey(), BaseSpannerConnectorConfig.CONNECTOR_SPANNER_SYNC_TOPIC_INTERNAL_PREFIX),
-                                e.getValue()))
-                        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
-                if (!syncTopicInternalProps.isEmpty()) {
-                    topicProps.putAll(syncTopicInternalProps);
+                Map<String, String> syncTopicPassThroughProps = config.getConfig()
+                        .subset(BaseSpannerConnectorConfig.CONNECTOR_SPANNER_SYNC_TOPIC_CONFIG_PREFIX, true).asMap();
+                if (!syncTopicPassThroughProps.isEmpty()) {
+                    topicProps.putAll(syncTopicPassThroughProps);
                 }
 
                 createTopic(syncTopic, Optional.of(1), topicProps);
