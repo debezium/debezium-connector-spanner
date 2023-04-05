@@ -77,7 +77,7 @@ public class ChangeStreamDao {
         }
         final ResultSet resultSet = databaseClient
                 .singleUse()
-                .executeQuery(statement, Options.priority(rpcPriority), Options.tag("job=" + jobName));
+                .executeQuery(statement, Options.priority(rpcPriority), Options.tag("kafka-spanner-connector-job=" + jobName));
 
         return new ChangeStreamResultSet(resultSet);
     }
