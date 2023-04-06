@@ -35,7 +35,7 @@
         <assembly.descriptor>connector-distribution-with-jsr310</assembly.descriptor>
         <docker.tag.name>latest</docker.tag.name>
         <docker.skip.push>true</docker.skip.push>
-        <docker.repository.name>docker.io/debezium/kafka-spanner-connector</docker.repository.name>
+        <docker.repository.name>quay.io/debezium/kafka-spanner-connector</docker.repository.name>
     </properties>
 
     <repositories>
