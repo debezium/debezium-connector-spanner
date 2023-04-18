@@ -75,11 +75,11 @@ public class SchemaDao {
 
             while (resultSet.next()) {
                 exist = true;
-                boolean allTables = isTrue(resultSet, 0);
+                boolean allTables = resultSet.getBoolean(0);
                 builder.allTables(allTables);
                 if (!allTables) {
                     String tableName = resultSet.getString(1);
-                    boolean allColumns = isTrue(resultSet, 2);
+                    boolean allColumns = resultSet.getBoolean(2);
                     builder.table(tableName, allColumns);
 
                     if (!allColumns) {
@@ -165,9 +165,9 @@ public class SchemaDao {
         Statement statement;
         if (isPostgres()) {
             statement = Statement.newBuilder("select" +
-                    "  cs.all," +
+                    "  CASE WHEN cs.all = 'YES' then true else false end AS all," +
                     "  cst.table_name," +
-                    "  cst.all_columns," +
+                    "  CASE WHEN cst.all_columns = 'YES' then true else false end AS all_columns," +
                     "  csc.column_name\n" +
                     "from" +
                     "  information_schema.change_streams cs\n" +
