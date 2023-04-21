@@ -74,7 +74,7 @@ public class ChangeStreamValidator implements ConfigurationValidator.Validator {
         this.result = isStreamExist(databaseClientFactory.getDatabaseClient(), changeStreamName);
 
         if (!result) {
-            String msg = "ChangeStream '" + changeStreamName + "' doesn't exist";
+            String msg = "ChangeStream '" + changeStreamName + "' doesn't exist or you don't have sufficient permissions";
             LOGGER.error(msg);
             context.error(msg, CHANGE_STREAM_NAME);
         }
