@@ -6,7 +6,6 @@
 package io.debezium.connector.spanner.db.dao;
 
 import java.util.Collection;
-import java.util.Objects;
 import java.util.stream.Collectors;
 
 import com.google.cloud.Timestamp;
@@ -59,13 +58,6 @@ public class SchemaDao {
         return builder.build();
     }
 
-    private boolean isTrue(ResultSet resultSet, int index) {
-        if (isPostgres()) {
-            return Objects.equals(resultSet.getString(index), "YES");
-        }
-        return resultSet.getBoolean(index);
-    }
-
     public ChangeStreamSchema getStream(Timestamp timestamp, String streamName) {
         ChangeStreamSchema.Builder builder = ChangeStreamSchema.builder()
                 .name(streamName);
@@ -104,7 +96,7 @@ public class SchemaDao {
                     "FROM" +
                     "  information_schema.COLUMNS \n" +
                     "WHERE" +
-                    "  AND table_schema = 'public'" +
+                    "  table_schema = 'public'" +
                     (tables == null ? ""
                             : " AND table_name = ANY(Array[" + tables.stream().map(s -> "'" + s + "'")
                                     .collect(Collectors.joining(",")) + "])"))
