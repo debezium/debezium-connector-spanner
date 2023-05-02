@@ -188,7 +188,7 @@ public class SynchronizationTaskContext {
 
             this.lowWatermarkCalculationJob.start();
 
-            this.schemaRegistry.init(taskSyncContextHolder.get().getDatabaseSchemaTimestamp());
+            this.schemaRegistry.init();
 
             this.taskStateChangeEventProcessor.startProcessing();
 
