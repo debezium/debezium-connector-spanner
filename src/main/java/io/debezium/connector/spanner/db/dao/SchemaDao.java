@@ -202,7 +202,7 @@ public class SchemaDao {
         return tx.executeQuery(statement);
     }
 
-    private boolean isPostgres() {
+    public boolean isPostgres() {
         return this.databaseClient.getDialect() == Dialect.POSTGRESQL;
     }
 }

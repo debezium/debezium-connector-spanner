@@ -9,11 +9,17 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import javax.annotation.Nullable;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.google.cloud.Timestamp;
+import com.google.cloud.spanner.Dialect;
+import com.google.cloud.spanner.ErrorCode;
+import com.google.cloud.spanner.SpannerException;
 
+import io.debezium.annotation.VisibleForTesting;
 import io.debezium.connector.spanner.db.dao.SchemaDao;
 import io.debezium.connector.spanner.db.model.schema.ChangeStreamSchema;
 import io.debezium.connector.spanner.db.model.schema.Column;
@@ -45,8 +51,8 @@ public class SchemaRegistry {
         this.schemaResetTrigger = schemaResetTrigger;
     }
 
-    public void init(Timestamp timestamp) {
-        forceUpdateSchema(timestamp);
+    public void init() {
+        forceUpdateSchema(null, Timestamp.now(), null);
     }
 
     public synchronized TableSchema getWatchedTable(TableId tableId) {
@@ -66,7 +72,7 @@ public class SchemaRegistry {
 
     public synchronized void checkSchema(TableId tableId, Timestamp timestamp, List<Column> rowType) {
         if (!validate(tableId, rowType)) {
-            if (this.updateSchema(timestamp)) {
+            if (this.updateSchema(tableId, timestamp, rowType)) {
                 schemaResetTrigger.run();
                 return;
             }
@@ -74,7 +80,8 @@ public class SchemaRegistry {
         }
     }
 
-    private boolean validate(TableId tableId, List<Column> rowType) {
+    @VisibleForTesting
+    boolean validate(TableId tableId, List<Column> rowType) {
         if (this.timestamp == null) {
             throw new IllegalStateException(DATABASE_SCHEMA_NOT_CACHED);
         }
@@ -89,38 +96,69 @@ public class SchemaRegistry {
         return SchemaValidator.validate(schemaTable, watchedTable, rowType);
     }
 
-    public synchronized boolean updateSchema(Timestamp updatedTimestamp) {
+    public synchronized boolean updateSchema(TableId tableId, Timestamp updatedTimestamp, List<Column> rowType) {
         if (updatedTimestamp.equals(this.timestamp)) {
             return false;
         }
 
         LOGGER.info("Schema is outdated. Try to update schema registry...");
-        forceUpdateSchema(updatedTimestamp);
+        forceUpdateSchema(tableId, updatedTimestamp, rowType);
         LOGGER.info("Schema registry has been updated to date {}", updatedTimestamp);
         return true;
     }
 
-    private void forceUpdateSchema(Timestamp updatedTimestamp) {
-        this.timestamp = updatedTimestamp;
-        this.changeStream = schemaDao.getStream(timestamp, streamName);
+    public void updateSchemaFromStaleTimestamp(TableId tableId, Timestamp timestamp, List<Column> rowType) {
+        LOGGER.info("Schema is outdated. Try to update schema registry outside of retention period...");
+        // TableSchema watchedTable = this.getWatchedTable(tableId);
+        SpannerSchema.SpannerSchemaBuilder builder = SpannerSchema.builder();
+        Dialect dialect = this.schemaDao.isPostgres() ? Dialect.POSTGRESQL : Dialect.GOOGLE_STANDARD_SQL;
+        for (Column column : rowType) {
+            if (column.isPrimaryKey()) {
+                builder.addPrimaryColumn(tableId.getTableName(), column.getName());
+            }
+            builder.addColumn(tableId.getTableName(), column.getName(), column.getType().getType().toString(), column.getOrdinalPosition(),
+                    column.isNullable(), dialect);
 
-        if (this.changeStream == null) {
-            throw new IllegalStateException("Change stream doesn't exist at timestamp: "
-                    + streamName + ", " + timestamp);
         }
-
-        SpannerSchema newSchema;
-        if (this.changeStream.isWatchedAllTables()) {
-            newSchema = schemaDao.getSchema(timestamp);
-        }
-        else {
-            newSchema = schemaDao.getSchema(timestamp, this.changeStream.getTables());
-        }
+        SpannerSchema newSchema = builder.build();
         if (this.spannerSchema == null) {
             this.spannerSchema = newSchema;
             return;
         }
         this.spannerSchema = SchemaMerger.merge(this.spannerSchema, newSchema);
+        LOGGER.info("Schema registry has been updated to stale timestamp {}", timestamp);
+
+    }
+
+    @VisibleForTesting
+    void forceUpdateSchema(@Nullable TableId tableId, Timestamp updatedTimestamp, @Nullable List<Column> rowTypes) {
+        try {
+            this.timestamp = updatedTimestamp;
+            this.changeStream = schemaDao.getStream(timestamp, streamName);
+
+            if (this.changeStream == null) {
+                throw new IllegalStateException("Change stream doesn't exist at timestamp: "
+                        + streamName + ", " + timestamp);
+            }
+
+            SpannerSchema newSchema;
+            if (this.changeStream.isWatchedAllTables()) {
+                newSchema = schemaDao.getSchema(timestamp);
+            }
+            else {
+                newSchema = schemaDao.getSchema(timestamp, this.changeStream.getTables());
+            }
+            if (this.spannerSchema == null) {
+                this.spannerSchema = newSchema;
+                return;
+            }
+            this.spannerSchema = SchemaMerger.merge(this.spannerSchema, newSchema);
+        }
+        catch (SpannerException e) {
+            if (e.getMessage().contains("has exceeded the maximum timestamp staleness") && e.getErrorCode().equals(ErrorCode.FAILED_PRECONDITION)) {
+                updateSchemaFromStaleTimestamp(tableId, timestamp, rowTypes);
+            }
+        }
     }
 
     public Set<TableId> getAllTables() {
@@ -128,5 +166,13 @@ public class SchemaRegistry {
             throw new IllegalStateException("database schema is not cached yet");
         }
         return this.spannerSchema.getAllTables();
+    }
+
+    @VisibleForTesting
+    TableSchema getTable(TableId tableId) {
+        if (this.spannerSchema == null) {
+            throw new IllegalStateException("database schema is not cached yet");
+        }
+        return this.spannerSchema.getTable(tableId);
     }
 }
