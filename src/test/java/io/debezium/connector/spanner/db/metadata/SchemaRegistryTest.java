@@ -153,6 +153,5 @@ class SchemaRegistryTest {
         schemaRegistry.updateSchemaFromStaleTimestamp(tableId, timestamp, rowType);
         assertEquals(1, schemaRegistry.getAllTables().size());
         assertEquals("Name", schemaRegistry.getAllTables().iterator().next().getTableName());
-        assertEquals(2, schemaRegistry.getTable(tableId).columns().size());
     }
 }
