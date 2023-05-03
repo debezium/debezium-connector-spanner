@@ -109,7 +109,6 @@ public class SchemaRegistry {
 
     public void updateSchemaFromStaleTimestamp(TableId tableId, Timestamp timestamp, List<Column> rowType) {
         LOGGER.info("Schema is outdated. Try to update schema registry outside of retention period...");
-        // TableSchema watchedTable = this.getWatchedTable(tableId);
         SpannerSchema.SpannerSchemaBuilder builder = SpannerSchema.builder();
         Dialect dialect = this.schemaDao.isPostgres() ? Dialect.POSTGRESQL : Dialect.GOOGLE_STANDARD_SQL;
         for (Column column : rowType) {
@@ -166,13 +165,5 @@ public class SchemaRegistry {
             throw new IllegalStateException("database schema is not cached yet");
         }
         return this.spannerSchema.getAllTables();
-    }
-
-    @VisibleForTesting
-    TableSchema getTable(TableId tableId) {
-        if (this.spannerSchema == null) {
-            throw new IllegalStateException("database schema is not cached yet");
-        }
-        return this.spannerSchema.getTable(tableId);
     }
 }
