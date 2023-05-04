@@ -52,6 +52,9 @@ public class SchemaRegistry {
     }
 
     public void init() {
+        // Always initialize the schema registry to current time so the connector can start
+        // successfully even when the gcp.spanner.start.time from configuration is out of
+        // the maximum retention window.
         forceUpdateSchema(null, Timestamp.now(), null);
     }
 
@@ -80,8 +83,7 @@ public class SchemaRegistry {
         }
     }
 
-    @VisibleForTesting
-    boolean validate(TableId tableId, List<Column> rowType) {
+    private boolean validate(TableId tableId, List<Column> rowType) {
         if (this.timestamp == null) {
             throw new IllegalStateException(DATABASE_SCHEMA_NOT_CACHED);
         }
@@ -154,8 +156,15 @@ public class SchemaRegistry {
             this.spannerSchema = SchemaMerger.merge(this.spannerSchema, newSchema);
         }
         catch (SpannerException e) {
+            // To prevent potential data loss when schema is updated but connector tries to query old schema out of the maximum retention window,
+            // we first catch the spanner exception and verify the cause. If it indicates a exceed maximum timestamp staleness message with an
+            // error code of FAILED_PRECONDITION, perform a manual update to merge the out of retention schema with current schema. Otherwise the
+            // exception not match this scenario is re-throwed.
             if (e.getMessage().contains("has exceeded the maximum timestamp staleness") && e.getErrorCode().equals(ErrorCode.FAILED_PRECONDITION)) {
                 updateSchemaFromStaleTimestamp(tableId, timestamp, rowTypes);
+            }
+            else {
+                throw e;
             }
         }
     }
