@@ -20,6 +20,7 @@ import com.google.cloud.spanner.Dialect;
 import io.debezium.config.Configuration;
 import io.debezium.connector.base.ChangeEventQueue;
 import io.debezium.connector.spanner.config.SpannerTableFilter;
+import io.debezium.connector.spanner.context.offset.SpannerOffsetContext;
 import io.debezium.connector.spanner.context.source.SourceInfoFactory;
 import io.debezium.connector.spanner.context.source.SpannerSourceTaskContext;
 import io.debezium.connector.spanner.db.DaoFactory;
@@ -44,9 +45,11 @@ import io.debezium.connector.spanner.task.SynchronizationTaskContext;
 import io.debezium.connector.spanner.task.SynchronizedPartitionManager;
 import io.debezium.connector.spanner.task.TaskUid;
 import io.debezium.pipeline.DataChangeEvent;
+import io.debezium.pipeline.notification.NotificationService;
 import io.debezium.pipeline.source.spi.EventMetadataProvider;
 import io.debezium.schema.DataCollectionFilters;
 import io.debezium.schema.DefaultTopicNamingStrategy;
+import io.debezium.schema.SchemaFactory;
 import io.debezium.schema.SchemaNameAdjuster;
 import io.debezium.spi.topic.TopicNamingStrategy;
 
@@ -192,6 +195,9 @@ public class SpannerConnectorTask extends SpannerBaseSourceTask {
                 sourceInfoFactory,
                 partitionManager);
 
+        NotificationService<SpannerPartition, SpannerOffsetContext> notificationService = new NotificationService<>(getNotificationChannels(),
+                connectorConfig, SchemaFactory.get(), dispatcher::enqueueNotification);
+
         this.coordinator = new SpannerChangeEventSourceCoordinator(
                 getInitialOffsets(),
                 errorHandler,
@@ -200,7 +206,8 @@ public class SpannerConnectorTask extends SpannerBaseSourceTask {
                 changeEventSourceFactory,
                 new SpannerChangeEventSourceMetricsFactory(spannerMeter),
                 dispatcher,
-                schema);
+                schema,
+                notificationService);
 
         this.spannerMeter.start();
 
