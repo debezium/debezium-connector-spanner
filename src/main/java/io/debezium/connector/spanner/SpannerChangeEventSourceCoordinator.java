@@ -15,6 +15,7 @@ import io.debezium.pipeline.ChangeEventSourceCoordinator;
 import io.debezium.pipeline.ErrorHandler;
 import io.debezium.pipeline.EventDispatcher;
 import io.debezium.pipeline.metrics.spi.ChangeEventSourceMetricsFactory;
+import io.debezium.pipeline.notification.NotificationService;
 import io.debezium.pipeline.source.spi.ChangeEventSourceFactory;
 import io.debezium.pipeline.spi.Offsets;
 import io.debezium.schema.DatabaseSchema;
@@ -31,9 +32,9 @@ public class SpannerChangeEventSourceCoordinator extends ChangeEventSourceCoordi
                                                ChangeEventSourceFactory changeEventSourceFactory,
                                                ChangeEventSourceMetricsFactory changeEventSourceMetricsFactory,
                                                EventDispatcher eventDispatcher,
-                                               DatabaseSchema schema) {
+                                               DatabaseSchema schema, NotificationService notificationService) {
         super(previousOffsets, errorHandler, connectorType, connectorConfig, changeEventSourceFactory,
-                changeEventSourceMetricsFactory, eventDispatcher, schema);
+                changeEventSourceMetricsFactory, eventDispatcher, schema, null, notificationService);
     }
 
     public void commitRecords(List<SourceRecord> recordList) throws InterruptedException {
