@@ -10,7 +10,6 @@ import static org.slf4j.LoggerFactory.getLogger;
 import org.slf4j.Logger;
 
 import io.debezium.connector.spanner.kafka.internal.TaskSyncPublisher;
-import io.debezium.connector.spanner.kafka.internal.model.MessageTypeEnum;
 import io.debezium.connector.spanner.kafka.internal.model.RebalanceState;
 import io.debezium.connector.spanner.kafka.internal.model.TaskState;
 import io.debezium.connector.spanner.kafka.internal.model.TaskSyncEvent;
@@ -67,10 +66,10 @@ public class RebalanceHandler {
                     .build();
         });
 
-        TaskSyncEvent taskSyncEvent = context.buildTaskSyncEvent(MessageTypeEnum.REBALANCE_ANSWER);
+        TaskSyncEvent taskSyncEvent = context.buildRebalanceAnswerTaskSyncEvent();
 
         LoggerUtils.debug(LOGGER, "processRebalancingEvent: send: {}", taskSyncEvent);
-        LOGGER.info("Task {} - RebalanceHandler sent sync event", taskSyncEvent.getTaskUid());
+        LOGGER.info("Task {} - RebalanceHandler sent sync event {}", taskSyncEvent.getTaskUid(), taskSyncEvent);
 
         taskSyncPublisher.send(taskSyncEvent);
 

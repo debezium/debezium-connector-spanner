@@ -17,6 +17,7 @@ import java.util.UUID;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 
+import io.debezium.connector.spanner.kafka.internal.model.MessageTypeEnum;
 import io.debezium.connector.spanner.kafka.internal.model.PartitionState;
 import io.debezium.connector.spanner.kafka.internal.model.TaskState;
 import io.debezium.connector.spanner.kafka.internal.model.TaskSyncEvent;
@@ -33,6 +34,27 @@ public class TaskTestHelper {
                 .build();
     }
 
+    public static TaskState generateTaskStateWithPartitions(String taskUid, List<PartitionState> partitions, List<PartitionState> sharedPartitions) {
+        return TaskState.builder()
+                .taskUid(taskUid)
+                .partitions(partitions)
+                .sharedPartitions(sharedPartitions)
+                .build();
+    }
+
+    public static TaskState generateTaskStateWithPartitions(
+                                                            String taskUid, String consumerId, long rebalanceGenerationId, long stateTimestamp,
+                                                            List<PartitionState> partitions, List<PartitionState> sharedPartitions) {
+        return TaskState.builder()
+                .taskUid(taskUid)
+                .consumerId(consumerId)
+                .rebalanceGenerationId(rebalanceGenerationId)
+                .stateTimestamp(stateTimestamp)
+                .partitions(partitions)
+                .sharedPartitions(sharedPartitions)
+                .build();
+    }
+
     public static TaskState generateTaskStateWithRandomPartitions(int partitionsCount, int sharedPartitionsCount) {
         return TaskState.builder()
                 .taskUid(UUID.randomUUID().toString())
@@ -43,6 +65,17 @@ public class TaskTestHelper {
 
     public static TaskSyncEvent createTaskSyncEvent(TaskState... taskStates) {
         return TaskSyncEvent.builder()
+                .taskStates(createTaskStateMap(taskStates)).build();
+    }
+
+    public static TaskSyncEvent createTaskSyncEvent(
+                                                    String taskUid, String consumerId,
+                                                    long rebalanceGenerationId, MessageTypeEnum messageType, TaskState... taskStates) {
+        return TaskSyncEvent.builder()
+                .taskUid(taskUid)
+                .consumerId(consumerId)
+                .rebalanceGenerationId(rebalanceGenerationId)
+                .messageType(messageType)
                 .taskStates(createTaskStateMap(taskStates)).build();
     }
 

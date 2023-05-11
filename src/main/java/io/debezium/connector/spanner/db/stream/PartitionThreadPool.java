@@ -10,10 +10,14 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 /**
  * Partition thread pool, a thread is created for each partition token
  */
 public class PartitionThreadPool {
+    private static final Logger LOGGER = LoggerFactory.getLogger(PartitionThreadPool.class);
 
     private final Map<String, Thread> threadMap = new HashMap<>();
 
@@ -38,6 +42,7 @@ public class PartitionThreadPool {
         clean();
         Thread thread = threadMap.get(token);
         if (thread != null) {
+            LOGGER.info("Interrupting SpannerConnector-PartitionThreadPool");
             thread.interrupt();
         }
         threadMap.remove(token);

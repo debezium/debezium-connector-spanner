@@ -126,11 +126,8 @@ public class SpannerChangeStream implements ChangeStream {
             catch (Exception ex) {
                 LOGGER.info("Exception during streaming {} from partition with token {}", ex.getMessage(), partition.getToken());
 
-                if (isCanceled(ex)) {
-                    return;
-                }
-
                 if (this.onError(partition, ex)) {
+                    LOGGER.info("Received irretriable error during streaming {} from partition with token {}", ex.getMessage(), partition.getToken());
                     return;
                 }
 
@@ -138,8 +135,12 @@ public class SpannerChangeStream implements ChangeStream {
                     partitionEventListener.onException(partition, ex);
                 }
                 catch (InterruptedException e) {
+                    LOGGER.info("Interrupting streaming partition task with token {} and exception {}", partition.getToken(), e);
                     Thread.currentThread().interrupt();
                 }
+            }
+            finally {
+                LOGGER.info("Stopped streaming from partition with token {}", partition.getToken());
             }
         });
 

@@ -31,15 +31,25 @@ class ChildPartitionOperationTest {
         Assertions.assertEquals(3, taskSyncContext.getCurrentTaskState().getPartitions().size());
 
         Assertions.assertEquals(2, taskSyncContext.getCurrentTaskState().getSharedPartitions().size());
+        ChildPartitionOperation operation1 = new ChildPartitionOperation(
+                List.of(buildPartition("n3", "parent0", Set.of("parent0")), buildPartition("n4", "parent0", Set.of("parent0"))));
 
-        taskSyncContext = new ChildPartitionOperation(List.of(buildPartition("n3", "parent0", Set.of("parent0")), buildPartition("n4", "parent0", Set.of("parent0"))))
-                .doOperation(taskSyncContext);
+        taskSyncContext = operation1.doOperation(taskSyncContext);
+        Assertions.assertEquals(operation1.updatedOwnedPartitions().size(), 0);
+        Assertions.assertEquals(operation1.updatedSharedPartitions().size(), 2);
+        Assertions.assertEquals(operation1.removedOwnedPartitions().size(), 0);
+        Assertions.assertEquals(operation1.removedSharedPartitions().size(), 0);
 
         Assertions.assertEquals(3, taskSyncContext.getCurrentTaskState().getPartitions().size());
 
         Assertions.assertEquals(4, taskSyncContext.getCurrentTaskState().getSharedPartitions().size());
 
-        taskSyncContext = new ChildPartitionOperation(List.of(buildPartition("n5", "parent0", Set.of("parent0")))).doOperation(taskSyncContext);
+        ChildPartitionOperation operation2 = new ChildPartitionOperation(List.of(buildPartition("n5", "parent0", Set.of("parent0"))));
+        taskSyncContext = operation2.doOperation(taskSyncContext);
+        Assertions.assertEquals(operation2.updatedOwnedPartitions().size(), 1);
+        Assertions.assertEquals(operation2.updatedSharedPartitions().size(), 0);
+        Assertions.assertEquals(operation2.removedOwnedPartitions().size(), 0);
+        Assertions.assertEquals(operation2.removedSharedPartitions().size(), 0);
 
         Assertions.assertEquals(4, taskSyncContext.getCurrentTaskState().getPartitions().size());
 
@@ -49,9 +59,14 @@ class ChildPartitionOperationTest {
 
     @Test
     void doOperationReceiveChildPartitionAfterMergeFromParent2() {
-        TaskSyncContext taskSyncContext = new ChildPartitionOperation(
-                List.of(buildPartition("n5", "parent2", Set.of("parent1", "parent2"))))
-                .doOperation(buildTaskSyncContext2());
+        ChildPartitionOperation operation = new ChildPartitionOperation(
+                List.of(buildPartition("n5", "parent2", Set.of("parent1", "parent2"))));
+        TaskSyncContext taskSyncContext = operation.doOperation(buildTaskSyncContext2());
+
+        Assertions.assertEquals(operation.updatedOwnedPartitions().size(), 0);
+        Assertions.assertEquals(operation.updatedSharedPartitions().size(), 0);
+        Assertions.assertEquals(operation.removedOwnedPartitions().size(), 0);
+        Assertions.assertEquals(operation.removedSharedPartitions().size(), 0);
 
         Assertions.assertEquals(1, taskSyncContext.getCurrentTaskState().getPartitions().size());
 
@@ -60,9 +75,16 @@ class ChildPartitionOperationTest {
 
     @Test
     void doOperationReceiveChildPartitionAfterMergeFromParent1() {
-        TaskSyncContext taskSyncContext = new ChildPartitionOperation(
-                List.of(buildPartition("n5", "parent1", Set.of("parent1", "parent2"))))
+        ChildPartitionOperation operation = new ChildPartitionOperation(
+                List.of(buildPartition("n5", "parent1", Set.of("parent1", "parent2"))));
+
+        TaskSyncContext taskSyncContext = operation
                 .doOperation(buildTaskSyncContext2());
+
+        Assertions.assertEquals(operation.updatedOwnedPartitions().size(), 1);
+        Assertions.assertEquals(operation.updatedSharedPartitions().size(), 0);
+        Assertions.assertEquals(operation.removedOwnedPartitions().size(), 0);
+        Assertions.assertEquals(operation.removedSharedPartitions().size(), 0);
 
         Assertions.assertEquals(2, taskSyncContext.getCurrentTaskState().getPartitions().size());
 
@@ -71,10 +93,16 @@ class ChildPartitionOperationTest {
 
     @Test
     void doOperationReceiveChildPartitionAfterMergeFromInitialPartition() {
-        TaskSyncContext taskSyncContext = new ChildPartitionOperation(
-                List.of(buildPartition("Parent0", null, Set.of())))
+        ChildPartitionOperation operation = new ChildPartitionOperation(
+                List.of(buildPartition("Parent0", null, Set.of())));
+
+        TaskSyncContext taskSyncContext = operation
                 .doOperation(buildEmptyTaskSyncContext());
 
+        Assertions.assertEquals(operation.updatedOwnedPartitions().size(), 1);
+        Assertions.assertEquals(operation.updatedSharedPartitions().size(), 0);
+        Assertions.assertEquals(operation.removedOwnedPartitions().size(), 0);
+        Assertions.assertEquals(operation.removedSharedPartitions().size(), 0);
         Assertions.assertEquals(1, taskSyncContext.getCurrentTaskState().getPartitions().size());
 
         Assertions.assertEquals(0, taskSyncContext.getCurrentTaskState().getSharedPartitions().size());

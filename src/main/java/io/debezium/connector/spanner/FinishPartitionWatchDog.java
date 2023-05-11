@@ -48,7 +48,6 @@ public class FinishPartitionWatchDog {
 
                 if (Instant.now().isAfter(lastUpdatedTime.plus(Duration.ofSeconds(600)))) {
                     LOGGER.info("Get pending partitions: {}", pendingToFinish);
-                    LOGGER.info("Get pending total partitions: {}", pending);
                     lastUpdatedTime = Instant.now();
                 }
 
@@ -80,6 +79,7 @@ public class FinishPartitionWatchDog {
                     metronome.pause();
                 }
                 catch (InterruptedException e) {
+                    LOGGER.info("Interrupting SpannerConnector-FinishingPartitionWatchDog");
                     Thread.currentThread().interrupt();
                     return;
                 }

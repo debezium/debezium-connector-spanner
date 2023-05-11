@@ -5,85 +5,305 @@
  */
 package io.debezium.connector.spanner.kafka.internal;
 
-import static org.assertj.core.api.Assertions.assertThat;
+import static io.debezium.connector.spanner.kafka.internal.BufferedPublisher.mergeTaskSyncEvent;
+import static io.debezium.connector.spanner.task.TaskTestHelper.createTaskSyncEvent;
+import static io.debezium.connector.spanner.task.TaskTestHelper.generateTaskStateWithPartitions;
 
-import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
-import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-import com.google.common.collect.Ordering;
+import io.debezium.connector.spanner.kafka.internal.model.MessageTypeEnum;
+import io.debezium.connector.spanner.kafka.internal.model.PartitionState;
+import io.debezium.connector.spanner.kafka.internal.model.PartitionStateEnum;
+import io.debezium.connector.spanner.kafka.internal.model.TaskState;
+import io.debezium.connector.spanner.kafka.internal.model.TaskSyncEvent;
 
 class BufferedPublisherTest {
 
     @Test
-    void testBufferedPublisher_1() throws InterruptedException {
-        Predicate<Integer> publishImmediately = p -> p % 10 == 0;
+    void testBufferedPublisher_1() {
+        AtomicReference<TaskSyncEvent> value = new AtomicReference<TaskSyncEvent>();
+        Predicate<TaskSyncEvent> publishImmediately = p -> false;
 
-        Consumer<Integer> onPublish = v -> {
+        Consumer<TaskSyncEvent> onPublish = v -> {
+            value.updateAndGet(currentValue -> mergeTaskSyncEvent("task0", currentValue, v));
         };
 
-        runAndCheck(publishImmediately, onPublish);
-    }
-
-    @Test
-    void testBufferedPublisher_2() throws InterruptedException {
-        Predicate<Integer> publishImmediately = p -> p % 10 == 0;
-
-        Consumer<Integer> onPublish = v -> {
-        };
-
-        runAndCheck(publishImmediately, onPublish);
-    }
-
-    @Test
-    void testBufferedPublisher_3() throws InterruptedException {
-        Predicate<Integer> publishImmediately = p -> p % 100 == 0;
-
-        Consumer<Integer> onPublish = v -> {
-            try {
-                Thread.sleep(20);
-            }
-            catch (InterruptedException e) {
-                e.printStackTrace();
-            }
-        };
-
-        runAndCheck(publishImmediately, onPublish);
-    }
-
-    private void runAndCheck(Predicate<Integer> publishImmediately, Consumer<Integer> onPublish) throws InterruptedException {
-        List<Integer> result = new CopyOnWriteArrayList<>();
-
-        BufferedPublisher<Integer> pub = new BufferedPublisher<>("test-task-1", "pub-1", 5,
+        BufferedPublisher pub = new BufferedPublisher("task0", "pub-1", 5,
                 publishImmediately,
-                onPublish
-                        // .andThen(System.out::println)
-                        .andThen(result::add));
+                onPublish);
 
         pub.start();
 
-        int total = 1001;
-        List<Integer> required = new ArrayList<>();
-        for (int i = 0; i < total; i++) {
-            pub.buffer(i);
-            Thread.sleep(1);
-            if (publishImmediately.test(i)) {
-                required.add(i);
-            }
-        }
+        TaskState task0 = generateTaskStateWithPartitions("task0",
+                List.of(PartitionState.builder()
+                        .token("token1").state(PartitionStateEnum.REMOVED).build(),
+                        PartitionState.builder()
+                                .token("token2").state(PartitionStateEnum.RUNNING).build()),
+                List.of(PartitionState.builder()
+                        .token("token3").state(PartitionStateEnum.CREATED).build()));
+
+        TaskState task1 = generateTaskStateWithPartitions("task0",
+                List.of(PartitionState.builder()
+                        .token("token1").state(PartitionStateEnum.REMOVED).build(),
+                        PartitionState.builder()
+                                .token("token2").state(PartitionStateEnum.FINISHED).build()),
+                List.of(PartitionState.builder()
+                        .token("token4").state(PartitionStateEnum.CREATED).build()));
+
+        TaskSyncEvent taskSyncEvent1 = createTaskSyncEvent("task0", "consumer0", 1, MessageTypeEnum.REGULAR, task0);
+        pub.buffer(taskSyncEvent1);
+        TaskSyncEvent taskSyncEvent2 = createTaskSyncEvent("task0", "consumer1", 2, MessageTypeEnum.REGULAR, task1);
+        pub.buffer(taskSyncEvent2);
+        pub.publishBuffered();
         pub.close();
 
-        // System.out.println("published: " + result.size());
-        assertThat(result)
-                .containsAll(required) // no missed required elements
-                .hasSizeGreaterThan(required.size()) // not only required elements
-                .hasSizeLessThan(total) // some of not required haven't been published
-                .hasSameSizeAs(new HashSet<>(result)); // no duplicates
-        assertThat(Ordering.natural().isOrdered(result)).isTrue(); // correctly ordered
+        TaskSyncEvent finalTaskSyncEvent = value.get();
+        Assertions.assertEquals("task0", finalTaskSyncEvent.getTaskUid());
+        Assertions.assertEquals(1, finalTaskSyncEvent.getTaskStates().size());
+
+        TaskState taskState1 = finalTaskSyncEvent.getTaskStates().get(finalTaskSyncEvent.getTaskUid());
+        Assertions.assertEquals(taskState1.getTaskUid(), "task0");
+
+        Assertions.assertEquals(taskState1.getPartitionsMap().size(), 2);
+        PartitionState partition1 = taskState1.getPartitionsMap().get("token1");
+        Assertions.assertEquals(partition1.getState(), PartitionStateEnum.REMOVED);
+        PartitionState partition2 = taskState1.getPartitionsMap().get("token2");
+        Assertions.assertEquals(partition2.getState(), PartitionStateEnum.FINISHED);
+
+        Assertions.assertEquals(taskState1.getSharedPartitions().size(), 2);
+        PartitionState partition3 = taskState1.getSharedPartitionsMap().get("token3");
+        Assertions.assertEquals(partition3.getState(), PartitionStateEnum.CREATED);
+        PartitionState partition4 = taskState1.getSharedPartitionsMap().get("token4");
+        Assertions.assertEquals(partition4.getState(), PartitionStateEnum.CREATED);
     }
+
+    @Test
+    void testBufferedPublisher_2() {
+        AtomicReference<TaskSyncEvent> value = new AtomicReference<TaskSyncEvent>();
+        Predicate<TaskSyncEvent> publishImmediately = p -> false;
+
+        Consumer<TaskSyncEvent> onPublish = v -> {
+            value.updateAndGet(currentValue -> mergeTaskSyncEvent("task0", currentValue, v));
+        };
+
+        BufferedPublisher pub = new BufferedPublisher("task0", "pub-1", 5,
+                publishImmediately,
+                onPublish);
+
+        pub.start();
+
+        TaskState task0 = generateTaskStateWithPartitions("task0",
+                List.of(PartitionState.builder()
+                        .token("token1").state(PartitionStateEnum.REMOVED).build(),
+                        PartitionState.builder()
+                                .token("token2").state(PartitionStateEnum.RUNNING).build()),
+                List.of(PartitionState.builder()
+                        .token("token3").state(PartitionStateEnum.CREATED).build()));
+
+        TaskState task1 = generateTaskStateWithPartitions("task0",
+                List.of(PartitionState.builder()
+                        .token("token1").state(PartitionStateEnum.REMOVED).build(),
+                        PartitionState.builder()
+                                .token("token2").state(PartitionStateEnum.FINISHED).build()),
+                List.of(PartitionState.builder()
+                        .token("token4").state(PartitionStateEnum.CREATED).build()));
+
+        // This task state is a separate task state.
+        TaskState task2 = generateTaskStateWithPartitions("task1",
+                List.of(PartitionState.builder()
+                        .token("token5").state(PartitionStateEnum.CREATED).build(),
+                        PartitionState.builder()
+                                .token("token6").state(PartitionStateEnum.CREATED).build()),
+                List.of(PartitionState.builder()
+                        .token("token7").state(PartitionStateEnum.RUNNING).build()));
+
+        // This task state is a separate task state.
+        TaskState task3 = generateTaskStateWithPartitions("task0",
+                List.of(PartitionState.builder()
+                        .token("token8").state(PartitionStateEnum.CREATED).build(),
+                        PartitionState.builder()
+                                .token("token9").state(PartitionStateEnum.CREATED).build()),
+                List.of(PartitionState.builder()
+                        .token("token10").state(PartitionStateEnum.RUNNING).build()));
+
+        // This task state is a separate task state.
+        TaskState task4 = generateTaskStateWithPartitions("task0",
+                List.of(PartitionState.builder()
+                        .token("token8").state(PartitionStateEnum.SCHEDULED).build(),
+                        PartitionState.builder()
+                                .token("token9").state(PartitionStateEnum.RUNNING).build()),
+                List.of(PartitionState.builder()
+                        .token("token10").state(PartitionStateEnum.RUNNING).build()));
+
+        TaskSyncEvent taskSyncEvent1 = createTaskSyncEvent("task0", "consumer0", 1, MessageTypeEnum.REGULAR, task0);
+        pub.buffer(taskSyncEvent1);
+        TaskSyncEvent taskSyncEvent2 = createTaskSyncEvent("task0", "consumer1", 2, MessageTypeEnum.REGULAR, task1);
+        pub.buffer(taskSyncEvent2);
+        TaskSyncEvent taskSyncEvent3 = createTaskSyncEvent("task1", "consumer1", 2, MessageTypeEnum.REGULAR, task2);
+        pub.buffer(taskSyncEvent3);
+        TaskSyncEvent taskSyncEvent4 = createTaskSyncEvent("task0", "consumer1", 2, MessageTypeEnum.REGULAR, task3);
+        pub.buffer(taskSyncEvent4);
+        TaskSyncEvent taskSyncEvent5 = createTaskSyncEvent("task0", "consumer1", 2, MessageTypeEnum.REGULAR, task4);
+        pub.buffer(taskSyncEvent5);
+        pub.publishBuffered();
+        pub.close();
+
+        // Assertions.assertEquals(value.get(), expectedTaskSyncEvent);
+        TaskSyncEvent finalTaskSyncEvent = value.get();
+        Assertions.assertEquals("task0", finalTaskSyncEvent.getTaskUid());
+        Assertions.assertEquals(1, finalTaskSyncEvent.getTaskStates().size());
+
+        TaskState taskState1 = finalTaskSyncEvent.getTaskStates().get(finalTaskSyncEvent.getTaskUid());
+        Assertions.assertEquals(taskState1.getTaskUid(), "task0");
+
+        Assertions.assertEquals(taskState1.getPartitionsMap().size(), 4);
+        PartitionState partition1 = taskState1.getPartitionsMap().get("token1");
+        Assertions.assertEquals(partition1.getState(), PartitionStateEnum.REMOVED);
+        PartitionState partition2 = taskState1.getPartitionsMap().get("token2");
+        Assertions.assertEquals(partition2.getState(), PartitionStateEnum.FINISHED);
+        PartitionState partition3 = taskState1.getPartitionsMap().get("token8");
+        Assertions.assertEquals(partition3.getState(), PartitionStateEnum.SCHEDULED);
+        PartitionState partition4 = taskState1.getPartitionsMap().get("token9");
+        Assertions.assertEquals(partition4.getState(), PartitionStateEnum.RUNNING);
+
+        Assertions.assertEquals(taskState1.getSharedPartitions().size(), 3);
+        PartitionState partition5 = taskState1.getSharedPartitionsMap().get("token3");
+        Assertions.assertEquals(partition5.getState(), PartitionStateEnum.CREATED);
+        PartitionState partition6 = taskState1.getSharedPartitionsMap().get("token4");
+        Assertions.assertEquals(partition6.getState(), PartitionStateEnum.CREATED);
+        PartitionState partition7 = taskState1.getSharedPartitionsMap().get("token10");
+        Assertions.assertEquals(partition7.getState(), PartitionStateEnum.RUNNING);
+    }
+
+    @Test
+    void testBufferedPublisher_3() {
+        AtomicReference<TaskSyncEvent> value = new AtomicReference<TaskSyncEvent>();
+        Predicate<TaskSyncEvent> publishImmediately = p -> false;
+
+        Consumer<TaskSyncEvent> onPublish = v -> {
+            value.updateAndGet(currentValue -> mergeTaskSyncEvent("task0", currentValue, v));
+        };
+
+        BufferedPublisher pub = new BufferedPublisher("task0", "pub-1", 5,
+                publishImmediately,
+                onPublish);
+
+        pub.start();
+
+        TaskState task0 = generateTaskStateWithPartitions("task0",
+                List.of(PartitionState.builder()
+                        .token("token1").state(PartitionStateEnum.REMOVED).build(),
+                        PartitionState.builder()
+                                .token("token2").state(PartitionStateEnum.RUNNING).build()),
+                List.of(PartitionState.builder()
+                        .token("token3").state(PartitionStateEnum.CREATED).build()));
+
+        TaskState task1 = generateTaskStateWithPartitions("task0",
+                List.of(PartitionState.builder()
+                        .token("token1").state(PartitionStateEnum.REMOVED).build(),
+                        PartitionState.builder()
+                                .token("token2").state(PartitionStateEnum.FINISHED).build()),
+                List.of(PartitionState.builder()
+                        .token("token4").state(PartitionStateEnum.CREATED).build()));
+
+        // This task state is a separate task state.
+        TaskState task2 = generateTaskStateWithPartitions("task1",
+                List.of(PartitionState.builder()
+                        .token("token5").state(PartitionStateEnum.CREATED).build(),
+                        PartitionState.builder()
+                                .token("token6").state(PartitionStateEnum.CREATED).build()),
+                List.of(PartitionState.builder()
+                        .token("token7").state(PartitionStateEnum.RUNNING).build()));
+
+        // This task state is a separate task state.
+        TaskState task3 = generateTaskStateWithPartitions("task0",
+                List.of(PartitionState.builder()
+                        .token("token8").state(PartitionStateEnum.CREATED).build(),
+                        PartitionState.builder()
+                                .token("token9").state(PartitionStateEnum.CREATED).build()),
+                List.of(PartitionState.builder()
+                        .token("token10").state(PartitionStateEnum.RUNNING).build()));
+
+        // This task state is a separate task state.
+        TaskState task4 = generateTaskStateWithPartitions("task0",
+                List.of(PartitionState.builder()
+                        .token("token8").state(PartitionStateEnum.SCHEDULED).build(),
+                        PartitionState.builder()
+                                .token("token9").state(PartitionStateEnum.RUNNING).build()),
+                List.of(PartitionState.builder()
+                        .token("token10").state(PartitionStateEnum.RUNNING).build()));
+
+        TaskSyncEvent taskSyncEvent1 = createTaskSyncEvent("task0", "consumer0", 1, MessageTypeEnum.REGULAR, task0);
+        pub.buffer(taskSyncEvent1);
+        TaskSyncEvent taskSyncEvent2 = createTaskSyncEvent("task0", "consumer1", 2, MessageTypeEnum.REGULAR, task1);
+        pub.buffer(taskSyncEvent2);
+        TaskSyncEvent taskSyncEvent3 = createTaskSyncEvent("task0", "consumer1", 2, MessageTypeEnum.REGULAR, task2);
+        pub.buffer(taskSyncEvent3);
+        TaskSyncEvent taskSyncEvent4 = createTaskSyncEvent("task0", "consumer1", 2, MessageTypeEnum.REGULAR, task3);
+        pub.buffer(taskSyncEvent4);
+
+        pub.publishBuffered();
+        TaskSyncEvent finalTaskSyncEvent = value.get();
+        Assertions.assertEquals("task0", finalTaskSyncEvent.getTaskUid());
+        Assertions.assertEquals(1, finalTaskSyncEvent.getTaskStates().size());
+
+        TaskState taskState1 = finalTaskSyncEvent.getTaskStates().get(finalTaskSyncEvent.getTaskUid());
+        Assertions.assertEquals(taskState1.getTaskUid(), "task0");
+
+        Assertions.assertEquals(taskState1.getPartitionsMap().size(), 4);
+        PartitionState partition1 = taskState1.getPartitionsMap().get("token1");
+        Assertions.assertEquals(partition1.getState(), PartitionStateEnum.REMOVED);
+        PartitionState partition2 = taskState1.getPartitionsMap().get("token2");
+        Assertions.assertEquals(partition2.getState(), PartitionStateEnum.FINISHED);
+        PartitionState partition3 = taskState1.getPartitionsMap().get("token8");
+        Assertions.assertEquals(partition3.getState(), PartitionStateEnum.CREATED);
+        PartitionState partition4 = taskState1.getPartitionsMap().get("token9");
+        Assertions.assertEquals(partition4.getState(), PartitionStateEnum.CREATED);
+
+        Assertions.assertEquals(taskState1.getSharedPartitions().size(), 3);
+        PartitionState partition5 = taskState1.getSharedPartitionsMap().get("token3");
+        Assertions.assertEquals(partition5.getState(), PartitionStateEnum.CREATED);
+        PartitionState partition6 = taskState1.getSharedPartitionsMap().get("token4");
+        Assertions.assertEquals(partition6.getState(), PartitionStateEnum.CREATED);
+        PartitionState partition7 = taskState1.getSharedPartitionsMap().get("token10");
+        Assertions.assertEquals(partition7.getState(), PartitionStateEnum.RUNNING);
+
+        TaskSyncEvent taskSyncEvent5 = createTaskSyncEvent("task0", "consumer1", 2, MessageTypeEnum.REGULAR, task4);
+        pub.buffer(taskSyncEvent5);
+        pub.publishBuffered();
+        pub.close();
+
+        // Assertions.assertEquals(value.get(), expectedTaskSyncEvent);
+        finalTaskSyncEvent = value.get();
+        Assertions.assertEquals("task0", finalTaskSyncEvent.getTaskUid());
+        Assertions.assertEquals(1, finalTaskSyncEvent.getTaskStates().size());
+
+        taskState1 = finalTaskSyncEvent.getTaskStates().get(finalTaskSyncEvent.getTaskUid());
+        Assertions.assertEquals(taskState1.getTaskUid(), "task0");
+
+        Assertions.assertEquals(taskState1.getPartitionsMap().size(), 4);
+        partition1 = taskState1.getPartitionsMap().get("token1");
+        Assertions.assertEquals(partition1.getState(), PartitionStateEnum.REMOVED);
+        partition2 = taskState1.getPartitionsMap().get("token2");
+        Assertions.assertEquals(partition2.getState(), PartitionStateEnum.FINISHED);
+        partition3 = taskState1.getPartitionsMap().get("token8");
+        Assertions.assertEquals(partition3.getState(), PartitionStateEnum.SCHEDULED);
+        partition4 = taskState1.getPartitionsMap().get("token9");
+        Assertions.assertEquals(partition4.getState(), PartitionStateEnum.RUNNING);
+
+        Assertions.assertEquals(taskState1.getSharedPartitions().size(), 3);
+        partition5 = taskState1.getSharedPartitionsMap().get("token3");
+        Assertions.assertEquals(partition5.getState(), PartitionStateEnum.CREATED);
+        partition6 = taskState1.getSharedPartitionsMap().get("token4");
+        Assertions.assertEquals(partition6.getState(), PartitionStateEnum.CREATED);
+        partition7 = taskState1.getSharedPartitionsMap().get("token10");
+        Assertions.assertEquals(partition7.getState(), PartitionStateEnum.RUNNING);
+    }
+
 }

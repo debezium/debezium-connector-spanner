@@ -7,16 +7,12 @@ package io.debezium.connector.spanner.task;
 
 import static org.slf4j.LoggerFactory.getLogger;
 
-import java.util.HashMap;
-import java.util.Map;
-
 import org.slf4j.Logger;
 
 import io.debezium.connector.spanner.kafka.internal.TaskSyncPublisher;
 import io.debezium.connector.spanner.kafka.internal.model.MessageTypeEnum;
 import io.debezium.connector.spanner.kafka.internal.model.RebalanceState;
 import io.debezium.connector.spanner.kafka.internal.model.SyncEventMetadata;
-import io.debezium.connector.spanner.kafka.internal.model.TaskState;
 import io.debezium.connector.spanner.kafka.internal.model.TaskSyncEvent;
 import io.debezium.connector.spanner.task.state.SyncEvent;
 import io.debezium.connector.spanner.task.state.TaskStateChangeEvent;
@@ -62,42 +58,21 @@ public class SyncEventHandler {
         if (!RebalanceState.START_INITIAL_SYNC.equals(taskSyncContextHolder.get().getRebalanceState())) {
             return;
         }
-        if (skipFromPreviousGeneration(inSync)) {
-            return;
-        }
 
-        taskSyncContextHolder.lock();
-        try {
+        process(inSync, metadata);
 
-            if (inSync != null) {
-                LOGGER.debug("Task {} - processPreviousStates - merge", taskSyncContextHolder.get().getTaskUid());
+        if (metadata.isCanInitiateRebalancing()) {
+            LOGGER.debug("Task {} - processPreviousStates - switch state to INITIAL_INCREMENTED_STATE_COMPLETED",
+                    taskSyncContextHolder.get().getTaskUid());
 
-                taskSyncContextHolder.update(context -> SyncEventMerger.merge(context, inSync));
-            }
-
-            if (metadata.isCanInitiateRebalancing()) {
-                LOGGER.debug("Task {} - processPreviousStates - switch state to INITIAL_INCREMENTED_STATE_COMPLETED",
-                        taskSyncContextHolder.get().getTaskUid());
-
-                taskSyncContextHolder.update(context -> context.toBuilder()
-                        .rebalanceState(RebalanceState.INITIAL_INCREMENTED_STATE_COMPLETED)
-                        .epochOffsetHolder(context.getEpochOffsetHolder().nextOffset(context.getCurrentKafkaRecordOffset()))
-                        .build());
-            }
-        }
-        finally {
-            taskSyncContextHolder.unlock();
+            taskSyncContextHolder.update(context -> context.toBuilder()
+                    .rebalanceState(RebalanceState.INITIAL_INCREMENTED_STATE_COMPLETED)
+                    .epochOffsetHolder(context.getEpochOffsetHolder().nextOffset(context.getCurrentKafkaRecordOffset()))
+                    .build());
         }
     }
 
     public void processNewEpoch(TaskSyncEvent inSync, SyncEventMetadata metadata) throws InterruptedException {
-        if (inSync == null) {
-            return;
-        }
-        if (skipFromPreviousGeneration(inSync)) {
-            return;
-        }
-
         taskSyncContextHolder.lock();
         try {
 
@@ -105,35 +80,21 @@ public class SyncEventHandler {
             long inGeneration = inSync.getRebalanceGenerationId();
 
             if (taskSyncContextHolder.get().getRebalanceState() == RebalanceState.INITIAL_INCREMENTED_STATE_COMPLETED &&
-                    inSync.getMessageType() == MessageTypeEnum.NEW_EPOCH &&
                     inGeneration >= currentGeneration) { // We ignore messages with a stale rebalanceGenerationid.
 
-                LOGGER.debug("Task {} - processNewEpoch : {} metadata {}, rebalanceId: {}",
+                LOGGER.info("Task {} - processNewEpoch {}: metadata {}, rebalanceId: {}, current task {}",
                         taskSyncContextHolder.get().getTaskUid(),
                         inSync,
+                        taskSyncContextHolder.get(),
                         metadata,
                         taskSyncContextHolder.get().getRebalanceGenerationId());
 
-                Map<String, TaskState> taskStates = new HashMap<>(inSync.getTaskStates());
-                taskStates.remove(taskSyncContextHolder.get().getTaskUid());
-                // When we receive NEW_EPOCH messages, we clear all task states belonging to tasks
-                // other than the current task state, and replace them with entries from the
-                // NEW_EPOCH message.
-                taskSyncContextHolder.update(context -> context.toBuilder()
-                        .rebalanceState(RebalanceState.NEW_EPOCH_STARTED)
-                        .createdTimestamp(inSync.getMessageTimestamp())
-                        .taskStates(taskStates)
+                taskSyncContextHolder.update(context -> SyncEventMerger.mergeNewEpoch(context, inSync));
 
-                        // update timestamp for the current task state
-                        .currentTaskState(context.getCurrentTaskState()
-                                .toBuilder()
-                                .stateTimestamp(inSync.getMessageTimestamp())
-                                .build())
-                        .build());
+                LOGGER.info("Task {} - SyncEventHandler sent response for new epoch",
+                        taskSyncContextHolder.get().getTaskUid());
 
-                LOGGER.debug("Task {} - SyncEventHandler sent response for new epoch", taskSyncContextHolder.get().getTaskUid());
-
-                taskSyncPublisher.send(taskSyncContextHolder.get().buildTaskSyncEvent());
+                taskSyncPublisher.send(taskSyncContextHolder.get().buildCurrentTaskSyncEvent());
             }
         }
         finally {
@@ -142,13 +103,7 @@ public class SyncEventHandler {
 
     }
 
-    public void process(TaskSyncEvent inSync, SyncEventMetadata metadata) throws InterruptedException {
-        if (inSync == null) {
-            return;
-        }
-        if (skipFromPreviousGeneration(inSync)) {
-            return;
-        }
+    public void processUpdateEpoch(TaskSyncEvent inSync, SyncEventMetadata metadata) throws InterruptedException {
 
         taskSyncContextHolder.lock();
         try {
@@ -157,9 +112,9 @@ public class SyncEventHandler {
                 return;
             }
 
-            LOGGER.debug("Task {} - process sync event", taskSyncContextHolder.get().getTaskUid());
+            LOGGER.info("Task {} - process epoch update", taskSyncContextHolder.get().getTaskUid());
 
-            taskSyncContextHolder.update(context -> SyncEventMerger.merge(context, inSync));
+            taskSyncContextHolder.update(context -> SyncEventMerger.mergeEpochUpdate(context, inSync));
 
             eventConsumer.accept(new SyncEvent());
         }
@@ -168,13 +123,28 @@ public class SyncEventHandler {
         }
     }
 
+    public void processRegularMessage(TaskSyncEvent inSync, SyncEventMetadata metadata) throws InterruptedException {
+        taskSyncContextHolder.lock();
+
+        try {
+
+            if (!taskSyncContextHolder.get().getRebalanceState().equals(RebalanceState.NEW_EPOCH_STARTED)) {
+                return;
+            }
+
+            LOGGER.debug("Task {} - process sync event", taskSyncContextHolder.get().getTaskUid());
+
+            taskSyncContextHolder.update(context -> SyncEventMerger.mergeIncrementalTaskSyncEvent(context, inSync));
+
+            eventConsumer.accept(new SyncEvent());
+
+        }
+        finally {
+            taskSyncContextHolder.unlock();
+        }
+    }
+
     public void processRebalanceAnswer(TaskSyncEvent inSync, SyncEventMetadata metadata) {
-        if (inSync == null) {
-            return;
-        }
-        if (skipFromPreviousGeneration(inSync)) {
-            return;
-        }
 
         taskSyncContextHolder.lock();
 
@@ -185,13 +155,42 @@ public class SyncEventHandler {
                 return;
             }
 
-            LOGGER.debug("Task {} - process sync event - rebalance answer", taskSyncContextHolder.get().getTaskUid());
+            LOGGER.info("Task {} - process sync event - rebalance answer", taskSyncContextHolder.get().getTaskUid());
 
-            taskSyncContextHolder.update(context -> SyncEventMerger.merge(context, inSync));
+            taskSyncContextHolder.update(context -> SyncEventMerger.mergeRebalanceAnswer(context, inSync));
 
         }
         finally {
             taskSyncContextHolder.unlock();
+        }
+    }
+
+    public void process(TaskSyncEvent inSync, SyncEventMetadata metadata) {
+        if (inSync == null) {
+            return;
+        }
+
+        if (skipFromPreviousGeneration(inSync)) {
+            return;
+        }
+
+        try {
+            if (inSync.getMessageType() == MessageTypeEnum.REGULAR) {
+                processRegularMessage(inSync, metadata);
+            }
+            else if (inSync.getMessageType() == MessageTypeEnum.REBALANCE_ANSWER) {
+                processRebalanceAnswer(inSync, metadata);
+            }
+            else if (inSync.getMessageType() == MessageTypeEnum.UPDATE_EPOCH) {
+                processUpdateEpoch(inSync, metadata);
+            }
+            else if (inSync.getMessageType() == MessageTypeEnum.NEW_EPOCH) {
+                processNewEpoch(inSync, metadata);
+            }
+        }
+
+        catch (Exception e) {
+            LOGGER.error("Exception during processing task message {}, {}", inSync, e);
         }
     }
 
