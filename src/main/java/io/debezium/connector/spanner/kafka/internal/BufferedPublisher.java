@@ -72,12 +72,10 @@ public class BufferedPublisher {
         }, "SpannerConnector-" + name);
     }
 
-    public void buffer(TaskSyncEvent update) {
+    public synchronized void buffer(TaskSyncEvent update) {
         if (publishImmediately.test(update)) {
-            synchronized (this) {
-                // We publish without affecting the updated values.
-                this.onPublish.accept(update);
-            }
+            // We publish without affecting the updated values.
+            this.onPublish.accept(update);
         }
         else {
             TaskSyncEvent updatedValue = value.updateAndGet(

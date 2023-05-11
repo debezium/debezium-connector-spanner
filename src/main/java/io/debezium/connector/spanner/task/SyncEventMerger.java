@@ -225,6 +225,29 @@ public class SyncEventMerger {
         Map<String, TaskState> newTaskStates = new HashMap<>(newMessage.getTaskStates());
         newTaskStates.remove(currentContext.getTaskUid());
 
+        List<String> newEpochAllPartitions = newTaskStates.values().stream()
+                .flatMap(taskState -> taskState.getPartitions().stream())
+                .map(partitionState -> partitionState.getToken())
+                .collect(Collectors.toList());
+
+        List<String> newEpochSharedPartitions = newTaskStates.values().stream()
+                .flatMap(taskState -> taskState.getSharedPartitions().stream())
+                .map(partitionState -> partitionState.getToken())
+                .collect(Collectors.toList());
+
+        TaskState currentTask = currentContext.getCurrentTaskState();
+        // The current task may have partitions that were shared to the dead task. The leader
+        // should have redistributed those partitions as part of the rebalance event handling
+        // and included the redistribued partitions in its owned or shared list in the new epoch
+        // message. We should make sure to clear those partitions from the task's share list.
+        List<PartitionState> currentSharedPartitions = currentTask.getSharedPartitions().stream()
+                .filter(partitionState -> !newEpochAllPartitions.contains(partitionState.getToken()))
+                .filter(partitionState -> !newEpochSharedPartitions.contains(partitionState.getToken()))
+                .collect(Collectors.toList());
+
+        TaskState newCurrentTask = currentTask.toBuilder()
+                .sharedPartitions(currentSharedPartitions).build();
+
         // When we receive NEW_EPOCH messages, we clear all task states belonging to tasks
         // other than the current task state, and replace them with entries from the
         // NEW_EPOCH message.
@@ -232,7 +255,7 @@ public class SyncEventMerger {
                 .createdTimestamp(newMessage.getMessageTimestamp())
                 .taskStates(newTaskStates)
                 // update timestamp for the current task state
-                .currentTaskState(currentContext.getCurrentTaskState()
+                .currentTaskState(newCurrentTask
                         .toBuilder()
                         .stateTimestamp(newMessage.getMessageTimestamp())
                         .build());
