@@ -231,7 +231,7 @@ public class SpannerStreamingChangeEventSource implements CommittingRecordsStrea
 
             boolean dispatched = spannerEventDispatcher.dispatchDataChangeEvent(partition, tableId,
                     new SpannerChangeRecordEmitter(recordUid, event.getModType(), mod, partition, offsetContext,
-                            Clock.SYSTEM));
+                            Clock.SYSTEM, connectorConfig));
             if (dispatched) {
                 LOGGER.debug("DataChangeEvent has been dispatched form table {} with modification: {}, offset{}, event: {}", tableId.getTableName(), mod,
                         offsetContext.getOffset(), event);

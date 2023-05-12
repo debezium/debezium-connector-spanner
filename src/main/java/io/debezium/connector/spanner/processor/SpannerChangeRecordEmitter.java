@@ -10,6 +10,7 @@ import org.apache.kafka.connect.header.ConnectHeaders;
 
 import com.google.common.annotations.VisibleForTesting;
 
+import io.debezium.connector.spanner.SpannerConnectorConfig;
 import io.debezium.connector.spanner.SpannerPartition;
 import io.debezium.connector.spanner.context.offset.SpannerOffsetContext;
 import io.debezium.connector.spanner.db.model.Mod;
@@ -30,8 +31,8 @@ public class SpannerChangeRecordEmitter extends AbstractChangeRecordEmitter<Span
     private final String recordUid;
 
     public SpannerChangeRecordEmitter(String recordUid, ModType modType, Mod mod, SpannerPartition partition,
-                                      SpannerOffsetContext offsetContext, Clock clock) {
-        super(partition, offsetContext, clock);
+                                      SpannerOffsetContext offsetContext, Clock clock, SpannerConnectorConfig connectorConfig) {
+        super(partition, offsetContext, clock, connectorConfig);
         this.modType = modType;
         this.mod = mod;
         this.recordUid = recordUid;
