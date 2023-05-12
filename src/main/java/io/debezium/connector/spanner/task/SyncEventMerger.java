@@ -77,15 +77,11 @@ public class SyncEventMerger {
             currentTaskStates.remove(newMessage.getTaskUid());
 
             // Retrieve the updated partitions from the new task.
-            List<PartitionState> newTaskPartitions = newTask.getPartitions().stream()
-                    .collect(Collectors.toList());
             List<String> newTaskPartitionTokens = newTask.getPartitions().stream()
                     .map(partitionState -> partitionState.getToken())
                     .collect(Collectors.toList());
 
             // Retrieve the updated shared partitions from the new task.
-            List<PartitionState> newTaskSharedPartitions = newTask.getSharedPartitions().stream()
-                    .collect(Collectors.toList());
             List<String> newTaskSharedPartitionTokens = newTask.getSharedPartitions().stream()
                     .map(partitionState -> partitionState.getToken())
                     .collect(Collectors.toList());

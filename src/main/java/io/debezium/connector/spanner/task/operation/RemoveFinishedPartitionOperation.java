@@ -39,7 +39,6 @@ public class RemoveFinishedPartitionOperation implements Operation {
 
         TaskState taskState = taskSyncContext.getCurrentTaskState();
 
-        Instant start = Instant.now();
         List<PartitionState> partitions = taskState.getPartitions().stream()
                 .map(
                         partitionState -> {
@@ -77,13 +76,6 @@ public class RemoveFinishedPartitionOperation implements Operation {
         if (taskState.getPartitions().size() != partitions.size()) {
             this.isRequiredPublishSyncEvent = true;
         }
-        Instant end = Instant.now();
-
-        LOGGER.warn(
-                "With task {}, Time for RemovedFinishedPartitions to remove partitions {} with partition count {} and removedPartitionCount {}",
-                taskSyncContext.getTaskUid(),
-                end.toEpochMilli() - start.toEpochMilli(),
-                taskSyncContext.getCurrentTaskState().getPartitions().size(), removedFinishedPartitions.size());
         return taskSyncContext.toBuilder()
                 .currentTaskState(taskState.toBuilder().partitions(partitions).build())
                 .build();

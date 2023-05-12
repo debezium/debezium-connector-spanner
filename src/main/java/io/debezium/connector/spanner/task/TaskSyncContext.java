@@ -147,7 +147,6 @@ public class TaskSyncContext {
                 .messageType(MessageTypeEnum.REGULAR)
                 .databaseSchemaTimestamp(databaseSchemaTimestamp)
                 .build();
-        checkDuplicationInTaskSyncEvent(result);
         return result;
     }
 
@@ -487,24 +486,5 @@ public class TaskSyncContext {
                 ", createdTimestamp=" + this.getCreatedTimestamp() +
                 ", taskStates=" + this.getTaskStates() +
                 ", currentTaskState=" + this.getCurrentTaskState() + ")";
-    }
-
-    private void checkDuplicationInTaskSyncEvent(TaskSyncEvent taskSyncContext) {
-        Map<String, List<PartitionState>> partitionsMap = taskSyncContext.getTaskStates().values().stream()
-                .flatMap(taskState -> taskState.getPartitions().stream())
-                .filter(
-                        partitionState -> !partitionState.getState().equals(PartitionStateEnum.FINISHED)
-                                && !partitionState.getState().equals(PartitionStateEnum.REMOVED))
-                .collect(Collectors.groupingBy(PartitionState::getToken));
-
-        Map<String, PartitionState> partitions = partitionsMap.entrySet().stream()
-                .map(entry -> new AbstractMap.SimpleEntry<>(entry.getKey(), entry.getValue().get(0)))
-                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
-
-        Map<String, List<PartitionState>> sharedPartitionsMap = taskSyncContext.getTaskStates().values().stream()
-                .flatMap(taskState -> taskState.getSharedPartitions().stream())
-                .filter(partitionState -> !partitions.containsKey(partitionState.getToken()))
-                .collect(Collectors.groupingBy(PartitionState::getToken));
-
     }
 }

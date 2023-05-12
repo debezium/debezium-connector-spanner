@@ -36,6 +36,7 @@ public class TakePartitionForStreamingOperation implements Operation {
     private final ChangeStream changeStream;
     private final PartitionFactory partitionFactory;
     private List<String> tokensScheduled = new ArrayList<String>();
+    private List<String> tokensRemoved = new ArrayList<String>();
 
     private boolean isRequiredPublishSyncEvent = false;
 
@@ -98,6 +99,7 @@ public class TakePartitionForStreamingOperation implements Operation {
                             isPartitionStreamingAlready(taskSyncContext.getTaskStates().values(), partitionState.getToken(), taskState.getTaskUid())) {
                         LOGGER.info("Removing streaming partition {} with state {} since partition is already streaming", partitionState.getToken(),
                                 partitionState.getState());
+                        tokensRemoved.add(partitionState.getToken());
                         return null;
                     }
                     return partitionState;
@@ -111,19 +113,12 @@ public class TakePartitionForStreamingOperation implements Operation {
     }
 
     private boolean isPartitionStreamingAlready(Collection<TaskState> taskStates, String token, String taskUid) {
-        Instant now = Instant.now();
         boolean isPartitionStreamingAlready = taskStates.stream().flatMap(taskState -> taskState.getPartitions().stream())
                 .filter(partitionState -> partitionState.getToken().equals(token))
                 .anyMatch(partitionState -> partitionState.getState().equals(PartitionStateEnum.SCHEDULED)
                         || partitionState.getState().equals(PartitionStateEnum.RUNNING)
                         || partitionState.getState().equals(PartitionStateEnum.FINISHED)
                         || partitionState.getState().equals(PartitionStateEnum.REMOVED));
-        Instant end = Instant.now();
-        LOGGER.warn(
-                "With task {}, Time for isPartitionStreamingAlready {}",
-                taskUid,
-                end.toEpochMilli() - now.toEpochMilli());
-
         return isPartitionStreamingAlready;
     }
 
@@ -143,17 +138,8 @@ public class TakePartitionForStreamingOperation implements Operation {
 
     @Override
     public TaskSyncContext doOperation(TaskSyncContext taskSyncContext) {
-        Instant now = Instant.now();
         taskSyncContext = removeAlreadyStreamingPartitions(taskSyncContext);
-        Instant removedPartitions = Instant.now();
         TaskSyncContext tookPartitionForStreaming = takePartitionForStreaming(taskSyncContext);
-        Instant tookStreaming = Instant.now();
-        LOGGER.warn(
-                "With task {}, Time for TakePartitionForStreaming to remove already streaming partitions {} and to take partition for streaming {} and partition count {} ",
-                taskSyncContext.getTaskUid(),
-                removedPartitions.toEpochMilli() - now.toEpochMilli(),
-                tookStreaming.toEpochMilli() - removedPartitions.toEpochMilli(),
-                taskSyncContext.getCurrentTaskState().getPartitions().size());
         return tookPartitionForStreaming;
     }
 
@@ -169,7 +155,7 @@ public class TakePartitionForStreamingOperation implements Operation {
 
     @Override
     public List<String> removedOwnedPartitions() {
-        return Collections.emptyList();
+        return tokensRemoved;
     }
 
     @Override

@@ -8,7 +8,6 @@ package io.debezium.connector.spanner.task;
 import static org.slf4j.LoggerFactory.getLogger;
 
 import java.time.Duration;
-import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.UnaryOperator;
@@ -37,7 +36,6 @@ public class TaskSyncContextHolder {
     private final ReentrantLock lock = new ReentrantLock();
 
     private final AtomicReference<TaskSyncContext> taskSyncContextRef = new AtomicReference<>();
-    private String holder;
 
     private final Duration sleepInterval = Duration.ofMillis(100);
     private final Clock clock;
@@ -45,7 +43,6 @@ public class TaskSyncContextHolder {
     public TaskSyncContextHolder(MetricsEventPublisher metricsEventPublisher) {
         this.metricsEventPublisher = metricsEventPublisher;
         this.clock = Clock.system();
-        this.holder = "The thread isn't locked in the current moment.";
     }
 
     public final void init(TaskSyncContext taskSyncContext) {
@@ -83,29 +80,10 @@ public class TaskSyncContextHolder {
 
     public void lock() {
         lock.lock();
-        Thread currentThread = Thread.currentThread();
-        String stackTrace = Arrays.toString(Thread.currentThread().getStackTrace()).replace(',', '\n');
-        holder = "Name: " + currentThread.getName() + " Stacktrace: " + stackTrace + "\n";
-    }
-
-    public boolean isLocked() {
-        return lock.isLocked();
     }
 
     public void unlock() {
         lock.unlock();
-    }
-
-    public String getHolder() {
-        if (lock.isLocked()) {
-            return holder;
-        }
-        return "The thread isn't locked in the current moment.";
-    }
-
-    public int getHoldCount() {
-        return lock.getHoldCount();
-
     }
 
     public boolean isHeldByCurrentThread() {
