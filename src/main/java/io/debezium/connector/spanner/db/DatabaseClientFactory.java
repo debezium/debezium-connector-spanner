@@ -12,12 +12,14 @@ import java.io.IOException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.google.api.gax.rpc.FixedHeaderProvider;
 import com.google.auth.oauth2.GoogleCredentials;
 import com.google.cloud.spanner.DatabaseClient;
 import com.google.cloud.spanner.DatabaseId;
 import com.google.cloud.spanner.SpannerOptions;
 import com.google.common.annotations.VisibleForTesting;
 
+import io.debezium.connector.spanner.Module;
 import io.debezium.connector.spanner.SpannerConnectorConfig;
 import io.debezium.util.Strings;
 
@@ -27,6 +29,7 @@ import io.debezium.util.Strings;
 public class DatabaseClientFactory {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(DatabaseClientFactory.class);
+    private static final String USER_AGENT_PREFIX = "kafka-change-streams-connector-";
 
     private final String projectId;
     private final String instanceId;
@@ -57,7 +60,8 @@ public class DatabaseClientFactory {
         if (!Strings.isNullOrEmpty(databaseRole)) {
             builder.setDatabaseRole(databaseRole);
         }
-
+        String userAgentString = USER_AGENT_PREFIX + Module.version();
+        builder.setHeaderProvider(FixedHeaderProvider.create("user-agent", userAgentString));
         this.options = builder.build();
     }
 
