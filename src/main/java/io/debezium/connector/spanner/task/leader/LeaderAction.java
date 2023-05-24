@@ -115,7 +115,7 @@ public class LeaderAction {
 
         taskSyncPublisher.send(taskSyncContext.buildUpdateEpochTaskSyncEvent());
 
-        LOGGER.info("Task {} - Epoch offset has been incremented and published {}:{}",
+        LOGGER.info("Task {} - Leader task has updated the epoch offset with rebalance generation ID: {} and epoch offset: {}",
                 taskSyncContextHolder.get().getTaskUid(), taskSyncContext.getRebalanceGenerationId(), taskSyncContext.getEpochOffsetHolder().getEpochOffset());
 
         return taskSyncContext;
@@ -156,6 +156,11 @@ public class LeaderAction {
 
         LOGGER.info("performLeaderActions: answers received {}", consumerToTaskMap);
 
+        TaskSyncContext staleContext = taskSyncContextHolder.get();
+        if (staleContext.checkDuplication(true, "Rebalance New Epoch Old Context")) {
+            LOGGER.warn("task {}, Duplication exists before rebalance event with old context {}", staleContext.getTaskUid(), staleContext);
+        }
+
         TaskSyncContext taskSyncContext = taskSyncContextHolder.updateAndGet(oldContext -> {
             TaskState leaderState = oldContext.getCurrentTaskState();
 
@@ -175,6 +180,12 @@ public class LeaderAction {
                     .epochOffsetHolder(oldContext.getEpochOffsetHolder().nextOffset(oldContext.getCurrentKafkaRecordOffset()))
                     .build();
         });
+
+        if (taskSyncContext.checkDuplication(true, "Rebalance New Epoch New Context")) {
+            LOGGER.warn("task {}, Duplication exists after rebalance event with old context {}", taskSyncContext.getTaskUid(), staleContext);
+            LOGGER.warn("task {}, Duplication exists after rebalance event with resulting context {}", taskSyncContext.getTaskUid(), taskSyncContext);
+            LOGGER.warn("task {}, Duplication exists after rebalance event with surviving tasks {}", taskSyncContext.getTaskUid(), consumerToTaskMap);
+        }
 
         TaskSyncEvent taskSyncEvent = taskSyncContext.buildNewEpochTaskSyncEvent();
 

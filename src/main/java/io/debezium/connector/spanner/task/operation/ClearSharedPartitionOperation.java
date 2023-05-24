@@ -32,11 +32,18 @@ public class ClearSharedPartitionOperation implements Operation {
 
         TaskState currentTaskState = taskSyncContext.getCurrentTaskState();
 
+        // Retrieve the tokens that are owned by other tasks.
         Set<String> tokens = taskSyncContext.getTaskStates().values().stream().flatMap(taskState -> taskState.getPartitions().stream()).map(PartitionState::getToken)
                 .collect(Collectors.toSet());
 
+        // Retrieve the other alive tasks.
+        Set<String> otherTasks = taskSyncContext.getTaskStates().values().stream().map(taskState -> taskState.getTaskUid()).collect(Collectors.toSet());
+
         List<PartitionState> newSharedList = currentTaskState.getSharedPartitions().stream()
+                // Filter out the tokens that are owned by the other tasks.
                 .filter(state -> !tokens.contains(state.getToken()))
+                // Filter out the tokens that are not assigned to any alive tasks.
+                .filter(state -> otherTasks.contains(state.getAssigneeTaskUid()))
                 .collect(Collectors.toList());
 
         if (newSharedList.size() != currentTaskState.getSharedPartitions().size()) {
@@ -46,6 +53,12 @@ public class ClearSharedPartitionOperation implements Operation {
 
         for (PartitionState partition : currentTaskState.getSharedPartitions()) {
             if (!newSharedList.contains(partition)) {
+                if (!tokens.contains(partition.getToken())) {
+                    LOGGER.info("TaskUid: {}, cleared shared token {}, because already owned by another task", taskSyncContext.getTaskUid(), partition);
+                }
+                else {
+                    LOGGER.info("TaskUid: {}, cleared shared token {}, because shared to dead task", taskSyncContext.getTaskUid(), partition);
+                }
                 removedSharedTokens.add(partition.getToken());
             }
         }

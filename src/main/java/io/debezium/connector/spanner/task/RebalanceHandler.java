@@ -40,7 +40,8 @@ public class RebalanceHandler {
     }
 
     public void process(boolean isLeader, String consumerId, long rebalanceGenerationId) throws InterruptedException {
-        LOGGER.info("processRebalancingEvent: start, consumerId: {}, rebalanceGenerationId: {}", consumerId, rebalanceGenerationId);
+        LOGGER.info("Task {}, processRebalancingEvent: start, consumerId: {}, rebalanceGenerationId: {}", taskSyncContextHolder.get().getTaskUid(), consumerId,
+                rebalanceGenerationId);
 
         this.leaderAction.stop();
 

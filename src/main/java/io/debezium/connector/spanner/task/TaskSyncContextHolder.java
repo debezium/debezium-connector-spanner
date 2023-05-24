@@ -34,6 +34,7 @@ public class TaskSyncContextHolder {
 
     private final MetricsEventPublisher metricsEventPublisher;
     private final ReentrantLock lock = new ReentrantLock();
+    private final AtomicReference<Boolean> saw_duplication = new AtomicReference<>();
 
     private final AtomicReference<TaskSyncContext> taskSyncContextRef = new AtomicReference<>();
 
@@ -43,6 +44,7 @@ public class TaskSyncContextHolder {
     public TaskSyncContextHolder(MetricsEventPublisher metricsEventPublisher) {
         this.metricsEventPublisher = metricsEventPublisher;
         this.clock = Clock.system();
+        this.saw_duplication.set(false);
     }
 
     public final void init(TaskSyncContext taskSyncContext) {
@@ -84,6 +86,14 @@ public class TaskSyncContextHolder {
 
     public void unlock() {
         lock.unlock();
+    }
+
+    public void set_saw_duplication() {
+        this.saw_duplication.set(true);
+    }
+
+    public boolean saw_duplication() {
+        return this.saw_duplication.get();
     }
 
     public boolean isHeldByCurrentThread() {

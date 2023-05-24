@@ -89,6 +89,7 @@ public class SpannerChangeStream implements ChangeStream {
         try {
             while (runningFlagSupplier.getAsBoolean()) {
                 if (signal.await(WAIT_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS) && exception.get() != null) {
+                    LOGGER.warn("Task {}, is throwing exception during streaming {}", exception.get());
                     throw exception.get();
                 }
 
@@ -124,10 +125,11 @@ public class SpannerChangeStream implements ChangeStream {
                 Thread.currentThread().interrupt();
             }
             catch (Exception ex) {
-                LOGGER.info("Exception during streaming {} from partition with token {}", ex.getMessage(), partition.getToken());
+                LOGGER.info("Exception during streaming {} from partition with token {}, CHECK IF TASK FAILED", ex.getMessage(), partition.getToken());
 
                 if (this.onError(partition, ex)) {
-                    LOGGER.info("Received irretriable error during streaming {} from partition with token {}", ex.getMessage(), partition.getToken());
+                    LOGGER.info("Received irretriable error during streaming {} from partition with token {}, CHECK IF TASK FAILED", ex.getMessage(),
+                            partition.getToken());
                     return;
                 }
 
@@ -135,8 +137,8 @@ public class SpannerChangeStream implements ChangeStream {
                     partitionEventListener.onException(partition, ex);
                 }
                 catch (InterruptedException e) {
-                    LOGGER.info("Interrupting streaming partition task with token {} and exception {}", partition.getToken(), e);
-                    Thread.currentThread().interrupt();
+                    LOGGER.info("Interrupting streaming partition task with token {} and exception {}, SHOULD NEVER REACH THIS POINT, CHECK IF TASK FAILED",
+                            partition.getToken(), e);
                 }
             }
             finally {

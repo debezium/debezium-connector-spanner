@@ -38,10 +38,12 @@ public class SyncEventMerger {
 
     // Apply the deltas from the new message onto the current task state.
     public static TaskSyncContext mergeIncrementalTaskSyncEvent(TaskSyncContext currentContext, TaskSyncEvent newMessage) {
+        boolean foundDuplication = false;
+        if (currentContext.checkDuplication(false, "INCREMENTAL EVENT")) {
+            foundDuplication = true;
+        }
         Map<String, TaskState> newTaskStatesMap = newMessage.getTaskStates();
         debug(LOGGER, "merge: state before {}, \nIncoming states: {}", currentContext, newTaskStatesMap);
-        LOGGER.info("Task: {}, Processed incremental answer from task {}: {}", currentContext.getTaskUid(), newMessage.getTaskUid(),
-                newMessage);
 
         // Get the current context.
         var builder = currentContext.toBuilder();
@@ -60,7 +62,6 @@ public class SyncEventMerger {
 
         // We only update our internal copy of the other task's state.
         TaskState currentTask = currentContext.getTaskStates().get(newMessage.getTaskUid());
-
         if (currentTask == null) {
             // If the in-memory task sync event does not contain the other task, we insert
             // the new task into the task states map.
@@ -119,7 +120,21 @@ public class SyncEventMerger {
                             newMessage.getMessageTimestamp()));
         }
         LOGGER.debug("merge: final state is not changed");
-        return builder.build();
+        TaskSyncContext newTaskSyncContext = builder
+                .build();
+        LOGGER.info("Task: {}, Processed incremental answer from task {}: newTask state timestamp {}, current task state timestamp {}, new tokens {}, shared tokens {}",
+                currentContext.getTaskUid(), newMessage.getTaskUid(), newTask.getStateTimestamp(), currentTask.getStateTimestamp(), newTask.getPartitions(),
+                newTask.getSharedPartitions());
+        LOGGER.info("Task: {}, Processed incremental answer from task {}: newTask state timestamp {}, current task state timestamp {}, resulting state {}",
+                currentContext.getTaskUid(), newMessage.getTaskUid(), newTask.getStateTimestamp(), currentTask.getStateTimestamp(),
+                newTaskSyncContext.getTaskStates().get(newMessage.getTaskUid()));
+
+        if (!foundDuplication && newTaskSyncContext.checkDuplication(true, "INCREMENTAL EVENT")) {
+            LOGGER.warn("Task {}, duplication exists after processing incremental message, old context {}", currentContext.getTaskUid(), currentContext);
+            LOGGER.warn("Task {}, duplication exists after processing incremental message, new message {}", currentContext.getTaskUid(), newMessage);
+            LOGGER.warn("Task {}, duplication exists after processing incremental message, resulting context {}", currentContext.getTaskUid(), newTaskSyncContext);
+        }
+        return newTaskSyncContext;
     }
 
     // Take in the new task's snapshot.
@@ -169,6 +184,10 @@ public class SyncEventMerger {
         debug(LOGGER, "merge: state before {}, \nIncoming states: {}", currentContext, newTaskStatesMap);
 
         var builder = currentContext.toBuilder();
+        // If the current task is the leader, there is no need to merge the epoch update.
+        if (newMessage.getTaskUid().equals(currentContext.getTaskUid())) {
+            return builder.build();
+        }
 
         Set<String> updatedStatesUids = new HashSet<>();
 
@@ -203,7 +222,11 @@ public class SyncEventMerger {
             builder.taskStates(mergedTaskStates)
                     .createdTimestamp(Long.max(currentContext.getCreatedTimestamp(), newMessage.getMessageTimestamp()));
 
+            // Update the epoch offset from the leader's epoch offset.
+            LOGGER.info("Task {}, updating the epoch offset from the leader update epoch {}: {}", currentContext.getTaskUid(), newMessage.getTaskUid(),
+                    newMessage.getEpochOffset());
             TaskSyncContext result = builder
+                    .epochOffsetHolder(currentContext.getEpochOffsetHolder().nextOffset(newMessage.getEpochOffset()))
                     .build();
 
             debug(LOGGER, "merge: final state {}, \nUpdated uids: {}, epoch: {}",
@@ -217,45 +240,49 @@ public class SyncEventMerger {
 
     // Take in an entire snapshot.
     public static TaskSyncContext mergeNewEpoch(TaskSyncContext currentContext, TaskSyncEvent newMessage) {
+        boolean foundDuplication = false;
+        if (currentContext.checkDuplication(true, "Merge new epoch")) {
+            foundDuplication = true;
+            LOGGER.warn("Task {}, duplication exists before processing new epoch, old context {}", currentContext.getTaskUid(), currentContext);
+        }
+
         var builder = currentContext.toBuilder();
+        // If the current task is the leader, there is no need to merge the epoch update.
+        if (newMessage.getTaskUid().equals(currentContext.getTaskUid())) {
+            return builder.build();
+        }
         Map<String, TaskState> newTaskStates = new HashMap<>(newMessage.getTaskStates());
         newTaskStates.remove(currentContext.getTaskUid());
 
-        List<String> newEpochAllPartitions = newTaskStates.values().stream()
-                .flatMap(taskState -> taskState.getPartitions().stream())
-                .map(partitionState -> partitionState.getToken())
-                .collect(Collectors.toList());
-
-        List<String> newEpochSharedPartitions = newTaskStates.values().stream()
-                .flatMap(taskState -> taskState.getSharedPartitions().stream())
-                .map(partitionState -> partitionState.getToken())
-                .collect(Collectors.toList());
-
         TaskState currentTask = currentContext.getCurrentTaskState();
-        // The current task may have partitions that were shared to the dead task. The leader
-        // should have redistributed those partitions as part of the rebalance event handling
-        // and included the redistribued partitions in its owned or shared list in the new epoch
-        // message. We should make sure to clear those partitions from the task's share list.
-        List<PartitionState> currentSharedPartitions = currentTask.getSharedPartitions().stream()
-                .filter(partitionState -> !newEpochAllPartitions.contains(partitionState.getToken()))
-                .filter(partitionState -> !newEpochSharedPartitions.contains(partitionState.getToken()))
-                .collect(Collectors.toList());
+        TaskState newCurrentTask = currentTask.toBuilder().rebalanceGenerationId(newMessage.getRebalanceGenerationId()).build();
 
-        TaskState newCurrentTask = currentTask.toBuilder()
-                .sharedPartitions(currentSharedPartitions).build();
+        LOGGER.info("Task {}, updating the epoch offset from the leader new epoch {}: {}", currentContext.getTaskUid(), newMessage.getTaskUid(),
+                newMessage.getEpochOffset());
 
-        // When we receive NEW_EPOCH messages, we clear all task states belonging to tasks
-        // other than the current task state, and replace them with entries from the
-        // NEW_EPOCH message.
-        builder.rebalanceState(RebalanceState.NEW_EPOCH_STARTED)
+        if (RebalanceState.START_INITIAL_SYNC.equals(currentContext.getRebalanceState())) {
+            // Update the rebalance generation ID in case we are processing from previous states.
+            LOGGER.info("Task {}, updating the rebalance generation ID from the leader new epoch {}: {}", currentContext.getTaskUid(), newMessage.getTaskUid(),
+                    newMessage.getRebalanceGenerationId());
+            builder.rebalanceGenerationId(newMessage.getRebalanceGenerationId());
+        }
+        else {
+            builder.rebalanceState(RebalanceState.NEW_EPOCH_STARTED);
+
+        }
+        builder
                 .createdTimestamp(newMessage.getMessageTimestamp())
+                // Update the epoch offset from the leader's epoch offset.
+                .epochOffsetHolder(currentContext.getEpochOffsetHolder().nextOffset(newMessage.getEpochOffset()))
                 .taskStates(newTaskStates)
-                // update timestamp for the current task state
-                .currentTaskState(newCurrentTask
-                        .toBuilder()
-                        .stateTimestamp(newMessage.getMessageTimestamp())
-                        .build());
+                .currentTaskState(newCurrentTask);
         TaskSyncContext result = builder.build();
+        if (!foundDuplication && result.checkDuplication(true, "NEW EPOCH")) {
+            LOGGER.warn("Task {}, duplication exists after processing new epoch, old context {}", result.getTaskUid(), currentContext);
+            LOGGER.warn("Task {}, duplication exists after processing new epoch, new message {}", result.getTaskUid(), newMessage);
+            LOGGER.warn("Task {}, duplication exists after processing new epoch, resulting context {}", result.getTaskUid(), result);
+        }
+
         return result;
     }
 

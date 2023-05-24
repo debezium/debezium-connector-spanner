@@ -60,10 +60,13 @@ public class LowWatermarkCalculator {
                                 && !partitionState.getState().equals(PartitionStateEnum.REMOVED))
                 .collect(Collectors.groupingBy(PartitionState::getToken));
 
+        int numPartitions = partitionsMap.size();
+
         Set<String> duplicatesInPartitions = checkDuplication(partitionsMap);
         if (!duplicatesInPartitions.isEmpty() && printOffsets) {
             LOGGER.warn(
-                    "task: {}, calculateLowWatermark: found duplication in partitionsMap: {}", taskSyncContextHolder.get().getTaskUid(), duplicatesInPartitions);
+                    "task: {}, calculateLowWatermark: found duplication in partitionsMap with size {}: {}", taskSyncContextHolder.get().getTaskUid(), numPartitions,
+                    duplicatesInPartitions);
             return null;
         }
 
@@ -76,11 +79,13 @@ public class LowWatermarkCalculator {
                 .filter(partitionState -> !partitions.containsKey(partitionState.getToken()))
                 .collect(Collectors.groupingBy(PartitionState::getToken));
 
+        int numSharedPartitions = sharedPartitionsMap.size();
+
         Set<String> duplicatesInSharedPartitions = checkDuplication(sharedPartitionsMap);
-        if (!duplicatesInSharedPartitions.isEmpty()) {
+        if (!duplicatesInSharedPartitions.isEmpty() && printOffsets) {
             LOGGER.warn(
-                    "calculateLowWatermark: found duplication in sharedPartitionsMap: {}",
-                    duplicatesInSharedPartitions);
+                    "task {}, calculateLowWatermark: found duplication in sharedPartitionsMap with size {}: {}",
+                    taskSyncContextHolder.get().getTaskUid(), numSharedPartitions, duplicatesInSharedPartitions);
             return null;
         }
 
@@ -94,6 +99,15 @@ public class LowWatermarkCalculator {
 
         allPartitions.putAll(sharedPartitions);
 
+        if (printOffsets) {
+            LOGGER.warn(
+                    "task: {}, numPartitions: {}, numSharedPartitions {}, task sync context {}",
+                    taskSyncContextHolder.get().getTaskUid(),
+                    partitions.size(),
+                    sharedPartitions.size(),
+                    taskSyncContextHolder.get());
+        }
+
         if (allPartitions.containsKey(InitialPartition.PARTITION_TOKEN)) {
             final long now = new Date().getTime();
             long lag = now
@@ -102,9 +116,10 @@ public class LowWatermarkCalculator {
                             .getStartTimestamp()
                             .toDate()
                             .getTime();
-            if (lag > OFFSET_MONITORING_LAG_MAX_MS) {
+            if (lag > OFFSET_MONITORING_LAG_MAX_MS && printOffsets) {
                 LOGGER.warn(
-                        "Partition has a very old start timestamp, lag: {}, token: {}",
+                        "task: {}, Partition has a very old start timestamp, lag: {}, token: {}, numPartitions: {}, numSharedPartitions {}",
+                        taskSyncContextHolder.get().getTaskUid(),
                         lag,
                         InitialPartition.PARTITION_TOKEN);
             }
@@ -119,26 +134,27 @@ public class LowWatermarkCalculator {
         catch (ConnectException e) {
             if (e.getCause() != null && e.getCause() instanceof InterruptedException) {
                 LOGGER.info(
-                        "Kafka connect offsetStorageReader is interrupting... Thread interrupted: {}",
-                        Thread.currentThread().isInterrupted());
+                        "Task {}, Kafka connect offsetStorageReader is interrupting... Thread interrupted: {}",
+                        taskSyncContextHolder.get().getTaskUid(), Thread.currentThread().isInterrupted());
             }
             else {
                 LOGGER.warn(
-                        "Kafka connect offsetStorageReader cannot return offsets. Thread interrupted: {}. {}",
-                        Thread.currentThread().isInterrupted(),
+                        "Task {}, Kafka connect offsetStorageReader cannot return offsets. Thread interrupted: {}. {}, throwing error",
+                        taskSyncContextHolder.get().getTaskUid(), Thread.currentThread().isInterrupted(),
                         SpannerErrorHandler.getStackTrace(e));
+                throw e;
             }
             return null;
         }
         catch (RuntimeException e) {
             LOGGER.warn(
-                    "Kafka connect offsetStorageReader cannot return offsets {}",
-                    SpannerErrorHandler.getStackTrace(e));
+                    "Task {}, Kafka connect offsetStorageReader cannot return offsets {}",
+                    taskSyncContextHolder.get().getTaskUid(), SpannerErrorHandler.getStackTrace(e));
             return null;
         }
 
         if (printOffsets) {
-            monitorOffsets(offsets, allPartitions);
+            monitorOffsets(offsets, allPartitions, numPartitions, numSharedPartitions);
         }
 
         return allPartitions.values().stream()
@@ -158,11 +174,15 @@ public class LowWatermarkCalculator {
                 .orElse(spannerConnectorConfig.startTime());
     }
 
-    private void monitorOffsets(Map<String, Timestamp> offsets, Map<String, PartitionState> allPartitions) {
+    private void monitorOffsets(Map<String, Timestamp> offsets, Map<String, PartitionState> allPartitions, int numPartitions, int numSharedPartitions) {
         if (offsets == null) {
             return;
         }
         final long now = new Date().getTime();
+        List<String> ownedPartitions = taskSyncContextHolder.get().getCurrentTaskState().getPartitions().stream().map(partitionState -> partitionState.getToken())
+                .collect(Collectors.toList());
+        List<String> sharedPartitions = taskSyncContextHolder.get().getCurrentTaskState().getSharedPartitions().stream().map(partitionState -> partitionState.getToken())
+                .collect(Collectors.toList());
 
         allPartitions.values().forEach(
                 partitionState -> {
@@ -171,14 +191,26 @@ public class LowWatermarkCalculator {
                         String token = partitionState.getToken();
                         long lag = now - timestamp.toDate().getTime();
                         if (lag > OFFSET_MONITORING_LAG_MAX_MS) {
-                            LOGGER.warn("Partition has a very old offset, lag: {}, token: {}, state: {}", lag, token, partitionState.getState());
+                            LOGGER.warn(
+                                    "task {}, Partition has a very old offset, lag: {}, token: {}, state: {}, fullToken: {}, numPartitions: {}, numSharedPartitions {}, owned by current task {}, shared by current task {}",
+                                    taskSyncContextHolder.get().getTaskUid(), lag, token,
+                                    partitionState.getState(), partitionState, numPartitions, numSharedPartitions,
+                                    ownedPartitions.contains(token), sharedPartitions.contains(token));
+                            LOGGER.warn("task {}, Extra logs Partition has a very old offset, lag: {}, token: {}, current task sync context {}",
+                                    taskSyncContextHolder.get().getTaskUid(), lag, token, taskSyncContextHolder.get());
                         }
                     }
                     else if (partitionState.getStartTimestamp() != null) {
                         String token = partitionState.getToken();
                         long lag = now - partitionState.getStartTimestamp().toDate().getTime();
                         if (lag > OFFSET_MONITORING_LAG_MAX_MS) {
-                            LOGGER.warn("Partition has a very old start time, lag: {}, token: {}, state: {}", lag, token, partitionState.getState());
+                            LOGGER.warn(
+                                    "task {}, Partition has a very old start time, lag: {}, token: {}, state: {}, fullToken: {}, numPartitions: {}, numSharedPartitions {}, owned by current task {}, shared by current task {}",
+                                    taskSyncContextHolder.get().getTaskUid(), lag,
+                                    token, partitionState.getState(), partitionState, numPartitions, numSharedPartitions, ownedPartitions.contains(token),
+                                    sharedPartitions.contains(token));
+                            LOGGER.warn("task {}, Extra logs Partition has a very old offset, lag: {}, token: {}, current task sync context {}",
+                                    taskSyncContextHolder.get().getTaskUid(), lag, token, taskSyncContextHolder.get());
                         }
                     }
                 });

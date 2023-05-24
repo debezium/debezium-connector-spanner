@@ -5,7 +5,6 @@
  */
 package io.debezium.connector.spanner.task.operation;
 
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;

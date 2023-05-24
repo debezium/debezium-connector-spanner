@@ -114,4 +114,8 @@ public class SpannerChangeStreamService {
         }
     }
 
+    public String getTaskUid() {
+        return this.taskUid;
+    }
+
 }

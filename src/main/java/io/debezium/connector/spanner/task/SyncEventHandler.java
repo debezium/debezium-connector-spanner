@@ -59,15 +59,26 @@ public class SyncEventHandler {
             return;
         }
 
+        TaskSyncContext oldContext = taskSyncContextHolder.get();
         process(inSync, metadata);
 
+        if (inSync != null) {
+            if (taskSyncContextHolder.get().checkDuplication(true,
+                    "New Task " + taskSyncContextHolder.get().getTaskUid() + "Processing Previous States with message type: " +
+                            inSync.getMessageType())) {
+                LOGGER.warn("task {}, Duplication exists after processing previous message", taskSyncContextHolder.get().getTaskUid());
+            }
+            LOGGER.warn("Task {} Processing previous states with old context {}", taskSyncContextHolder.get().getTaskUid(), oldContext);
+            LOGGER.warn("Task {} Processing previous states with resulting context {}", taskSyncContextHolder.get().getTaskUid(), taskSyncContextHolder.get());
+        }
+
         if (metadata.isCanInitiateRebalancing()) {
-            LOGGER.debug("Task {} - processPreviousStates - switch state to INITIAL_INCREMENTED_STATE_COMPLETED",
+            LOGGER.info("Task {} - processPreviousStates - switch state to INITIAL_INCREMENTED_STATE_COMPLETED",
                     taskSyncContextHolder.get().getTaskUid());
 
             taskSyncContextHolder.update(context -> context.toBuilder()
                     .rebalanceState(RebalanceState.INITIAL_INCREMENTED_STATE_COMPLETED)
-                    .epochOffsetHolder(context.getEpochOffsetHolder().nextOffset(context.getCurrentKafkaRecordOffset()))
+                    // We will leave the epoch offset as 0, since only leader is in charge of updating epoch offset.
                     .build());
         }
     }
@@ -79,8 +90,12 @@ public class SyncEventHandler {
             long currentGeneration = taskSyncContextHolder.get().getRebalanceGenerationId();
             long inGeneration = inSync.getRebalanceGenerationId();
 
-            if (taskSyncContextHolder.get().getRebalanceState() == RebalanceState.INITIAL_INCREMENTED_STATE_COMPLETED &&
-                    inGeneration >= currentGeneration) { // We ignore messages with a stale rebalanceGenerationid.
+            // Let's say that the task just started up, and it hasn't connected to the Rebalance
+            // topic yet, and needs to process previous new epoch messages.
+            boolean start_initial_sync = taskSyncContextHolder.get().getRebalanceState() == RebalanceState.START_INITIAL_SYNC;
+
+            if (start_initial_sync || (taskSyncContextHolder.get().getRebalanceState() == RebalanceState.INITIAL_INCREMENTED_STATE_COMPLETED &&
+                    inGeneration >= currentGeneration)) { // We ignore messages with a stale rebalanceGenerationid.
 
                 LOGGER.info("Task {} - processNewEpoch {}: metadata {}, rebalanceId: {}, current task {}",
                         taskSyncContextHolder.get().getTaskUid(),
@@ -108,7 +123,9 @@ public class SyncEventHandler {
         taskSyncContextHolder.lock();
         try {
 
-            if (!taskSyncContextHolder.get().getRebalanceState().equals(RebalanceState.NEW_EPOCH_STARTED)) {
+            boolean start_initial_sync = taskSyncContextHolder.get().getRebalanceState() == RebalanceState.START_INITIAL_SYNC;
+
+            if (!start_initial_sync && !taskSyncContextHolder.get().getRebalanceState().equals(RebalanceState.NEW_EPOCH_STARTED)) {
                 return;
             }
 
@@ -200,7 +217,7 @@ public class SyncEventHandler {
             long currentGeneration = taskSyncContextHolder.get().getRebalanceGenerationId();
 
             if (inGeneration < currentGeneration) {
-                LOGGER.debug("skipFromPreviousGeneration: currentGen: {}, inGen: {}, inTaskUid: {}", currentGeneration, inGeneration, inSync.getTaskUid());
+                LOGGER.info("skipFromPreviousGeneration: currentGen: {}, inGen: {}, inTaskUid: {}", currentGeneration, inGeneration, inSync.getTaskUid());
                 return true;
             }
         }
