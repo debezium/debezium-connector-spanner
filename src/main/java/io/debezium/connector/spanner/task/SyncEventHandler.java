@@ -7,6 +7,9 @@ package io.debezium.connector.spanner.task;
 
 import static org.slf4j.LoggerFactory.getLogger;
 
+import java.util.Set;
+import java.util.stream.Collectors;
+
 import org.slf4j.Logger;
 
 import io.debezium.connector.spanner.kafka.internal.TaskSyncPublisher;
@@ -53,7 +56,7 @@ public class SyncEventHandler {
         LOGGER.debug("Task {} - update task sync topic offset with {}", taskSyncContextHolder.get().getTaskUid(), metadata.getOffset());
     }
 
-    public void processPreviousStates(TaskSyncEvent inSync, SyncEventMetadata metadata) {
+    public void processPreviousStates(TaskSyncEvent inSync, SyncEventMetadata metadata) throws InterruptedException, IllegalStateException {
 
         if (!RebalanceState.START_INITIAL_SYNC.equals(taskSyncContextHolder.get().getRebalanceState())) {
             return;
@@ -83,7 +86,7 @@ public class SyncEventHandler {
         }
     }
 
-    public void processNewEpoch(TaskSyncEvent inSync, SyncEventMetadata metadata) throws InterruptedException {
+    public void processNewEpoch(TaskSyncEvent inSync, SyncEventMetadata metadata) throws InterruptedException, IllegalStateException {
         taskSyncContextHolder.lock();
         try {
 
@@ -103,6 +106,15 @@ public class SyncEventHandler {
                         taskSyncContextHolder.get(),
                         metadata,
                         taskSyncContextHolder.get().getRebalanceGenerationId());
+
+                Set<String> allNewEpochTasks = inSync.getTaskStates().values().stream().map(taskState -> taskState.getTaskUid()).collect(Collectors.toSet());
+                if (!start_initial_sync && !allNewEpochTasks.contains(taskSyncContextHolder.get().getTaskUid())) {
+                    LOGGER.warn("Task {} - Received new epoch message , but leader did not include the task in the new epoch message {}, this task should have died",
+                            taskSyncContextHolder.get().getTaskUid(), allNewEpochTasks);
+                    return;
+                    // throw new IllegalStateException(
+                    // "Task " + taskSyncContextHolder.get().getTaskUid() + " was not included in all epoch tasks " + allNewEpochTasks.toString());
+                }
 
                 taskSyncContextHolder.update(context -> SyncEventMerger.mergeNewEpoch(context, inSync));
 
@@ -182,7 +194,7 @@ public class SyncEventHandler {
         }
     }
 
-    public void process(TaskSyncEvent inSync, SyncEventMetadata metadata) {
+    public void process(TaskSyncEvent inSync, SyncEventMetadata metadata) throws InterruptedException, IllegalStateException {
         if (inSync == null) {
             return;
         }
@@ -205,9 +217,9 @@ public class SyncEventHandler {
                 processNewEpoch(inSync, metadata);
             }
         }
-
         catch (Exception e) {
             LOGGER.error("Exception during processing task message {}, {}", inSync, e);
+            throw e;
         }
     }
 

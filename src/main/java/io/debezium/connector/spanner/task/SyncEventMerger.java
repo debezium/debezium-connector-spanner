@@ -59,17 +59,25 @@ public class SyncEventMerger {
         if (newTask.getTaskUid().equals(currentContext.getTaskUid())) {
             return builder.build();
         }
+      
+        // We don't want to process the message if the message we received doesn't contain
+        // our ID. We are probably a dead task.
+        TaskState curTaskInNewMessage = newTaskStatesMap.get(currentContext.getTaskUid());
+        if (curTaskInNewMessage == null) {
+           LOGGER.warn("The new message task state map {} for {} did not contain the task's UID: {}, ignoring message {}, CHECK IF TASK IS DEAD",
+               newTaskStatesMap, newMessage.getTaskUid(), currentContext.getTaskUid(),
+               newMessage);
+          return builder.build();
+        }
 
         // We only update our internal copy of the other task's state.
         TaskState currentTask = currentContext.getTaskStates().get(newMessage.getTaskUid());
         if (currentTask == null) {
-            // If the in-memory task sync event does not contain the other task, we insert
-            // the new task into the task states map.
-            Map<String, TaskState> currentTaskStates = new HashMap<>(currentContext.getTaskStates());
-            currentTaskStates.put(newMessage.getTaskUid(), newTask);
-            builder.taskStates(currentTaskStates)
-                    .createdTimestamp(Long.max(currentContext.getCreatedTimestamp(),
-                            newMessage.getMessageTimestamp()));
+            // If the in-memory task sync event does not contain the other task, we don't do
+            // anything here. We assume that the task was not included in the new epoch message.
+            LOGGER.warn("The current task state map for {} did not contain the message's UID: {}, ignoring message {}", currentContext.getTaskUid(),
+                    newMessage.getTaskUid(), newMessage);
+            return builder.build();
         }
         else if (newTask.getStateTimestamp() > currentTask.getStateTimestamp()) {
             Instant beforeProcessing = Instant.now();
@@ -243,7 +251,6 @@ public class SyncEventMerger {
         boolean foundDuplication = false;
         if (currentContext.checkDuplication(true, "Merge new epoch")) {
             foundDuplication = true;
-            LOGGER.warn("Task {}, duplication exists before processing new epoch, old context {}", currentContext.getTaskUid(), currentContext);
         }
 
         var builder = currentContext.toBuilder();
