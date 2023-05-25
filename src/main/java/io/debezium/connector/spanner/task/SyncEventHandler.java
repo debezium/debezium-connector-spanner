@@ -7,9 +7,6 @@ package io.debezium.connector.spanner.task;
 
 import static org.slf4j.LoggerFactory.getLogger;
 
-import java.util.Set;
-import java.util.stream.Collectors;
-
 import org.slf4j.Logger;
 
 import io.debezium.connector.spanner.kafka.internal.TaskSyncPublisher;
@@ -106,15 +103,6 @@ public class SyncEventHandler {
                         taskSyncContextHolder.get(),
                         metadata,
                         taskSyncContextHolder.get().getRebalanceGenerationId());
-
-                Set<String> allNewEpochTasks = inSync.getTaskStates().values().stream().map(taskState -> taskState.getTaskUid()).collect(Collectors.toSet());
-                if (!start_initial_sync && !allNewEpochTasks.contains(taskSyncContextHolder.get().getTaskUid())) {
-                    LOGGER.warn("Task {} - Received new epoch message , but leader did not include the task in the new epoch message {}, this task should have died",
-                            taskSyncContextHolder.get().getTaskUid(), allNewEpochTasks);
-                    return;
-                    // throw new IllegalStateException(
-                    // "Task " + taskSyncContextHolder.get().getTaskUid() + " was not included in all epoch tasks " + allNewEpochTasks.toString());
-                }
 
                 taskSyncContextHolder.update(context -> SyncEventMerger.mergeNewEpoch(context, inSync));
 

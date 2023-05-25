@@ -10,6 +10,7 @@ import static java.util.stream.Collectors.toUnmodifiableMap;
 import static org.slf4j.LoggerFactory.getLogger;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -58,16 +59,6 @@ public class SyncEventMerger {
         // We don't want to reprocess the current task's incremental message.
         if (newTask.getTaskUid().equals(currentContext.getTaskUid())) {
             return builder.build();
-        }
-      
-        // We don't want to process the message if the message we received doesn't contain
-        // our ID. We are probably a dead task.
-        TaskState curTaskInNewMessage = newTaskStatesMap.get(currentContext.getTaskUid());
-        if (curTaskInNewMessage == null) {
-           LOGGER.warn("The new message task state map {} for {} did not contain the task's UID: {}, ignoring message {}, CHECK IF TASK IS DEAD",
-               newTaskStatesMap, newMessage.getTaskUid(), currentContext.getTaskUid(),
-               newMessage);
-          return builder.build();
         }
 
         // We only update our internal copy of the other task's state.
@@ -248,12 +239,31 @@ public class SyncEventMerger {
 
     // Take in an entire snapshot.
     public static TaskSyncContext mergeNewEpoch(TaskSyncContext currentContext, TaskSyncEvent newMessage) {
+        var builder = currentContext.toBuilder();
+        Set<String> allNewEpochTasks = newMessage.getTaskStates().values().stream().map(taskState -> taskState.getTaskUid()).collect(Collectors.toSet());
+        boolean start_initial_sync = currentContext.getRebalanceState() == RebalanceState.START_INITIAL_SYNC;
+        if (!start_initial_sync && !allNewEpochTasks.contains(currentContext.getTaskUid())) {
+            LOGGER.warn(
+                    "Task {} - Received new epoch message , but leader did not include the task in the new epoch message {}, this task should have died, changing to ZOMBIE STATE and clearing all partitions / shared partitions",
+                    currentContext.getTaskUid(), allNewEpochTasks);
+
+            List<PartitionState> emptyList = new ArrayList<>();
+            TaskState newCurrentTask = currentContext.getCurrentTaskState().toBuilder().partitions(emptyList).sharedPartitions(emptyList).build();
+
+            builder.rebalanceState(RebalanceState.ZOMBIE_STATE)
+                    .createdTimestamp(newMessage.getMessageTimestamp())
+                    .currentTaskState(newCurrentTask);
+
+            return builder.build();
+            // throw new IllegalStateException(
+            // "Task " + taskSyncContextHolder.get().getTaskUid() + " was not included in all epoch tasks " + allNewEpochTasks.toString());
+        }
+
         boolean foundDuplication = false;
         if (currentContext.checkDuplication(true, "Merge new epoch")) {
             foundDuplication = true;
         }
 
-        var builder = currentContext.toBuilder();
         // If the current task is the leader, there is no need to merge the epoch update.
         if (newMessage.getTaskUid().equals(currentContext.getTaskUid())) {
             return builder.build();

@@ -96,9 +96,9 @@ public class TaskStateChangeEventHandler {
                 new FindPartitionForStreamingOperation(),
                 new TakePartitionForStreamingOperation(changeStream, partitionFactory),
                 new RemoveFinishedPartitionOperation());
-        if (taskSyncContextHolder.get().checkDuplication(true, "Task State Change Event Handler: " + event.getClass().getSimpleName())) {
-            LOGGER.warn("task {}, Duplication exists after processing task state change", taskSyncContextHolder.get().getTaskUid());
-        }
+        // if (taskSyncContextHolder.get().checkDuplication(true, "Task State Change Event Handler: " + event.getClass().getSimpleName())) {
+        // LOGGER.warn("task {}, Duplication exists after processing task state change", taskSyncContextHolder.get().getTaskUid());
+        // }
     }
 
     private void processEvent(NewPartitionsEvent newPartitionsEvent) throws InterruptedException {
@@ -107,9 +107,9 @@ public class TaskStateChangeEventHandler {
                 new FindPartitionForStreamingOperation(),
                 new TakePartitionForStreamingOperation(changeStream, partitionFactory),
                 new RemoveFinishedPartitionOperation());
-        if (taskSyncContextHolder.get().checkDuplication(true, "Task State Change Event Handler: " + newPartitionsEvent.getClass().getSimpleName())) {
-            LOGGER.warn("task {}, Duplication exists after processing task state change", taskSyncContextHolder.get().getTaskUid());
-        }
+        // if (taskSyncContextHolder.get().checkDuplication(true, "Task State Change Event Handler: " + newPartitionsEvent.getClass().getSimpleName())) {
+        // LOGGER.warn("task {}, Duplication exists after processing task state change", taskSyncContextHolder.get().getTaskUid());
+        // }
     }
 
     private void processSyncEvent() throws InterruptedException {
@@ -120,9 +120,9 @@ public class TaskStateChangeEventHandler {
                 new TakePartitionForStreamingOperation(changeStream, partitionFactory),
                 new RemoveFinishedPartitionOperation(),
                 new ConnectorEndDetectionOperation(finishingHandler, connectorConfig.endTime()));
-        if (taskSyncContextHolder.get().checkDuplication(true, "Task State Change Event Handler: " + "sync event")) {
-            LOGGER.warn("task {}, Duplication exists after processing task state change", taskSyncContextHolder.get().getTaskUid());
-        }
+        // if (taskSyncContextHolder.get().checkDuplication(true, "Task State Change Event Handler: " + "sync event")) {
+        // LOGGER.warn("task {}, Duplication exists after processing task state change", taskSyncContextHolder.get().getTaskUid());
+        // }
 
         failOverloadedTaskByTimer(taskSyncContext);
     }

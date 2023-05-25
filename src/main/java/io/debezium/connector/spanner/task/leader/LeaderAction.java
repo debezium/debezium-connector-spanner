@@ -157,8 +157,10 @@ public class LeaderAction {
         LOGGER.info("performLeaderActions: answers received {}", consumerToTaskMap);
 
         TaskSyncContext staleContext = taskSyncContextHolder.get();
+        boolean foundDuplication = false;
         if (staleContext.checkDuplication(true, "Rebalance New Epoch Old Context")) {
-            LOGGER.warn("task {}, Duplication exists before rebalance event with old context {}", staleContext.getTaskUid(), staleContext);
+            foundDuplication = true;
+
         }
 
         TaskSyncContext taskSyncContext = taskSyncContextHolder.updateAndGet(oldContext -> {
@@ -181,7 +183,7 @@ public class LeaderAction {
                     .build();
         });
 
-        if (taskSyncContext.checkDuplication(true, "Rebalance New Epoch New Context")) {
+        if (!foundDuplication && taskSyncContext.checkDuplication(true, "Rebalance New Epoch New Context")) {
             LOGGER.warn("task {}, Duplication exists after rebalance event with old context {}", taskSyncContext.getTaskUid(), staleContext);
             LOGGER.warn("task {}, Duplication exists after rebalance event with resulting context {}", taskSyncContext.getTaskUid(), taskSyncContext);
             LOGGER.warn("task {}, Duplication exists after rebalance event with surviving tasks {}", taskSyncContext.getTaskUid(), consumerToTaskMap);
