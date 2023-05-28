@@ -9,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doReturn;
@@ -22,6 +23,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Map;
+import java.util.Properties;
 import java.util.function.Function;
 import java.util.stream.Stream;
 
@@ -36,6 +38,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 import com.fasterxml.jackson.databind.node.MissingNode;
 
 import io.debezium.config.Configuration;
+import io.debezium.config.Field;
 import io.debezium.connector.spanner.SpannerConnectorConfig;
 import io.debezium.connector.spanner.SpannerPartition;
 import io.debezium.connector.spanner.context.offset.SpannerOffsetContext;
@@ -56,9 +59,13 @@ class SpannerChangeRecordEmitterTest {
         Mod mod = new Mod(0, keysJsonNode, oldValuesJsonNode, MissingNode.getInstance());
 
         SpannerPartition initialSpannerPartition = SpannerPartition.getInitialSpannerPartition();
+        Configuration config = mock(Configuration.class);
+        when(config.getString(anyString())).thenReturn("String");
+        when(config.getString((Field) any())).thenReturn("String");
+        when(config.asProperties()).thenReturn(new Properties());
         SpannerChangeRecordEmitter actualSpannerChangeRecordEmitter = new SpannerChangeRecordEmitter(
                 "1234", ModType.INSERT, mod, initialSpannerPartition, mock(SpannerOffsetContext.class), mock(Clock.class),
-                new SpannerConnectorConfig(Configuration.empty()));
+                new SpannerConnectorConfig(config));
 
         SpannerPartition partition = actualSpannerChangeRecordEmitter.getPartition();
         assertSame(initialSpannerPartition, partition);
@@ -81,10 +88,14 @@ class SpannerChangeRecordEmitterTest {
     @MethodSource("summaryStringProvider")
     void testGetOperation(ModType modType, Envelope.Operation expected) {
         Mod mod = new Mod(0, MissingNode.getInstance(), MissingNode.getInstance(), MissingNode.getInstance());
+        Configuration config = mock(Configuration.class);
+        when(config.getString(anyString())).thenReturn("String");
+        when(config.getString((Field) any())).thenReturn("String");
+        when(config.asProperties()).thenReturn(new Properties());
         assertEquals(expected,
                 new SpannerChangeRecordEmitter(
                         "1234", modType, mod, SpannerPartition.getInitialSpannerPartition(),
-                        mock(SpannerOffsetContext.class), mock(Clock.class), new SpannerConnectorConfig(Configuration.empty())).getOperation());
+                        mock(SpannerOffsetContext.class), mock(Clock.class), new SpannerConnectorConfig(config)).getOperation());
     }
 
     @Test
@@ -98,8 +109,13 @@ class SpannerChangeRecordEmitterTest {
         MissingNode oldValuesJsonNode = MissingNode.getInstance();
         Mod mod = new Mod(0, keysJsonNode, oldValuesJsonNode, MissingNode.getInstance());
 
+        Configuration config = mock(Configuration.class);
+        when(config.getString(anyString())).thenReturn("String");
+        when(config.getString((Field) any())).thenReturn("String");
+        when(config.asProperties()).thenReturn(new Properties());
+
         SpannerChangeRecordEmitter spannerChangeRecordEmitter = spy(new SpannerChangeRecordEmitter("1234", ModType.INSERT,
-                mod, SpannerPartition.getInitialSpannerPartition(), spannerOffsetContext, clock, new SpannerConnectorConfig(Configuration.empty())));
+                mod, SpannerPartition.getInitialSpannerPartition(), spannerOffsetContext, clock, new SpannerConnectorConfig(config)));
         Function<Mod, Struct> function = (Function<Mod, Struct>) mock(Function.class);
         when(function.apply(any())).thenThrow(new IllegalArgumentException());
         TableId id = TableId.getTableId("Table Name");
@@ -142,8 +158,13 @@ class SpannerChangeRecordEmitterTest {
         MissingNode oldValuesJsonNode = MissingNode.getInstance();
         Mod mod = new Mod(0, keysJsonNode, oldValuesJsonNode, MissingNode.getInstance());
 
+        Configuration config = mock(Configuration.class);
+        when(config.getString(anyString())).thenReturn("String");
+        when(config.getString((Field) any())).thenReturn("String");
+        when(config.asProperties()).thenReturn(new Properties());
+
         SpannerChangeRecordEmitter spannerChangeRecordEmitter = spy(new SpannerChangeRecordEmitter("1234", ModType.INSERT,
-                mod, SpannerPartition.getInitialSpannerPartition(), spannerOffsetContext, clock, new SpannerConnectorConfig(Configuration.empty())));
+                mod, SpannerPartition.getInitialSpannerPartition(), spannerOffsetContext, clock, new SpannerConnectorConfig(config)));
         Function<Mod, Struct> function = (Function<Mod, Struct>) mock(Function.class);
         when(function.apply(any())).thenThrow(new IllegalArgumentException());
         TableId id = TableId.getTableId("Table Name");
@@ -182,8 +203,13 @@ class SpannerChangeRecordEmitterTest {
         MissingNode oldValuesJsonNode = MissingNode.getInstance();
         Mod mod = new Mod(0, keysJsonNode, oldValuesJsonNode, MissingNode.getInstance());
 
+        Configuration config = mock(Configuration.class);
+        when(config.getString(anyString())).thenReturn("String");
+        when(config.getString((Field) any())).thenReturn("String");
+        when(config.asProperties()).thenReturn(new Properties());
+
         SpannerChangeRecordEmitter spannerChangeRecordEmitter = new SpannerChangeRecordEmitter("1234", ModType.INSERT,
-                mod, SpannerPartition.getInitialSpannerPartition(), spannerOffsetContext, clock, new SpannerConnectorConfig(Configuration.empty()));
+                mod, SpannerPartition.getInitialSpannerPartition(), spannerOffsetContext, clock, new SpannerConnectorConfig(config));
         TableId id = TableId.getTableId("Table Name");
         ConnectSchema keySchema = new ConnectSchema(Schema.Type.INT8);
         Function<Mod, Struct> keyGenerator = (Function<Mod, Struct>) mock(Function.class);
@@ -209,10 +235,13 @@ class SpannerChangeRecordEmitterTest {
         MissingNode oldValuesJsonNode = MissingNode.getInstance();
         Mod mod = new Mod(0, keysJsonNode, oldValuesJsonNode, MissingNode.getInstance());
 
-        Configuration configuration = mock(Configuration.class);
+        Configuration config = mock(Configuration.class);
+        when(config.getString(anyString())).thenReturn("String");
+        when(config.getString((Field) any())).thenReturn("String");
+        when(config.asProperties()).thenReturn(new Properties());
 
         SpannerChangeRecordEmitter spannerChangeRecordEmitter = new SpannerChangeRecordEmitter("1234", ModType.INSERT,
-                mod, SpannerPartition.getInitialSpannerPartition(), mock(SpannerOffsetContext.class), mock(Clock.class), new SpannerConnectorConfig(configuration));
+                mod, SpannerPartition.getInitialSpannerPartition(), mock(SpannerOffsetContext.class), mock(Clock.class), new SpannerConnectorConfig(config));
         TableId id = TableId.getTableId("Table Name");
         ConnectSchema keySchema = new ConnectSchema(Schema.Type.INT8);
         Function<Mod, Struct> keyGenerator = (Function<Mod, Struct>) mock(Function.class);
