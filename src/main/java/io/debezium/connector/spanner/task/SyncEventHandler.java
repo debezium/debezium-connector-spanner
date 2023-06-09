@@ -9,6 +9,8 @@ import static org.slf4j.LoggerFactory.getLogger;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 
@@ -18,6 +20,7 @@ import io.debezium.connector.spanner.kafka.internal.model.RebalanceState;
 import io.debezium.connector.spanner.kafka.internal.model.SyncEventMetadata;
 import io.debezium.connector.spanner.kafka.internal.model.TaskState;
 import io.debezium.connector.spanner.kafka.internal.model.TaskSyncEvent;
+import io.debezium.connector.spanner.task.operation.CheckPartitionDuplicationOperation;
 import io.debezium.connector.spanner.task.state.SyncEvent;
 import io.debezium.connector.spanner.task.state.TaskStateChangeEvent;
 import io.debezium.function.BlockingConsumer;
@@ -103,7 +106,10 @@ public class SyncEventHandler {
 
             long currentGeneration = taskSyncContextHolder.get().getRebalanceGenerationId();
             long inGeneration = inSync.getRebalanceGenerationId();
-
+            boolean foundDuplication = false;
+            if (taskSyncContextHolder.get().checkDuplication(false, "Before Merge New Epoch")) {
+                foundDuplication = true;
+            }
             if (taskSyncContextHolder.get().getRebalanceState() == RebalanceState.INITIAL_INCREMENTED_STATE_COMPLETED &&
                     inSync.getMessageType() == MessageTypeEnum.NEW_EPOCH &&
                     inGeneration >= currentGeneration) { // We ignore messages with a stale rebalanceGenerationid.
@@ -115,6 +121,8 @@ public class SyncEventHandler {
                         taskSyncContextHolder.get().getRebalanceGenerationId());
 
                 Map<String, TaskState> taskStates = new HashMap<>(inSync.getTaskStates());
+                Set<String> allNewEpochTasks = taskStates.values().stream().map(taskState -> taskState.getTaskUid()).collect(Collectors.toSet());
+
                 taskStates.remove(taskSyncContextHolder.get().getTaskUid());
                 // When we receive NEW_EPOCH messages, we clear all task states belonging to tasks
                 // other than the current task state, and replace them with entries from the
@@ -131,10 +139,22 @@ public class SyncEventHandler {
                                 .build())
                         .build());
 
+                // If current task is not included in the coming new epoch message, this task is probably dead. We remove the duplicate partitions in this dead task
+                // to prevent it from furthering contributing duplicate tasks to the sync topic.
+                if (!allNewEpochTasks.contains(taskSyncContextHolder.get().getTaskUid())) {
+                    LOGGER.warn(
+                            "Task {} - Received new epoch message , but leader did not include the task in the new epoch message {}, this task should have died",
+                            taskSyncContextHolder.get().getTaskUid(), allNewEpochTasks);
+                    CheckPartitionDuplicationOperation dedupOp = new CheckPartitionDuplicationOperation();
+                    taskSyncContextHolder.update((context) -> dedupOp.doOperation(context));
+                }
                 LOGGER.debug("Task {} - SyncEventHandler sent response for new epoch", taskSyncContextHolder.get().getTaskUid());
-
                 taskSyncPublisher.send(taskSyncContextHolder.get().buildTaskSyncEvent());
+                if (!foundDuplication && taskSyncContextHolder.get().checkDuplication(false, "Process New Epoch After Merge")) {
+                    LOGGER.warn("Duplication exists after process new epoch message on task {}, ", taskSyncContextHolder.get().getTaskUid());
+                }
             }
+
         }
         finally {
             taskSyncContextHolder.unlock();
@@ -162,6 +182,7 @@ public class SyncEventHandler {
             taskSyncContextHolder.update(context -> SyncEventMerger.merge(context, inSync));
 
             eventConsumer.accept(new SyncEvent());
+
         }
         finally {
             taskSyncContextHolder.unlock();

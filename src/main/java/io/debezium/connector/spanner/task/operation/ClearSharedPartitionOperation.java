@@ -32,8 +32,11 @@ public class ClearSharedPartitionOperation implements Operation {
         Set<String> tokens = taskSyncContext.getTaskStates().values().stream().flatMap(taskState -> taskState.getPartitions().stream()).map(PartitionState::getToken)
                 .collect(Collectors.toSet());
 
+        Set<String> otherTasks = taskSyncContext.getTaskStates().values().stream().map(taskState -> taskState.getTaskUid()).collect(Collectors.toSet());
+
         List<PartitionState> newSharedList = currentTaskState.getSharedPartitions().stream()
                 .filter(state -> !tokens.contains(state.getToken()))
+                .filter(state -> otherTasks.contains(state.getAssigneeTaskUid()))
                 .collect(Collectors.toList());
 
         if (newSharedList.size() != currentTaskState.getSharedPartitions().size()) {

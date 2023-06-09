@@ -155,7 +155,21 @@ public class LeaderAction {
                 activeConsumers,
                 taskSyncContextHolder.get().getRebalanceGenerationId());
 
+        // If leader did not receive answers from all tasks successfully, it should not send a new epoch message.
+        if (consumerToTaskMap.size() < activeConsumers.size()) {
+            LOGGER.error("Terminate new epoch: expected answers from {} consumers but only {} were found", activeConsumers.size(),
+                    consumerToTaskMap.size());
+            throw new InterruptedException();
+        }
+
         LOGGER.info("performLeaderActions: answers received {}", consumerToTaskMap);
+
+        TaskSyncContext staleContext = taskSyncContextHolder.get();
+        boolean foundDuplication = false;
+        if (staleContext.checkDuplication(false, "Rebalance New Epoch Old Context")) {
+            LOGGER.warn("Duplication exists before rebalance event with old context {}", staleContext);
+            foundDuplication = true;
+        }
 
         TaskSyncContext taskSyncContext = taskSyncContextHolder.updateAndGet(oldContext -> {
             TaskState leaderState = oldContext.getCurrentTaskState();
@@ -176,6 +190,12 @@ public class LeaderAction {
                     .epochOffsetHolder(oldContext.getEpochOffsetHolder().nextOffset(oldContext.getCurrentKafkaRecordOffset()))
                     .build();
         });
+
+        if (!foundDuplication && taskSyncContext.checkDuplication(false, "Rebalance New Epoch New Context")) {
+            LOGGER.warn("Duplication exists after rebalance event with old context {} task {}, ", taskSyncContext.getTaskUid(), staleContext);
+            LOGGER.warn("Duplication exists after rebalance event with resulting context {} task {},", taskSyncContext.getTaskUid(), taskSyncContext);
+            LOGGER.warn("Duplication exists after rebalance event with surviving tasks {} task {},", taskSyncContext.getTaskUid(), consumerToTaskMap);
+        }
 
         TaskSyncEvent taskSyncEvent = taskSyncContext.buildTaskSyncEvent(MessageTypeEnum.NEW_EPOCH);
 

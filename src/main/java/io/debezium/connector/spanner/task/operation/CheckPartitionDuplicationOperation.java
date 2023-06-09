@@ -40,6 +40,10 @@ public class CheckPartitionDuplicationOperation implements Operation {
         this.changeStream = changeStream;
     }
 
+    public CheckPartitionDuplicationOperation() {
+        this.changeStream = null;
+    }
+
     @Override
     public boolean isRequiredPublishSyncEvent() {
         return isRequiredPublishSyncEvent;
@@ -58,14 +62,20 @@ public class CheckPartitionDuplicationOperation implements Operation {
                 continue;
             }
 
-            this.isRequiredPublishSyncEvent = needToStopStreaming(taskSyncContext.getTaskUid(), taskUidPartitionState);
-
-            if (isRequiredPublishSyncEvent) {
-                taskSyncContext = stopStreaming(taskSyncContext, partitionState);
-                LOGGER.debug("Stop streaming the partition: {}", token);
+            if (this.changeStream == null) {
+                if (needToRemoveFromDeadTask(taskSyncContext.getTaskUid(), taskUidPartitionState)) {
+                    taskSyncContext = removeFromDeadTask(taskSyncContext, partitionState);
+                }
             }
             else {
-                LOGGER.warn("Continue streaming the partition: {}", token);
+                this.isRequiredPublishSyncEvent = needToStopStreaming(taskSyncContext.getTaskUid(), taskUidPartitionState);
+                if (isRequiredPublishSyncEvent) {
+                    taskSyncContext = stopStreaming(taskSyncContext, partitionState);
+                    LOGGER.debug("Stop streaming the partition: {}", token);
+                }
+                else {
+                    LOGGER.warn("Continue streaming the partition: {}", token);
+                }
             }
         }
 
@@ -94,10 +104,39 @@ public class CheckPartitionDuplicationOperation implements Operation {
         return !ConflictResolver.hasPriority(currentTaskUid, tasks);
     }
 
+    private boolean needToRemoveFromDeadTask(String currentTaskUid,
+                                             Map<String, PartitionState> taskUidPartitionState) {
+
+        Set<String> tasks = taskUidPartitionState.entrySet().stream()
+                .map(Map.Entry::getKey).collect(Collectors.toSet());
+
+        return !ConflictResolver.hasPriority(currentTaskUid, tasks);
+    }
+
     private TaskSyncContext stopStreaming(TaskSyncContext taskSyncContext, PartitionState state) {
         String token = state.getToken();
 
         changeStream.stop(token);
+
+        TaskState currentTaskState = taskSyncContext.getCurrentTaskState();
+
+        List<PartitionState> partitions = currentTaskState.getPartitions().stream()
+                .map(partitionState -> {
+                    if (partitionState.getToken().equals(token)) {
+                        return null;
+                    }
+                    return partitionState;
+                })
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
+
+        return taskSyncContext.toBuilder()
+                .currentTaskState(currentTaskState.toBuilder().partitions(partitions).build())
+                .build();
+    }
+
+    private TaskSyncContext removeFromDeadTask(TaskSyncContext taskSyncContext, PartitionState state) {
+        String token = state.getToken();
 
         TaskState currentTaskState = taskSyncContext.getCurrentTaskState();
 

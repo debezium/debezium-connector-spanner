@@ -62,8 +62,7 @@ public class LowWatermarkCalculator {
 
         Set<String> duplicatesInPartitions = checkDuplication(partitionsMap);
         if (!duplicatesInPartitions.isEmpty()) {
-            LOGGER.warn(
-                    "calculateLowWatermark: found duplication in partitionsMap: {}", duplicatesInPartitions);
+            LOGGER.warn("calculateLowWatermark: found duplication in partitionsMap: {}", duplicatesInPartitions);
             return null;
         }
 
