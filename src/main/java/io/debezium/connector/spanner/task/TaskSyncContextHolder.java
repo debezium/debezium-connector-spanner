@@ -99,7 +99,6 @@ public class TaskSyncContextHolder {
     }
 
     public void awaitNewEpoch() {
-        LOGGER.info("beginning Awaiting new epoch {}", this.get().getTaskUid());
         while (!RebalanceState.NEW_EPOCH_STARTED.equals(this.get().getRebalanceState())) {
             if (Thread.interrupted()) {
                 Thread.currentThread().interrupt();
@@ -109,7 +108,6 @@ public class TaskSyncContextHolder {
 
             try {
                 // Sleep for sleepInterval.
-                LOGGER.info("Awaiting new epoch {}", this.get().getTaskUid());
                 metronome.pause();
             }
             catch (InterruptedException e) {

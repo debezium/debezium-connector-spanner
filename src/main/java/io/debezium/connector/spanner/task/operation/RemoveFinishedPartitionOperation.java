@@ -65,6 +65,7 @@ public class RemoveFinishedPartitionOperation implements Operation {
                                 LOGGER.info(
                                         "Partition {} will not be removed from the task since deletion timestamp"
                                                 + " {}, finished timestamp {} is less than now {}",
+                                        partitionState,
                                         deletionTime,
                                         partitionState.getFinishedTimestamp(),
                                         currentTime);

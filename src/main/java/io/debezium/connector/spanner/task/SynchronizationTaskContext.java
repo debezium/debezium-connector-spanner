@@ -205,17 +205,23 @@ public class SynchronizationTaskContext {
 
         try {
             this.taskSyncEventListener.shutdown();
+            LOGGER.info("Task {}, Shut down TaskSyncEventListener", this.taskSyncContextHolder.get().getTaskUid());
             this.rebalancingEventListener.shutdown();
+            LOGGER.info("Task {}, Shut down rebalancingEventListener", this.taskSyncContextHolder.get().getTaskUid());
 
             this.taskStateChangeEventProcessor.stopProcessing();
+            LOGGER.info("Task {}, Shut down TaskStateChangeEventProcessor", this.taskSyncContextHolder.get().getTaskUid());
 
             this.lowWatermarkCalculationJob.stop();
+            LOGGER.info("Task {}, Shut down LowWatermarkCalculationJob", this.taskSyncContextHolder.get().getTaskUid());
 
             this.rebalanceHandler.destroy();
+            LOGGER.info("Task {}, Shut down rebalance handler", this.taskSyncContextHolder.get().getTaskUid());
             this.taskSyncPublisher.close();
+            LOGGER.info("Task {}, Shut down TaskSyncPublisher", this.taskSyncContextHolder.get().getTaskUid());
         }
         catch (Throwable ex) {
-            LOGGER.warn("Exception during sync context destroying", ex);
+            LOGGER.warn("Task {}, Exception during sync context destroying", this.taskSyncContextHolder.get().getTaskUid(), ex);
         }
 
     }

@@ -62,8 +62,10 @@ public class LowWatermarkCalculator {
 
         Set<String> duplicatesInPartitions = checkDuplication(partitionsMap);
         if (!duplicatesInPartitions.isEmpty()) {
-            LOGGER.warn(
-                    "calculateLowWatermark: found duplication in partitionsMap: {}", duplicatesInPartitions);
+            if (printOffsets) {
+                LOGGER.warn(
+                        "calculateLowWatermark: found duplication in partitionsMap: {}", duplicatesInPartitions);
+            }
             return null;
         }
 
@@ -78,9 +80,11 @@ public class LowWatermarkCalculator {
 
         Set<String> duplicatesInSharedPartitions = checkDuplication(sharedPartitionsMap);
         if (!duplicatesInSharedPartitions.isEmpty()) {
-            LOGGER.warn(
-                    "calculateLowWatermark: found duplication in sharedPartitionsMap: {}",
-                    duplicatesInSharedPartitions);
+            if (printOffsets) {
+                LOGGER.warn(
+                        "calculateLowWatermark: found duplication in sharedPartitionsMap: {}",
+                        duplicatesInSharedPartitions);
+            }
             return null;
         }
 
