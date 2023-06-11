@@ -22,7 +22,6 @@ import com.google.cloud.Timestamp;
 
 import io.debezium.connector.spanner.SpannerConnectorConfig;
 import io.debezium.connector.spanner.db.model.Partition;
-import io.debezium.connector.spanner.exception.SpannerConnectorException;
 import io.debezium.connector.spanner.kafka.internal.model.PartitionStateEnum;
 import io.debezium.connector.spanner.kafka.internal.model.TaskState;
 import io.debezium.connector.spanner.metrics.MetricsEventPublisher;
@@ -111,7 +110,7 @@ public class LeaderService {
 
             if (timeoutMeter.isExpired()) {
                 LOGGER.error("Task {} : Not received all answers from tasks", taskSyncContextHolder.get().getTaskUid());
-                errorHandler.setProducerThrowable(new SpannerConnectorException("Not received all answers from tasks"));
+                // errorHandler.setProducerThrowable(new SpannerConnectorException("Not received all answers from tasks"));
                 break;
             }
 
@@ -135,7 +134,7 @@ public class LeaderService {
                     new RebalanceMetricEvent(consumerToTaskMap.size(), consumers.size()));
 
         }
-        LOGGER.info("awaitAllNewTaskStateUpdates: all new task updated the state: {}", consumerToTaskMap);
+        LOGGER.info("awaitAllNewTaskStateUpdates: new task updated the state: {}", consumerToTaskMap);
         return consumerToTaskMap;
     }
 

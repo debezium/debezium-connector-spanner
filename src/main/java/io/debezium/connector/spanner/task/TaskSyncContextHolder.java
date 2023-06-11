@@ -87,10 +87,11 @@ public class TaskSyncContextHolder {
     }
 
     public void awaitInitialization() {
-        LOGGER.debug("awaitInitialization: start");
+        LOGGER.info("awaitInitialization: start");
         TimeoutMeter timeout = TimeoutMeter.setTimeout(AWAIT_TIME_TIME_OUT);
         while (RebalanceState.START_INITIAL_SYNC.equals(this.get().getRebalanceState())) {
             if (timeout.isExpired()) {
+                LOGGER.info("Await task initialization timeout expired");
                 throw new SpannerConnectorException("Await task initialization timeout expired");
             }
         }
@@ -98,6 +99,7 @@ public class TaskSyncContextHolder {
     }
 
     public void awaitNewEpoch() {
+        LOGGER.info("beginning Awaiting new epoch {}", this.get().getTaskUid());
         while (!RebalanceState.NEW_EPOCH_STARTED.equals(this.get().getRebalanceState())) {
             if (Thread.interrupted()) {
                 Thread.currentThread().interrupt();
@@ -107,6 +109,7 @@ public class TaskSyncContextHolder {
 
             try {
                 // Sleep for sleepInterval.
+                LOGGER.info("Awaiting new epoch {}", this.get().getTaskUid());
                 metronome.pause();
             }
             catch (InterruptedException e) {

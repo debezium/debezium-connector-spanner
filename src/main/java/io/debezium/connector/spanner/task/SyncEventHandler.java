@@ -90,7 +90,7 @@ public class SyncEventHandler {
         }
     }
 
-    public void processNewEpoch(TaskSyncEvent inSync, SyncEventMetadata metadata) throws InterruptedException {
+    public void processNewEpoch(TaskSyncEvent inSync, SyncEventMetadata metadata) throws InterruptedException, IllegalStateException {
         if (inSync == null) {
             return;
         }
@@ -115,6 +115,17 @@ public class SyncEventHandler {
                         taskSyncContextHolder.get().getRebalanceGenerationId());
 
                 Map<String, TaskState> taskStates = new HashMap<>(inSync.getTaskStates());
+
+                if (!taskStates.containsKey(taskSyncContextHolder.get().getTaskUid())) {
+                    LOGGER.info("Task {}, new epoch message {} does not contain task state, terminating", taskSyncContextHolder.get().getTaskUid(), inSync);
+                    throw new IllegalStateException("New epoch message does not contain task state " + taskSyncContextHolder.get().getTaskUid());
+                }
+
+                TaskSyncContext staleContext = taskSyncContextHolder.get();
+                boolean foundDuplication = false;
+                if (staleContext.checkDuplication(true, "Process New Epoch Old Context")) {
+                    foundDuplication = true;
+                }
                 taskStates.remove(taskSyncContextHolder.get().getTaskUid());
                 // When we receive NEW_EPOCH messages, we clear all task states belonging to tasks
                 // other than the current task state, and replace them with entries from the
@@ -131,7 +142,11 @@ public class SyncEventHandler {
                                 .build())
                         .build());
 
-                LOGGER.debug("Task {} - SyncEventHandler sent response for new epoch", taskSyncContextHolder.get().getTaskUid());
+                if (!foundDuplication) {
+                    taskSyncContextHolder.get().checkDuplication(true, "Process New Epoch New Context");
+                }
+
+                LOGGER.info("Task {} - SyncEventHandler sent response for new epoch", taskSyncContextHolder.get().getTaskUid());
 
                 taskSyncPublisher.send(taskSyncContextHolder.get().buildTaskSyncEvent());
             }

@@ -6,15 +6,24 @@
 package io.debezium.connector.spanner.task;
 
 import static java.util.Collections.emptyList;
+import static org.slf4j.LoggerFactory.getLogger;
 
 import java.time.Instant;
+import java.util.AbstractMap;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+import org.slf4j.Logger;
 
 import com.google.cloud.Timestamp;
 
 import io.debezium.connector.spanner.SpannerConnectorConfig;
 import io.debezium.connector.spanner.kafka.internal.model.MessageTypeEnum;
+import io.debezium.connector.spanner.kafka.internal.model.PartitionState;
+import io.debezium.connector.spanner.kafka.internal.model.PartitionStateEnum;
 import io.debezium.connector.spanner.kafka.internal.model.RebalanceState;
 import io.debezium.connector.spanner.kafka.internal.model.TaskState;
 import io.debezium.connector.spanner.kafka.internal.model.TaskSyncEvent;
@@ -25,6 +34,8 @@ import io.debezium.connector.spanner.kafka.internal.model.TaskSyncEvent;
  * the Sync Topic
  */
 public class TaskSyncContext {
+    private static final Logger LOGGER = getLogger(TaskSyncContext.class);
+
     private final String taskUid;
     private final RebalanceState rebalanceState;
     private final String consumerId;
@@ -340,6 +351,55 @@ public class TaskSyncContext {
         return this.initialized;
     }
 
+    public boolean checkDuplication(boolean printOffsets, String loggingString) {
+        Map<String, List<PartitionState>> partitionsMap = getAllTaskStates().values().stream()
+                .flatMap(taskState -> taskState.getPartitions().stream())
+                .filter(
+                        partitionState -> !partitionState.getState().equals(PartitionStateEnum.FINISHED)
+                                && !partitionState.getState().equals(PartitionStateEnum.REMOVED))
+                .collect(Collectors.groupingBy(PartitionState::getToken));
+
+        int numPartitions = partitionsMap.size();
+
+        Set<String> duplicatesInPartitions = checkDuplicationInMap(partitionsMap);
+        if (!duplicatesInPartitions.isEmpty()) {
+            if (printOffsets) {
+                LOGGER.warn(
+                        "task: {}, logging {}, taskSyncContext: found duplication in partitionsMap with size {}: {}, {}", getTaskUid(), loggingString, numPartitions,
+                        duplicatesInPartitions, getAllTaskStates());
+            }
+            return true;
+        }
+
+        Map<String, PartitionState> partitions = partitionsMap.entrySet().stream()
+                .map(entry -> new AbstractMap.SimpleEntry<>(entry.getKey(), entry.getValue().get(0)))
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+
+        Map<String, List<PartitionState>> sharedPartitionsMap = getAllTaskStates().values().stream()
+                .flatMap(taskState -> taskState.getSharedPartitions().stream())
+                .filter(partitionState -> !partitions.containsKey(partitionState.getToken()))
+                .collect(Collectors.groupingBy(PartitionState::getToken));
+
+        int numSharedPartitions = sharedPartitionsMap.size();
+
+        Set<String> duplicatesInSharedPartitions = checkDuplicationInMap(sharedPartitionsMap);
+        if (!duplicatesInSharedPartitions.isEmpty()) {
+            if (printOffsets) {
+                LOGGER.warn(
+                        "task: {}, logging {}, taskSyncContext: found duplication in sharedPartitionsMap with size {}: {}, {}",
+                        getTaskUid(), loggingString, numSharedPartitions, duplicatesInSharedPartitions, getAllTaskStates());
+            }
+            return true;
+        }
+        if (printOffsets) {
+            LOGGER.warn(
+                    "task: {}, logging {}, taskSyncContext: counted num partitions {} and num shared partitions {} ",
+                    getTaskUid(), loggingString, numPartitions,
+                    numSharedPartitions);
+        }
+        return false;
+    }
+
     @Override
     public String toString() {
         return "TaskSyncContext(taskUid=" + this.getTaskUid() +
@@ -352,5 +412,12 @@ public class TaskSyncContext {
                 ", createdTimestamp=" + this.getCreatedTimestamp() +
                 ", taskStates=" + this.getTaskStates() +
                 ", currentTaskState=" + this.getCurrentTaskState() + ")";
+    }
+
+    private Set<String> checkDuplicationInMap(Map<String, List<PartitionState>> map) {
+        return map.entrySet().stream()
+                .filter(entry -> entry.getValue().size() > 1)
+                .map(Map.Entry::getKey)
+                .collect(Collectors.toUnmodifiableSet());
     }
 }

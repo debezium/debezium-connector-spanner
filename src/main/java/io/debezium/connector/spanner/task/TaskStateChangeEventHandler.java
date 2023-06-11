@@ -17,7 +17,6 @@ import io.debezium.connector.spanner.SpannerConnectorConfig;
 import io.debezium.connector.spanner.db.stream.ChangeStream;
 import io.debezium.connector.spanner.exception.SpannerConnectorException;
 import io.debezium.connector.spanner.kafka.internal.TaskSyncPublisher;
-import io.debezium.connector.spanner.task.operation.CheckPartitionDuplicationOperation;
 import io.debezium.connector.spanner.task.operation.ChildPartitionOperation;
 import io.debezium.connector.spanner.task.operation.ClearSharedPartitionOperation;
 import io.debezium.connector.spanner.task.operation.ConnectorEndDetectionOperation;
@@ -101,7 +100,6 @@ public class TaskStateChangeEventHandler {
         performOperation(
                 new ChildPartitionOperation(newPartitionsEvent.getPartitions()),
                 new FindPartitionForStreamingOperation(),
-                new CheckPartitionDuplicationOperation(changeStream),
                 new TakePartitionForStreamingOperation(changeStream, partitionFactory),
                 new RemoveFinishedPartitionOperation());
     }
@@ -110,7 +108,6 @@ public class TaskStateChangeEventHandler {
         TaskSyncContext taskSyncContext = performOperation(
                 new ClearSharedPartitionOperation(),
                 new TakeSharedPartitionOperation(),
-                new CheckPartitionDuplicationOperation(changeStream),
                 new FindPartitionForStreamingOperation(),
                 new TakePartitionForStreamingOperation(changeStream, partitionFactory),
                 new RemoveFinishedPartitionOperation(),

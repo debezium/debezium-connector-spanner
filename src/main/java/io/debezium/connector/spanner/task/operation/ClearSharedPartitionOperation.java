@@ -5,7 +5,9 @@
  */
 package io.debezium.connector.spanner.task.operation;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -29,20 +31,74 @@ public class ClearSharedPartitionOperation implements Operation {
 
         TaskState currentTaskState = taskSyncContext.getCurrentTaskState();
 
-        Set<String> tokens = taskSyncContext.getTaskStates().values().stream().flatMap(taskState -> taskState.getPartitions().stream()).map(PartitionState::getToken)
+        List<String> removedSharedTokens = new ArrayList<String>();
+
+        // Retrieve the tokens that are owned by other tasks.
+        Set<String> otherTokens = taskSyncContext.getTaskStates().values().stream().flatMap(taskState -> taskState.getPartitions().stream()).map(PartitionState::getToken)
                 .collect(Collectors.toSet());
 
-        List<PartitionState> newSharedList = currentTaskState.getSharedPartitions().stream()
-                .filter(state -> !tokens.contains(state.getToken()))
+        // Retrieve the tokens that are shared by other tasks.
+        Set<PartitionState> otherSharedTokens = taskSyncContext.getTaskStates().values().stream().flatMap(taskState -> taskState.getSharedPartitions().stream())
+                .collect(Collectors.toSet());
+
+        // Retrieve the other alive tasks.
+        Set<String> otherTasks = taskSyncContext.getTaskStates().values().stream().map(taskState -> taskState.getTaskUid()).collect(Collectors.toSet());
+
+        List<PartitionState> currentSharedList = currentTaskState.getSharedPartitions().stream()
                 .collect(Collectors.toList());
 
-        if (newSharedList.size() != currentTaskState.getSharedPartitions().size()) {
+        List<PartitionState> finalSharedList = new ArrayList<PartitionState>();
+        boolean reassignedPartition = false;
+
+        // Filter or reassign shared partitions that are currently owned or shared to dead tasks.
+        for (PartitionState sharedToken : currentSharedList) {
+            // This token is owned by another task.
+            if (otherTokens.contains(sharedToken.getToken())) {
+                LOGGER.info("Task {}, token {} already owned by other tasks {}, can remove", taskSyncContext.getTaskUid(), sharedToken, otherTasks);
+            }
+
+            // This token is assigned to a dead task.
+            else if (!otherTasks.contains(sharedToken.getAssigneeTaskUid())) {
+                LOGGER.info("Task {}, token {} not assigned to alive tasks {}", taskSyncContext.getTaskUid(), sharedToken, otherTasks);
+
+                boolean otherTaskSharesPartition = false;
+                // Check if another task has shared this partition to a valid task.
+                for (PartitionState otherSharedToken : otherSharedTokens) {
+                    // Another task has shared this token to an alive task.
+                    if (otherSharedToken.getToken().equals(sharedToken.getToken()) &&
+                            otherTasks.contains(otherSharedToken.getAssigneeTaskUid())) {
+                        LOGGER.info("Task {}, token {} shared to other alive tasks {}, can remove", taskSyncContext.getTaskUid(), otherSharedToken, otherTasks);
+                        // We want to remove this token.
+                        otherTaskSharesPartition = true;
+                        break;
+                    }
+                }
+
+                // Reassign this token to another task if it isn't shared to another alive task.
+                if (!otherTaskSharesPartition) {
+                    reassignedPartition = true;
+                    Random rand = new Random(System.currentTimeMillis());
+                    String[] otherTasksArray = (String[]) otherTasks.toArray();
+                    String assigneeTaskUid = otherTasksArray[rand.nextInt(otherTasks.size())];
+                    LOGGER.info("Task {}, token {} not shared by other tasks {}, reassigned to {}", taskSyncContext.getTaskUid(), sharedToken, otherTasks,
+                            assigneeTaskUid);
+                    finalSharedList.add(PartitionState.builder().token(sharedToken.getToken()).assigneeTaskUid(assigneeTaskUid).build());
+                }
+            }
+            else {
+                // This token is not owned by other tasks, nor is it shared to a dead task.
+                finalSharedList.add(sharedToken);
+            }
+        }
+
+        if (finalSharedList.size() != currentSharedList.size() || reassignedPartition) {
             this.isRequiredPublishSyncEvent = true;
-            LOGGER.debug("Task cleared shared partitions, taskUid: {}", taskSyncContext.getTaskUid());
+            LOGGER.info("Task cleared shared partitions, taskUid: {}, final shared list {}, original list {}", taskSyncContext.getTaskUid(), finalSharedList,
+                    currentTaskState.getSharedPartitions());
         }
 
         return taskSyncContext.toBuilder().currentTaskState(currentTaskState.toBuilder()
-                .sharedPartitions(newSharedList)
+                .sharedPartitions(finalSharedList)
                 .build()).build();
     }
 

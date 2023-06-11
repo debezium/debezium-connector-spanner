@@ -141,6 +141,11 @@ public class LowWatermarkCalculator {
             monitorOffsets(offsets, allPartitions);
         }
 
+        if (printOffsets) {
+            LOGGER.info("Task {}, all Partitions {}, owned partitions {}, shared partitions {}", taskSyncContext.getTaskUid(), allPartitions.size(), partitions.size(),
+                    sharedPartitions.size());
+        }
+
         return allPartitions.values().stream()
                 .map(
                         partitionState -> {

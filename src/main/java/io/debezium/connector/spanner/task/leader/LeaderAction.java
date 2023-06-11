@@ -143,7 +143,7 @@ public class LeaderAction {
         this.leaderThread = null;
     }
 
-    private void newEpoch() throws InterruptedException {
+    private void newEpoch() throws InterruptedException, IllegalStateException {
         LOGGER.info("performLeaderActions: new epoch initialization");
         boolean startFromScratch = leaderService.isStartFromScratch();
 
@@ -156,6 +156,19 @@ public class LeaderAction {
                 taskSyncContextHolder.get().getRebalanceGenerationId());
 
         LOGGER.info("performLeaderActions: answers received {}", consumerToTaskMap);
+
+        if (consumerToTaskMap.size() < activeConsumers.size()) {
+            LOGGER.info("TaskUid {}, Expected active consumers {}, but only received consumers {}, not sending new epoch", taskSyncContextHolder.get().getTaskUid(),
+                    activeConsumers, consumerToTaskMap);
+            throw new IllegalStateException("Task Uid " + taskSyncContextHolder.get().getTaskUid() + " Expected active consumers " + activeConsumers.toString()
+                    + " but only received consumers " + consumerToTaskMap.toString() + " not sending new epoch ");
+        }
+
+        TaskSyncContext staleContext = taskSyncContextHolder.get();
+        boolean foundDuplication = false;
+        if (staleContext.checkDuplication(true, "Rebalance New Epoch Old Context")) {
+            foundDuplication = true;
+        }
 
         TaskSyncContext taskSyncContext = taskSyncContextHolder.updateAndGet(oldContext -> {
             TaskState leaderState = oldContext.getCurrentTaskState();
@@ -177,7 +190,12 @@ public class LeaderAction {
                     .build();
         });
 
+        if (!foundDuplication) {
+            taskSyncContext.checkDuplication(true, "Rebalance New Epoch New Context");
+        }
+
         TaskSyncEvent taskSyncEvent = taskSyncContext.buildTaskSyncEvent(MessageTypeEnum.NEW_EPOCH);
+        LOGGER.info("Task {} - sent new epoch {}", taskSyncContext.getTaskUid(), taskSyncEvent);
 
         LOGGER.info("Task {} - LeaderAction sent sync event start new epoch {}:{}", taskSyncContext.getTaskUid(),
                 taskSyncContext.getRebalanceGenerationId(), taskSyncContext.getEpochOffsetHolder().getEpochOffset());
