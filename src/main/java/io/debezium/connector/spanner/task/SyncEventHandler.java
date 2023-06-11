@@ -7,16 +7,12 @@ package io.debezium.connector.spanner.task;
 
 import static org.slf4j.LoggerFactory.getLogger;
 
-import java.util.HashMap;
-import java.util.Map;
-
 import org.slf4j.Logger;
 
 import io.debezium.connector.spanner.kafka.internal.TaskSyncPublisher;
 import io.debezium.connector.spanner.kafka.internal.model.MessageTypeEnum;
 import io.debezium.connector.spanner.kafka.internal.model.RebalanceState;
 import io.debezium.connector.spanner.kafka.internal.model.SyncEventMetadata;
-import io.debezium.connector.spanner.kafka.internal.model.TaskState;
 import io.debezium.connector.spanner.kafka.internal.model.TaskSyncEvent;
 import io.debezium.connector.spanner.task.state.SyncEvent;
 import io.debezium.connector.spanner.task.state.TaskStateChangeEvent;
@@ -70,9 +66,14 @@ public class SyncEventHandler {
         try {
 
             if (inSync != null) {
-                LOGGER.debug("Task {} - processPreviousStates - merge", taskSyncContextHolder.get().getTaskUid());
-
-                taskSyncContextHolder.update(context -> SyncEventMerger.merge(context, inSync));
+                if (inSync.getMessageType() == MessageTypeEnum.NEW_EPOCH) {
+                    LOGGER.info("Task {} - processPreviousStates - merge new epoch with rebalance generation ID {}", taskSyncContextHolder.get().getTaskUid(),
+                            inSync.getRebalanceGenerationId());
+                    taskSyncContextHolder.update(context -> SyncEventMerger.mergeNewEpoch(context, inSync));
+                }
+                else {
+                    taskSyncContextHolder.update(context -> SyncEventMerger.merge(context, inSync));
+                }
             }
 
             if (metadata.isCanInitiateRebalancing()) {
@@ -83,6 +84,9 @@ public class SyncEventHandler {
                         .rebalanceState(RebalanceState.INITIAL_INCREMENTED_STATE_COMPLETED)
                         .epochOffsetHolder(context.getEpochOffsetHolder().nextOffset(context.getCurrentKafkaRecordOffset()))
                         .build());
+                LOGGER.info("Task {} - now initialized with epoch offset {} and context {}", taskSyncContextHolder.get().getTaskUid(),
+                        taskSyncContextHolder.get().getEpochOffsetHolder().getEpochOffset(), taskSyncContextHolder.get());
+                taskSyncContextHolder.get().checkDuplication(true, "Initialized Task State");
             }
         }
         finally {
@@ -108,44 +112,13 @@ public class SyncEventHandler {
                     inSync.getMessageType() == MessageTypeEnum.NEW_EPOCH &&
                     inGeneration >= currentGeneration) { // We ignore messages with a stale rebalanceGenerationid.
 
-                LOGGER.debug("Task {} - processNewEpoch : {} metadata {}, rebalanceId: {}",
+                LOGGER.info("Task {} - processNewEpoch : {} metadata {}, rebalanceId: {}",
                         taskSyncContextHolder.get().getTaskUid(),
                         inSync,
                         metadata,
                         taskSyncContextHolder.get().getRebalanceGenerationId());
 
-                Map<String, TaskState> taskStates = new HashMap<>(inSync.getTaskStates());
-
-                if (!taskStates.containsKey(taskSyncContextHolder.get().getTaskUid())) {
-                    LOGGER.info("Task {}, new epoch message {} does not contain task state, terminating", taskSyncContextHolder.get().getTaskUid(), inSync);
-                    throw new IllegalStateException("New epoch message does not contain task state " + taskSyncContextHolder.get().getTaskUid());
-                }
-
-                TaskSyncContext staleContext = taskSyncContextHolder.get();
-                boolean foundDuplication = false;
-                if (staleContext.checkDuplication(true, "Process New Epoch Old Context")) {
-                    foundDuplication = true;
-                }
-                taskStates.remove(taskSyncContextHolder.get().getTaskUid());
-                // When we receive NEW_EPOCH messages, we clear all task states belonging to tasks
-                // other than the current task state, and replace them with entries from the
-                // NEW_EPOCH message.
-                taskSyncContextHolder.update(context -> context.toBuilder()
-                        .rebalanceState(RebalanceState.NEW_EPOCH_STARTED)
-                        .createdTimestamp(inSync.getMessageTimestamp())
-                        .taskStates(taskStates)
-
-                        // update timestamp for the current task state
-                        .currentTaskState(context.getCurrentTaskState()
-                                .toBuilder()
-                                .stateTimestamp(inSync.getMessageTimestamp())
-                                .build())
-                        .build());
-
-                if (!foundDuplication) {
-                    taskSyncContextHolder.get().checkDuplication(true, "Process New Epoch New Context");
-                }
-
+                taskSyncContextHolder.update(context -> SyncEventMerger.mergeNewEpoch(context, inSync));
                 LOGGER.info("Task {} - SyncEventHandler sent response for new epoch", taskSyncContextHolder.get().getTaskUid());
 
                 taskSyncPublisher.send(taskSyncContextHolder.get().buildTaskSyncEvent());

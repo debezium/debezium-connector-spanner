@@ -47,6 +47,10 @@ public class ChildPartitionOperation implements Operation {
             TaskState taskState = taskSyncContext.getCurrentTaskState();
 
             if (!InitialPartition.isInitialPartition(newPartition.getToken())) {
+                if (newPartition.getParentTokens().size() > 1) {
+                    LOGGER.warn("Task {}, partition {} is a result of a merge with parent tokens {}", taskSyncContext.getTaskUid(), newPartition,
+                            newPartition.getParentTokens());
+                }
                 String priorityParentPartition = ConflictResolver.getPriorityPartition(newPartition.getParentTokens());
 
                 if (!priorityParentPartition.equals(newPartition.getOriginPartitionToken())) {

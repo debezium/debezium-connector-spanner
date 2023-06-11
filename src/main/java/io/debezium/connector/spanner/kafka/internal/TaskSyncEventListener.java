@@ -85,14 +85,14 @@ public class TaskSyncEventListener {
         try {
 
             if (endOffset == startOffset) {
-                LOGGER.debug("listen: Sync topic is empty, so initial sync is finished");
+                LOGGER.info("task {}, listen: Sync topic is empty, so initial sync is finished", consumerGroup);
                 for (BlockingBiConsumer<TaskSyncEvent, SyncEventMetadata> eventConsumer : eventConsumers) {
                     eventConsumer.accept(
                             null, SyncEventMetadata.builder().canInitiateRebalancing(true).build());
                 }
             }
             else {
-                LOGGER.debug("listen: read last message");
+                LOGGER.info("Task {}, listen: read last message", consumerGroup);
                 try {
                     consumer.seek(topicPartition, startOffset);
                     seekBackToPreviousEpoch(consumer, topicPartition, beginOffset);
@@ -196,7 +196,7 @@ public class TaskSyncEventListener {
         long previousEpochOffset = taskSyncEvent.getEpochOffset();
         long startOffset = Math.max(previousEpochOffset, beginOffset);
 
-        LOGGER.debug("listen: seek back to previous epoch offset: {}", startOffset);
+        LOGGER.info("Task {}, listen: seek back to previous epoch offset: {}", consumerGroup, startOffset);
         consumer.seek(topicPartition, startOffset);
     }
 
