@@ -213,7 +213,11 @@ public class SpannerConnectorTask extends SpannerBaseSourceTask {
 
         this.coordinator.start(taskContext, this.queue, metadataProvider);
 
+        LOGGER.info("Before initialization task sync {}", taskUid);
+
         this.synchronizationTaskContext.init();
+
+        LOGGER.info("Finished starting task {}", taskUid);
 
         return coordinator;
     }

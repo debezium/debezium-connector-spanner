@@ -46,6 +46,7 @@ public class TaskPartitionEqualSharingRebalancer implements TaskPartitionRebalan
         LOGGER.info("Leader task state {}", leaderTaskState);
         survivedTasks = excludeLeader(leaderTaskState.getTaskUid(), survivedTasks);
         LOGGER.info("Survived tasks {}", survivedTasks);
+        LOGGER.info("Obsolete tasks {}", obsoleteTaskStates);
 
         TaskState newLeaderTaskState = moveFinishedPartitionsFromObsoleteTasks(leaderTaskState, obsoleteTaskStates);
         LOGGER.info(

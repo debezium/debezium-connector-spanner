@@ -22,5 +22,5 @@ public interface BlockingBiConsumer<T, U> {
      * @param u the second input argument
      * @throws InterruptedException if the calling thread is interrupted while blocking
      */
-    void accept(T t, U u) throws InterruptedException;
+    void accept(T t, U u) throws InterruptedException, IllegalStateException;
 }
