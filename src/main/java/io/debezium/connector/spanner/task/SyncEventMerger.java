@@ -36,7 +36,10 @@ public class SyncEventMerger {
     public static TaskSyncContext merge(TaskSyncContext context, TaskSyncEvent inSync) {
 
         boolean foundDuplication = false;
-        if (context.checkDuplication(true, " Old Process message " + inSync.getMessageType().toString())) {
+
+        // Only check for duplicate partition errors for messages that are NEW_EPOCH, UPDATE_EPOCH,
+        // or REBALANCE_ANSWER.
+        if (inSync.getMessageType() != MessageTypeEnum.REGULAR && context.checkDuplication(false, inSync.getMessageType().toString())) {
             foundDuplication = true;
         }
         Map<String, TaskState> newTaskStatesMap = inSync.getTaskStates();
@@ -64,8 +67,8 @@ public class SyncEventMerger {
             }
         }
 
-        if (inSync.getMessageType() == MessageTypeEnum.UPDATE_EPOCH && !inTaskState.getTaskUid().equals(context.getTaskUid())) {
-            LOGGER.info("Task {}, updating the epoch offset from the leader update epoch {}: {}", context.getTaskUid(), inSync.getTaskUid(),
+        if (inSync.getMessageType() == MessageTypeEnum.UPDATE_EPOCH && !inSync.getTaskUid().equals(context.getTaskUid())) {
+            LOGGER.info("Task {}, updating the epoch offset from the leader's UPDATE_EPOCH message {}: {}", context.getTaskUid(), inSync.getTaskUid(),
                     inSync.getEpochOffset());
             builder.epochOffsetHolder(context.getEpochOffsetHolder().nextOffset(inSync.getEpochOffset()));
         }
@@ -89,8 +92,8 @@ public class SyncEventMerger {
             debug(LOGGER, "merge: final state {}, \nUpdated uids: {}, epoch: {}",
                     result, updatedStatesUids, result.getRebalanceGenerationId());
 
-            if (!foundDuplication) {
-                if (result.checkDuplication(true, "New Process message " + inSync.getMessageType().toString())) {
+            if (inSync.getMessageType() != MessageTypeEnum.REGULAR && !foundDuplication) {
+                if (result.checkDuplication(true, inSync.getMessageType().toString())) {
                     LOGGER.info("Task {} found duplication after processing {}", context.getTaskUid(), inSync);
                     LOGGER.info("Task {} final message {}", context.getTaskUid(), result);
                 }
@@ -109,21 +112,23 @@ public class SyncEventMerger {
         boolean start_initial_sync = currentContext.getRebalanceState() == RebalanceState.START_INITIAL_SYNC;
         if (!start_initial_sync && !allNewEpochTasks.contains(currentContext.getTaskUid())) {
             LOGGER.warn(
-                    "Task {} - Received new epoch message , but leader did not include the task in the new epoch message {}, throwing exception",
-                    currentContext.getTaskUid(), allNewEpochTasks);
+                    "Task {} - Received new epoch message , but leader did not include the task in the new epoch message, throwing exception",
+                    currentContext.getTaskUid());
 
             throw new IllegalStateException("New epoch message does not contain task state " + currentContext.getTaskUid());
         }
 
+        // Check that there is no preexisting partition duplication in the task.
         boolean foundDuplication = false;
-        if (currentContext.checkDuplication(true, "Merge new epoch")) {
+        if (currentContext.checkDuplication(false, "NEW_EPOCH")) {
             foundDuplication = true;
         }
 
-        // If the current task is the leader, there is no need to merge the epoch update.
+        // If the current task is the leader, there is no need to merge the new epoch message.
         if (inSync.getTaskUid().equals(currentContext.getTaskUid())) {
             return builder.build();
         }
+
         Map<String, TaskState> newTaskStates = new HashMap<>(inSync.getTaskStates());
         newTaskStates.remove(currentContext.getTaskUid());
 
@@ -140,6 +145,8 @@ public class SyncEventMerger {
             currentTaskBuilder.rebalanceGenerationId(inSync.getRebalanceGenerationId());
         }
         else {
+            // Update the state to NEW_EPOCH_STARTED if we have received a new epoch message during
+            // normal task execution.
             builder.rebalanceState(RebalanceState.NEW_EPOCH_STARTED);
         }
 
@@ -152,7 +159,9 @@ public class SyncEventMerger {
                 .taskStates(newTaskStates)
                 .currentTaskState(currentTaskBuilder.build());
         TaskSyncContext result = builder.build();
-        if (!foundDuplication && result.checkDuplication(true, "NEW EPOCH")) {
+
+        // Check that there is no partition duplication after processing the new epoch message.
+        if (!foundDuplication && result.checkDuplication(true, "NEW_EPOCH")) {
             LOGGER.warn("Task {}, duplication exists after processing new epoch, old context {}", result.getTaskUid(), currentContext);
             LOGGER.warn("Task {}, duplication exists after processing new epoch, new message {}", result.getTaskUid(), inSync);
             LOGGER.warn("Task {}, duplication exists after processing new epoch, resulting context {}", result.getTaskUid(), result);

@@ -257,10 +257,10 @@ public class SpannerStreamingChangeEventSource implements CommittingRecordsStrea
         LOGGER.info("Received ChildPartitionsEvent: {}", event);
 
         if (event.getChildPartitions().size() > 1) {
-            LOGGER.info("Partition split into more than 1 child token {}", event);
+            LOGGER.info("A split event occurred {}", event);
         }
         else {
-            LOGGER.info("Partition was a move with only 1 child token {}", event);
+            LOGGER.info("A move event occurred {}", event);
 
         }
         List<Partition> partitions = event.getChildPartitions().stream().map(childPartition -> {

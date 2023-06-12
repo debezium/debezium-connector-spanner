@@ -164,13 +164,17 @@ public class TaskSyncEventListener {
             debug(LOGGER, "Receive SyncEvent from Kafka topic: {}", taskSyncEvent);
 
             for (BlockingBiConsumer<TaskSyncEvent, SyncEventMetadata> eventConsumer : eventConsumers) {
+                boolean canInitiateRebalancing = (record.offset() >= endOffset - 1);
+                if (canInitiateRebalancing) {
+                    LOGGER.info("task {}, finished processing all previous sync event messages, can initiate rebalancing", consumerGroup);
+                }
                 eventConsumer.accept(
                         taskSyncEvent,
                         SyncEventMetadata.builder()
                                 .offset(record.offset())
                                 // Once we have consumed all the messages present in the sync topic at the
                                 // start of the connector, we can then connect to the rebalance topic.
-                                .canInitiateRebalancing(record.offset() >= endOffset - 1)
+                                .canInitiateRebalancing(canInitiateRebalancing)
                                 .build());
             }
         }
