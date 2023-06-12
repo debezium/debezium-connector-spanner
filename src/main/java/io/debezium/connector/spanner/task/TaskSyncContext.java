@@ -351,7 +351,11 @@ public class TaskSyncContext {
         return this.initialized;
     }
 
+    // Debug function used to check if there is any partiton or shared partition duplication
+    // inside the TaskSyncContext.
     public boolean checkDuplication(boolean printOffsets, String loggingString) {
+
+        // Filter out all of the FINISHED or REMOVED partitions.
         Map<String, List<PartitionState>> partitionsMap = getAllTaskStates().values().stream()
                 .flatMap(taskState -> taskState.getPartitions().stream())
                 .filter(
@@ -361,6 +365,7 @@ public class TaskSyncContext {
 
         int numPartitions = partitionsMap.size();
 
+        // Check that there are no duplicate partitions in the partitions map.
         Set<String> duplicatesInPartitions = checkDuplicationInMap(partitionsMap);
         if (!duplicatesInPartitions.isEmpty()) {
             if (printOffsets) {
@@ -374,7 +379,6 @@ public class TaskSyncContext {
         Map<String, PartitionState> partitions = partitionsMap.entrySet().stream()
                 .map(entry -> new AbstractMap.SimpleEntry<>(entry.getKey(), entry.getValue().get(0)))
                 .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
-
         Map<String, List<PartitionState>> sharedPartitionsMap = getAllTaskStates().values().stream()
                 .flatMap(taskState -> taskState.getSharedPartitions().stream())
                 .filter(partitionState -> !partitions.containsKey(partitionState.getToken()))
@@ -382,6 +386,7 @@ public class TaskSyncContext {
 
         int numSharedPartitions = sharedPartitionsMap.size();
 
+        // Check that there are no duplicate partitions in the shared partitions map.
         Set<String> duplicatesInSharedPartitions = checkDuplicationInMap(sharedPartitionsMap);
         if (!duplicatesInSharedPartitions.isEmpty()) {
             if (printOffsets) {

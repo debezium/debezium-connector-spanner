@@ -54,12 +54,12 @@ public class ClearSharedPartitionOperation implements Operation {
         for (PartitionState sharedToken : currentSharedList) {
             // This token is owned by another task.
             if (otherTokens.contains(sharedToken.getToken())) {
-                LOGGER.info("Task {}, token {} already owned by other tasks {}, can remove", taskSyncContext.getTaskUid(), sharedToken, otherTasks);
+                LOGGER.info("Task {}, removing token {} since it is already owned by other tasks {}", taskSyncContext.getTaskUid(), sharedToken, otherTasks);
             }
 
             // This token is assigned to a dead task.
             else if (!otherTasks.contains(sharedToken.getAssigneeTaskUid())) {
-                LOGGER.info("Task {}, token {} not assigned to alive tasks {}", taskSyncContext.getTaskUid(), sharedToken, otherTasks);
+                LOGGER.info("Task {}, token {} is not assigned to an alive task {}", taskSyncContext.getTaskUid(), sharedToken, otherTasks);
 
                 boolean otherTaskSharesPartition = false;
                 // Check if another task has shared this partition to a valid task.
@@ -67,7 +67,7 @@ public class ClearSharedPartitionOperation implements Operation {
                     // Another task has shared this token to an alive task.
                     if (otherSharedToken.getToken().equals(sharedToken.getToken()) &&
                             otherTasks.contains(otherSharedToken.getAssigneeTaskUid())) {
-                        LOGGER.info("Task {}, token {} shared to other alive tasks {}, can remove", taskSyncContext.getTaskUid(), otherSharedToken, otherTasks);
+                        LOGGER.info("Task {}, removing token {} since it is shared to another alive task {}", taskSyncContext.getTaskUid(), otherSharedToken, otherTasks);
                         // We want to remove this token.
                         otherTaskSharesPartition = true;
                         break;
@@ -80,8 +80,8 @@ public class ClearSharedPartitionOperation implements Operation {
                     Random rand = new Random(System.currentTimeMillis());
                     String[] otherTasksArray = (String[]) otherTasks.toArray();
                     String assigneeTaskUid = otherTasksArray[rand.nextInt(otherTasks.size())];
-                    LOGGER.info("Task {}, token {} not shared by other tasks {}, reassigned to {}", taskSyncContext.getTaskUid(), sharedToken, otherTasks,
-                            assigneeTaskUid);
+                    LOGGER.info("Task {}, reassigning token {} to another task {} since it was not previously assigned to an alive task", taskSyncContext.getTaskUid(),
+                            sharedToken, assigneeTaskUid);
                     finalSharedList.add(PartitionState.builder().token(sharedToken.getToken()).assigneeTaskUid(assigneeTaskUid).build());
                 }
             }
@@ -93,7 +93,7 @@ public class ClearSharedPartitionOperation implements Operation {
 
         if (finalSharedList.size() != currentSharedList.size() || reassignedPartition) {
             this.isRequiredPublishSyncEvent = true;
-            LOGGER.info("Task cleared shared partitions, taskUid: {}, final shared list {}, original list {}", taskSyncContext.getTaskUid(), finalSharedList,
+            LOGGER.info("Task cleared some shared partitions, taskUid: {}, final shared list {}, original list {}", taskSyncContext.getTaskUid(), finalSharedList,
                     currentTaskState.getSharedPartitions());
         }
 

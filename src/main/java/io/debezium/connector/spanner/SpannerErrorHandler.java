@@ -52,16 +52,14 @@ public class SpannerErrorHandler extends ErrorHandler {
 
         boolean retriable = isRetriable(producerThrowable);
 
-        LOGGER.info("Checking up on Task failure for task {}", task.getTaskUid());
-
         if (first) {
             if (retriable) {
-                LOGGER.info("Queueing retriable exception {} for task {}", producerThrowable, task.getTaskUid());
+                LOGGER.info("Encountered retriable exception {} for task {}", producerThrowable, task.getTaskUid());
                 queue.producerException(
                         new RetriableException("An exception occurred in the change event producer. This connector will be restarted.", producerThrowable));
             }
             else {
-                LOGGER.info("Queueing unretriable exception {} for task {}", producerThrowable, task.getTaskUid());
+                LOGGER.info("Encountered unretriable exception {} for task {}", producerThrowable, task.getTaskUid());
                 queue.producerException(new ConnectException("An exception occurred in the change event producer. This connector will be stopped.", producerThrowable));
             }
         }

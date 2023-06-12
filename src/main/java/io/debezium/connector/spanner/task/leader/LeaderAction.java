@@ -164,9 +164,10 @@ public class LeaderAction {
                     + " but only received consumers " + consumerToTaskMap.toString() + " not sending new epoch ");
         }
 
+        // Check if there is any duplicate partitions in the task sync context before rebalancing.
         TaskSyncContext staleContext = taskSyncContextHolder.get();
         boolean foundDuplication = false;
-        if (staleContext.checkDuplication(true, "Rebalance New Epoch Old Context")) {
+        if (staleContext.checkDuplication(false, "NEW EPOCH rebalance event, initial context")) {
             foundDuplication = true;
         }
 
@@ -191,12 +192,11 @@ public class LeaderAction {
         });
 
         if (!foundDuplication) {
-            taskSyncContext.checkDuplication(true, "Rebalance New Epoch New Context");
+            taskSyncContext.checkDuplication(true, "NEW EPOCH rebalance event, resulting context");
         }
 
         TaskSyncEvent taskSyncEvent = taskSyncContext.buildTaskSyncEvent(MessageTypeEnum.NEW_EPOCH);
-        LOGGER.info("Task {} - sent new epoch {}", taskSyncContext.getTaskUid(), taskSyncEvent);
-
+        LOGGER.debug("Task {} - sent new epoch {}", taskSyncContext.getTaskUid(), taskSyncEvent);
         LOGGER.info("Task {} - LeaderAction sent sync event with rebalance generation ID {}: and epoch offset {}", taskSyncContext.getTaskUid(),
                 taskSyncContext.getRebalanceGenerationId(), taskSyncContext.getEpochOffsetHolder().getEpochOffset());
 

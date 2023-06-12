@@ -126,10 +126,6 @@ public class SpannerChangeStream implements ChangeStream {
             catch (Exception ex) {
                 LOGGER.info("Exception during streaming {} from partition with token {}", ex.getMessage(), partition.getToken());
 
-                // if (isCanceled(ex)) {
-                // return;
-                // }
-
                 if (this.onError(partition, ex)) {
                     LOGGER.info("Unretriable exception during streaming {} from partition with token {}", ex.getMessage(), partition.getToken());
                     return;
@@ -143,7 +139,7 @@ public class SpannerChangeStream implements ChangeStream {
                 }
             }
             finally {
-                LOGGER.info("Stopping streaming from partition with token {}", partition.getToken());
+                LOGGER.info("Stopped streaming from partition with token {}", partition.getToken());
             }
         });
 

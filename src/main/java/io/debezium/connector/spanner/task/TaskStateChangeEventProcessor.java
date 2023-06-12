@@ -78,7 +78,6 @@ public class TaskStateChangeEventProcessor {
 
                 this.taskSyncContextHolder.lock();
                 try {
-                    LOGGER.info("Task {}, interrupting the event handler thread", this.taskSyncContextHolder.get().getTaskUid());
                     this.taskStateChangeEventHandler.processEvent(event);
                 }
                 catch (InterruptedException e) {

@@ -184,8 +184,6 @@ public class SynchronizationTaskContext {
             this.rebalancingEventListener
                     .listen(metadata -> rebalanceHandler.process(metadata.isLeader(), metadata.getConsumerId(), metadata.getRebalanceGenerationId()));
 
-            // this.taskSyncContextHolder.awaitNewEpoch();
-
             this.lowWatermarkCalculationJob.start();
 
             this.schemaRegistry.init();
@@ -234,7 +232,6 @@ public class SynchronizationTaskContext {
 
     private void onError(Throwable throwable) {
         this.errorHandler.setProducerThrowable(throwable);
-        // destroy();
     }
 
     private void onFinish() {

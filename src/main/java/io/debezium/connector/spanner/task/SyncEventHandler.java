@@ -86,7 +86,9 @@ public class SyncEventHandler {
                         .build());
                 LOGGER.info("Task {} - now initialized with epoch offset {} and context {}", taskSyncContextHolder.get().getTaskUid(),
                         taskSyncContextHolder.get().getEpochOffsetHolder().getEpochOffset(), taskSyncContextHolder.get());
-                taskSyncContextHolder.get().checkDuplication(true, "Initialized Task State");
+
+                // Check that there are no duplicate partitions after the task has finished initializing.
+                taskSyncContextHolder.get().checkDuplication(true, "Finished Initializing Task State");
             }
         }
         finally {
@@ -173,7 +175,7 @@ public class SyncEventHandler {
                 return;
             }
 
-            LOGGER.debug("Task {} - process sync event - rebalance answer", taskSyncContextHolder.get().getTaskUid());
+            LOGGER.info("Task {} - process sync event - rebalance answer", taskSyncContextHolder.get().getTaskUid());
 
             taskSyncContextHolder.update(context -> SyncEventMerger.merge(context, inSync));
 
