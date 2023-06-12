@@ -64,7 +64,7 @@ public class SyncEventMerger {
             }
         }
 
-        if (inSync.getMessageType() == MessageTypeEnum.UPDATE_EPOCH) {
+        if (inSync.getMessageType() == MessageTypeEnum.UPDATE_EPOCH && !inTaskState.getTaskUid().equals(context.getTaskUid())) {
             LOGGER.info("Task {}, updating the epoch offset from the leader update epoch {}: {}", context.getTaskUid(), inSync.getTaskUid(),
                     inSync.getEpochOffset());
             builder.epochOffsetHolder(context.getEpochOffsetHolder().nextOffset(inSync.getEpochOffset()));
