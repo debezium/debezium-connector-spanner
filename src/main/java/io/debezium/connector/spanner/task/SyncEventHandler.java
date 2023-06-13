@@ -77,7 +77,8 @@ public class SyncEventHandler {
             }
 
             if (metadata.isCanInitiateRebalancing()) {
-                LOGGER.info("task {}, finished processing all previous sync event messages with end offset {}, can initiate rebalancing", taskSyncContextHolder.get().getTaskUid(), endOffset);
+                LOGGER.info("task {}, finished processing all previous sync event messages with end offset {}, can initiate rebalancing",
+                        taskSyncContextHolder.get().getTaskUid(), metadata.getOffset());
 
                 taskSyncContextHolder.update(context -> context.toBuilder()
                         .rebalanceState(RebalanceState.INITIAL_INCREMENTED_STATE_COMPLETED)
