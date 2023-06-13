@@ -165,9 +165,6 @@ public class TaskSyncEventListener {
 
             for (BlockingBiConsumer<TaskSyncEvent, SyncEventMetadata> eventConsumer : eventConsumers) {
                 boolean canInitiateRebalancing = (record.offset() >= endOffset - 1);
-                if (canInitiateRebalancing) {
-                    LOGGER.info("task {}, finished processing all previous sync event messages, can initiate rebalancing", consumerGroup);
-                }
                 eventConsumer.accept(
                         taskSyncEvent,
                         SyncEventMetadata.builder()

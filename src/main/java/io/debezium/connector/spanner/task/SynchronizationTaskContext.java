@@ -169,18 +169,19 @@ public class SynchronizationTaskContext {
 
             this.taskSyncEventListener.subscribe(syncEventHandler::updateCurrentOffset);
 
-            this.taskSyncEventListener.subscribe(syncEventHandler::processPreviousStates);
+            this.taskSyncEventListener.subscribe(syncEventHandler::process);
 
             this.taskSyncEventListener.subscribe(syncEventHandler::processNewEpoch);
 
             this.taskSyncEventListener.subscribe(syncEventHandler::processRebalanceAnswer);
 
-            this.taskSyncEventListener.subscribe(syncEventHandler::process);
+            this.taskSyncEventListener.subscribe(syncEventHandler::processPreviousStates);
 
             this.taskSyncEventListener.start();
 
             this.taskSyncContextHolder.awaitInitialization();
 
+            LOGGER.info("{}, connecting to the rebalance topic", task.getTaskUid());
             this.rebalancingEventListener
                     .listen(metadata -> rebalanceHandler.process(metadata.isLeader(), metadata.getConsumerId(), metadata.getRebalanceGenerationId()));
 

@@ -77,8 +77,7 @@ public class SyncEventHandler {
             }
 
             if (metadata.isCanInitiateRebalancing()) {
-                LOGGER.debug("Task {} - processPreviousStates - switch state to INITIAL_INCREMENTED_STATE_COMPLETED",
-                        taskSyncContextHolder.get().getTaskUid());
+                LOGGER.info("task {}, finished processing all previous sync event messages with end offset {}, can initiate rebalancing", taskSyncContextHolder.get().getTaskUid(), consumerGroup);
 
                 taskSyncContextHolder.update(context -> context.toBuilder()
                         .rebalanceState(RebalanceState.INITIAL_INCREMENTED_STATE_COMPLETED)
@@ -114,9 +113,9 @@ public class SyncEventHandler {
                     inSync.getMessageType() == MessageTypeEnum.NEW_EPOCH &&
                     inGeneration >= currentGeneration) { // We ignore messages with a stale rebalanceGenerationid.
 
-                LOGGER.info("Task {} - processNewEpoch : {} metadata {}, rebalanceId: {}",
+                LOGGER.debug("Task {} - processNewEpoch {}", taskSyncContextHolder.get().getTaskUid(), inSync);
+                LOGGER.info("Task {} - processNewEpoch : metadata {}, rebalanceId: {}",
                         taskSyncContextHolder.get().getTaskUid(),
-                        inSync,
                         metadata,
                         taskSyncContextHolder.get().getRebalanceGenerationId());
 
