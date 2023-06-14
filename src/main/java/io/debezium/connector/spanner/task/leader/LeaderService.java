@@ -133,6 +133,8 @@ public class LeaderService {
                     new RebalanceMetricEvent(consumerToTaskMap.size(), consumers.size()));
 
         }
+        LOGGER.info("awaitAllNewTaskStateUpdates: " +
+                "expected: {}, actual: {}. Expected consumers: {}", consumers.size(), consumerToTaskMap.size(), consumers);
         LOGGER.info("awaitAllNewTaskStateUpdates: new task updated the state with {} consumers: {}", consumerToTaskMap, consumerToTaskMap.size());
         return consumerToTaskMap;
     }

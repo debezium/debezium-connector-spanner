@@ -38,10 +38,7 @@ public class RemoveFinishedPartitionOperation implements Operation {
         List<PartitionState> partitions = taskState.getPartitions().stream()
                 .map(
                         partitionState -> {
-                            if (partitionState.getState().equals(PartitionStateEnum.FINISHED)
-                                    && allChildrenFinishedAndAtLeastOnePresent(
-                                            taskSyncContext, partitionState.getToken())) {
-
+                            if (partitionState.getState().equals(PartitionStateEnum.FINISHED)) {
                                 if (partitionState.getFinishedTimestamp() == null) {
                                     throw new IllegalStateException(
                                             "FinishedTimestamp must be specified for finished partitions");
@@ -52,7 +49,9 @@ public class RemoveFinishedPartitionOperation implements Operation {
                                                 + DELETION_DELAY.getSeconds(),
                                         0);
                                 Timestamp currentTime = Timestamp.now();
-                                if (deletionTime.compareTo(currentTime) < 0) {
+                                if (deletionTime.compareTo(currentTime) < 0 &&
+                                        allChildrenFinishedAndAtLeastOnePresent(
+                                                taskSyncContext, partitionState.getToken())) {
                                     LOGGER.info(
                                             "Partition {} will be removed from the task with finished timestamp {},"
                                                     + " deletion timestamp {} and current time {}",
@@ -62,13 +61,7 @@ public class RemoveFinishedPartitionOperation implements Operation {
                                             currentTime);
                                     return null;
                                 }
-                                LOGGER.info(
-                                        "Partition {} will not be removed from the task since deletion timestamp"
-                                                + " {}, finished timestamp {} is less than now {}",
-                                        partitionState,
-                                        deletionTime,
-                                        partitionState.getFinishedTimestamp(),
-                                        currentTime);
+                                return partitionState;
                             }
                             return partitionState;
                         })

@@ -64,7 +64,7 @@ public class LowWatermarkCalculator {
         if (!duplicatesInPartitions.isEmpty()) {
             if (printOffsets) {
                 LOGGER.warn(
-                        "calculateLowWatermark: found duplication in partitionsMap: {}", duplicatesInPartitions);
+                        "Task {}, calculateLowWatermark: found duplication in partitionsMap: {}", taskSyncContextHolder.get().getTaskUid(), duplicatesInPartitions);
             }
             return null;
         }
@@ -82,8 +82,8 @@ public class LowWatermarkCalculator {
         if (!duplicatesInSharedPartitions.isEmpty()) {
             if (printOffsets) {
                 LOGGER.warn(
-                        "calculateLowWatermark: found duplication in sharedPartitionsMap: {}",
-                        duplicatesInSharedPartitions);
+                        "Task {}, calculateLowWatermark: found duplication in sharedPartitionsMap: {}",
+                        taskSyncContextHolder.get().getTaskUid(), duplicatesInSharedPartitions);
             }
             return null;
         }
@@ -181,14 +181,14 @@ public class LowWatermarkCalculator {
                         String token = partitionState.getToken();
                         long lag = now - timestamp.toDate().getTime();
                         if (lag > OFFSET_MONITORING_LAG_MAX_MS) {
-                            LOGGER.warn("Partition has a very old offset, lag: {}, token: {}", lag, token);
+                            LOGGER.warn("Task {}, Partition has a very old offset, lag: {}, token: {}", taskSyncContextHolder.get().getTaskUid(), lag, token);
                         }
                     }
                     else if (partitionState.getStartTimestamp() != null) {
                         String token = partitionState.getToken();
                         long lag = now - partitionState.getStartTimestamp().toDate().getTime();
                         if (lag > OFFSET_MONITORING_LAG_MAX_MS) {
-                            LOGGER.warn("Partition has a very old start time, lag: {}, token: {}", lag, token);
+                            LOGGER.warn("Task {}, Partition has a very old start time, lag: {}, token: {}", taskSyncContextHolder.get().getTaskUid(), lag, token);
                         }
                     }
                 });
