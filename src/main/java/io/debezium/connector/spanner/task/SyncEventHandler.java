@@ -118,7 +118,7 @@ public class SyncEventHandler {
                 LOGGER.info("Task {} - processNewEpoch : metadata {}, rebalanceId: {}",
                         taskSyncContextHolder.get().getTaskUid(),
                         metadata,
-                        taskSyncContextHolder.get().getRebalanceGenerationId());
+                        inSync.getRebalanceGenerationId());
 
                 taskSyncContextHolder.update(context -> SyncEventMerger.mergeNewEpoch(context, inSync));
                 LOGGER.info("Task {} - SyncEventHandler sent response for new epoch", taskSyncContextHolder.get().getTaskUid());
