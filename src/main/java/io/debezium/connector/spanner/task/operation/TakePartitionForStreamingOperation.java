@@ -89,8 +89,8 @@ public class TakePartitionForStreamingOperation implements Operation {
 
         List<PartitionState> partitions = taskSyncContext.getCurrentTaskState().getPartitions().stream()
                 .map(partitionState -> {
-                    if (isPartitionStreamingAlready(taskSyncContext.getTaskStates().values(), partitionState.getToken())
-                            && partitionState.getState().equals(PartitionStateEnum.READY_FOR_STREAMING)) {
+                    if (partitionState.getState().equals(PartitionStateEnum.READY_FOR_STREAMING) &&
+                            isPartitionStreamingAlready(taskSyncContext.getTaskStates().values(), partitionState.getToken())) {
                         LOGGER.info("Removing streaming partition {} with state {} since partition is already streaming", partitionState.getToken(),
                                 partitionState.getState());
                         return null;
