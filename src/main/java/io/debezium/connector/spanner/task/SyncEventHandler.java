@@ -96,7 +96,7 @@ public class SyncEventHandler {
         }
     }
 
-    public void processNewEpoch(TaskSyncEvent inSync, SyncEventMetadata metadata) throws InterruptedException, IllegalStateException {
+    public void processNewEpoch(TaskSyncEvent inSync, SyncEventMetadata metadata) throws InterruptedException {
         if (inSync == null) {
             return;
         }
