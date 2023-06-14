@@ -18,6 +18,7 @@ import org.slf4j.Logger;
 
 import com.google.cloud.Timestamp;
 
+import io.debezium.DebeziumException;
 import io.debezium.connector.spanner.kafka.internal.model.PartitionState;
 import io.debezium.connector.spanner.kafka.internal.model.PartitionStateEnum;
 import io.debezium.connector.spanner.kafka.internal.model.TaskState;
@@ -40,7 +41,7 @@ public class RemoveFinishedPartitionOperation implements Operation {
                         partitionState -> {
                             if (partitionState.getState().equals(PartitionStateEnum.FINISHED)) {
                                 if (partitionState.getFinishedTimestamp() == null) {
-                                    throw new IllegalStateException(
+                                    throw new DebeziumException(
                                             "FinishedTimestamp must be specified for finished partitions");
                                 }
 
