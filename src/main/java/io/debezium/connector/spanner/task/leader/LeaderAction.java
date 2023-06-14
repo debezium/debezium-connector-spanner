@@ -17,6 +17,7 @@ import java.util.function.Consumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import io.debezium.DebeziumException;
 import io.debezium.connector.spanner.kafka.internal.KafkaConsumerAdminService;
 import io.debezium.connector.spanner.kafka.internal.TaskSyncPublisher;
 import io.debezium.connector.spanner.kafka.internal.model.MessageTypeEnum;
@@ -143,7 +144,7 @@ public class LeaderAction {
         this.leaderThread = null;
     }
 
-    private void newEpoch() throws InterruptedException, IllegalStateException {
+    private void newEpoch() throws InterruptedException {
         LOGGER.info("performLeaderActions: new epoch initialization");
         boolean startFromScratch = leaderService.isStartFromScratch();
 
@@ -160,7 +161,7 @@ public class LeaderAction {
         if (consumerToTaskMap.size() < activeConsumers.size()) {
             LOGGER.info("TaskUid {}, Expected active consumers {}, but only received consumers {}, not sending new epoch", taskSyncContextHolder.get().getTaskUid(),
                     activeConsumers, consumerToTaskMap);
-            throw new IllegalStateException("Task Uid " + taskSyncContextHolder.get().getTaskUid() + " Expected active consumers " + activeConsumers.toString()
+            throw new DebeziumException("Task Uid " + taskSyncContextHolder.get().getTaskUid() + " Expected active consumers " + activeConsumers.toString()
                     + " but only received consumers " + consumerToTaskMap.toString() + " not sending new epoch ");
         }
 

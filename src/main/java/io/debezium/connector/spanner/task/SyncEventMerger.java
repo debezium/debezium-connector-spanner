@@ -18,6 +18,7 @@ import java.util.stream.Stream;
 
 import org.slf4j.Logger;
 
+import io.debezium.DebeziumException;
 import io.debezium.connector.spanner.kafka.internal.model.MessageTypeEnum;
 import io.debezium.connector.spanner.kafka.internal.model.RebalanceState;
 import io.debezium.connector.spanner.kafka.internal.model.TaskState;
@@ -115,7 +116,7 @@ public class SyncEventMerger {
                     "Task {} - Received new epoch message , but leader did not include the task in the new epoch message, throwing exception",
                     currentContext.getTaskUid());
 
-            throw new IllegalStateException("New epoch message does not contain task state " + currentContext.getTaskUid());
+            throw new DebeziumException("New epoch message does not contain task state " + currentContext.getTaskUid());
         }
 
         // Check that there is no preexisting partition duplication in the task.
