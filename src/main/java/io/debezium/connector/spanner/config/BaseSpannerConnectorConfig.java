@@ -541,12 +541,7 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
             .withDefault("10485880")
             .withDescription("Sync topic max message size");
 
-    public static final Field SOURCE_INFO_STRUCT_MAKER = Field.create("sourceinfo.struct.maker")
-            .withDisplayName("Source info struct maker class")
-            .withType(Type.CLASS)
-            .withWidth(Width.MEDIUM)
-            .withImportance(ConfigDef.Importance.LOW)
-            .withDescription("The name of the SourceInfoStructMaker class that returns SourceInfo schema and struct.")
+    public static final Field SOURCE_INFO_STRUCT_MAKER = CommonConnectorConfig.SOURCE_INFO_STRUCT_MAKER
             .withDefault(SpannerSourceInfoStructMaker.class.getName());
 
     protected static final ConfigDefinition CONFIG_DEFINITION = ConfigDefinition.editor()
@@ -606,7 +601,8 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
                     TABLE_INCLUDE_LIST,
                     CUSTOM_CONVERTERS,
                     TOMBSTONES_ON_DELETE,
-                    AbstractTopicNamingStrategy.TOPIC_HEARTBEAT_PREFIX)
+                    AbstractTopicNamingStrategy.TOPIC_HEARTBEAT_PREFIX,
+                    SOURCE_INFO_STRUCT_MAKER)
             .create();
     private static final int POLL_INTERVAL_IN_MS = 25;
 

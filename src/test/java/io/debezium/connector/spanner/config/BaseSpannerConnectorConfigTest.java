@@ -32,7 +32,7 @@ class BaseSpannerConnectorConfigTest {
     void testConfigDef() {
         ConfigDef actualConfigDefResult = BaseSpannerConnectorConfig.configDef();
         Map<String, ConfigDef.ConfigKey> configKeysResult = actualConfigDefResult.configKeys();
-        assertEquals(52, configKeysResult.size());
+        assertEquals(53, configKeysResult.size());
         List<String> groupsResult = actualConfigDefResult.groups();
         assertEquals(3, groupsResult.size());
         assertEquals("Spanner", groupsResult.get(0));
