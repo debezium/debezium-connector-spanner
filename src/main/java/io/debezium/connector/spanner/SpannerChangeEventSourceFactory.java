@@ -13,6 +13,7 @@ import io.debezium.connector.spanner.db.stream.ChangeStream;
 import io.debezium.connector.spanner.metrics.SpannerMeter;
 import io.debezium.connector.spanner.processor.SpannerEventDispatcher;
 import io.debezium.pipeline.ErrorHandler;
+import io.debezium.pipeline.notification.NotificationService;
 import io.debezium.pipeline.source.spi.ChangeEventSourceFactory;
 import io.debezium.pipeline.source.spi.SnapshotChangeEventSource;
 import io.debezium.pipeline.source.spi.SnapshotProgressListener;
@@ -57,7 +58,9 @@ public class SpannerChangeEventSourceFactory implements ChangeEventSourceFactory
     }
 
     @Override
-    public SnapshotChangeEventSource<SpannerPartition, SpannerOffsetContext> getSnapshotChangeEventSource(SnapshotProgressListener snapshotProgressListener) {
+    public SnapshotChangeEventSource<SpannerPartition, SpannerOffsetContext> getSnapshotChangeEventSource(
+                                                                                                          SnapshotProgressListener<SpannerPartition> snapshotProgressListener,
+                                                                                                          NotificationService<SpannerPartition, SpannerOffsetContext> notificationService) {
         return (context, partition, previousOffset) -> SnapshotResult.skipped(null);
     }
 

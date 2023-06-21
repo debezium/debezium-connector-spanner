@@ -27,7 +27,7 @@ class SpannerChangeEventSourceFactoryTest {
         SpannerChangeEventSourceFactory spannerChangeEventSourceFactory = new SpannerChangeEventSourceFactory(
                 null, null, null, null, null, null, null, null);
 
-        assertNotNull(spannerChangeEventSourceFactory.getSnapshotChangeEventSource(null));
+        assertNotNull(spannerChangeEventSourceFactory.getSnapshotChangeEventSource(null, null));
     }
 
     @Test
