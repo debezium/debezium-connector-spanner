@@ -5,8 +5,6 @@
  */
 package io.debezium.connector.spanner.metrics.jmx;
 
-import java.util.Map;
-
 import org.apache.kafka.connect.data.Struct;
 
 import com.google.cloud.Timestamp;
@@ -20,6 +18,7 @@ import io.debezium.pipeline.metrics.DefaultStreamingChangeEventSourceMetrics;
 import io.debezium.pipeline.source.spi.EventMetadataProvider;
 import io.debezium.pipeline.spi.OffsetContext;
 import io.debezium.spi.schema.DataCollectionId;
+import io.debezium.util.Collect;
 
 /**
  * Implementation of metrics related to the streaming phase of the Spanner connector
@@ -40,7 +39,7 @@ public class SpannerStreamingChangeEventSourceMetrics
                                                     EventMetadataProvider metadataProvider,
                                                     SpannerMeter spannerMeter) {
         super(taskContext, changeEventQueueMetrics, metadataProvider,
-                Map.of(CONNECTOR_NAME_TAG, taskContext.getConnectorName(),
+                Collect.linkMapOf(CONNECTOR_NAME_TAG, taskContext.getConnectorName(),
                         TASK_ID_TAG, TASK_ID_TAG + "-" + taskContext.getTaskId()));
         this.spannerMeter = spannerMeter;
         this.jsonSerializer = new JsonSerializer();
