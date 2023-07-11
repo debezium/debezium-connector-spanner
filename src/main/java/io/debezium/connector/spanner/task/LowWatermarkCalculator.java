@@ -106,7 +106,8 @@ public class LowWatermarkCalculator {
                             .getStartTimestamp()
                             .toDate()
                             .getTime();
-            if (lag > OFFSET_MONITORING_LAG_MAX_MS) {
+            long acceptedLag = spannerConnectorConfig.getHeartbeatInterval().getSeconds() * 1000 + OFFSET_MONITORING_LAG_MAX_MS;
+            if (lag > acceptedLag) {
                 LOGGER.warn(
                         "Partition has a very old start timestamp, lag: {}, token: {}",
                         lag,
@@ -177,17 +178,18 @@ public class LowWatermarkCalculator {
         allPartitions.values().forEach(
                 partitionState -> {
                     Timestamp timestamp = offsets.get(partitionState.getToken());
+                    long acceptedLag = spannerConnectorConfig.getHeartbeatInterval().getSeconds() * 1000 + OFFSET_MONITORING_LAG_MAX_MS;
                     if (timestamp != null) {
                         String token = partitionState.getToken();
                         long lag = now - timestamp.toDate().getTime();
-                        if (lag > OFFSET_MONITORING_LAG_MAX_MS) {
+                        if (lag > acceptedLag) {
                             LOGGER.warn("Task {}, Partition has a very old offset, lag: {}, token: {}", taskSyncContextHolder.get().getTaskUid(), lag, token);
                         }
                     }
                     else if (partitionState.getStartTimestamp() != null) {
                         String token = partitionState.getToken();
                         long lag = now - partitionState.getStartTimestamp().toDate().getTime();
-                        if (lag > OFFSET_MONITORING_LAG_MAX_MS) {
+                        if (lag > acceptedLag) {
                             LOGGER.warn("Task {}, Partition has a very old start time, lag: {}, token: {}", taskSyncContextHolder.get().getTaskUid(), lag, token);
                         }
                     }

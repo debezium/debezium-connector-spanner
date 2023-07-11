@@ -54,11 +54,18 @@ public class SyncEventHandler {
     }
 
     public void processPreviousStates(TaskSyncEvent inSync, SyncEventMetadata metadata) {
-
         if (!RebalanceState.START_INITIAL_SYNC.equals(taskSyncContextHolder.get().getRebalanceState())) {
             return;
         }
         if (skipFromPreviousGeneration(inSync)) {
+            if (metadata.isCanInitiateRebalancing()) {
+                LOGGER.info("task {}, finished processing all previous sync event messages with end offset {}, can initiate rebalancing",
+                        taskSyncContextHolder.get().getTaskUid(), metadata.getOffset());
+                taskSyncContextHolder.update(context -> context.toBuilder()
+                        .rebalanceState(RebalanceState.INITIAL_INCREMENTED_STATE_COMPLETED)
+                        .epochOffsetHolder(context.getEpochOffsetHolder().nextOffset(context.getCurrentKafkaRecordOffset()))
+                        .build());
+            }
             return;
         }
 
