@@ -27,9 +27,6 @@ import io.debezium.util.Metronome;
  * Publishes metric events, when state is changed.
  */
 public class TaskSyncContextHolder {
-
-    private static final Duration AWAIT_TIME_TIME_OUT = Duration.ofSeconds(120);
-
     private static final Logger LOGGER = getLogger(TaskSyncContextHolder.class);
 
     private final MetricsEventPublisher metricsEventPublisher;
@@ -86,9 +83,9 @@ public class TaskSyncContextHolder {
         lock.unlock();
     }
 
-    public void awaitInitialization() {
+    public void awaitInitialization(Duration awaitTimeout) {
         LOGGER.info("awaitInitialization: start");
-        TimeoutMeter timeout = TimeoutMeter.setTimeout(AWAIT_TIME_TIME_OUT);
+        TimeoutMeter timeout = TimeoutMeter.setTimeout(awaitTimeout);
         while (RebalanceState.START_INITIAL_SYNC.equals(this.get().getRebalanceState())) {
             if (timeout.isExpired()) {
                 LOGGER.info("Await task initialization timeout expired");

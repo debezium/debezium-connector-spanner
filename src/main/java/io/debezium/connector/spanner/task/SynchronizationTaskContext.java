@@ -7,6 +7,8 @@ package io.debezium.connector.spanner.task;
 
 import static org.slf4j.LoggerFactory.getLogger;
 
+import java.time.Duration;
+
 import org.slf4j.Logger;
 
 import io.debezium.connector.spanner.SpannerConnectorConfig;
@@ -179,7 +181,9 @@ public class SynchronizationTaskContext {
 
             this.taskSyncEventListener.start();
 
-            this.taskSyncContextHolder.awaitInitialization();
+            final Duration awaitTimeout = connectorConfig.awaitInitializationTimeout();
+
+            this.taskSyncContextHolder.awaitInitialization(awaitTimeout);
 
             LOGGER.info("{}, connecting to the rebalance topic", task.getTaskUid());
             this.rebalancingEventListener

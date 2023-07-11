@@ -92,7 +92,7 @@ public class TaskSyncEventListener {
                 }
             }
             else {
-                LOGGER.info("Task {}, listen: read last message", consumerGroup);
+                LOGGER.info("Task {}, listen: read last message with start offset {} and end offset {}", consumerGroup, startOffset, endOffset);
                 try {
                     consumer.seek(topicPartition, startOffset);
                     seekBackToPreviousEpoch(consumer, topicPartition, beginOffset);
@@ -163,6 +163,9 @@ public class TaskSyncEventListener {
             TaskSyncEvent taskSyncEvent = parseSyncEvent(record);
             debug(LOGGER, "Receive SyncEvent from Kafka topic: {}", taskSyncEvent);
 
+            if (record.offset() == endOffset - 1) {
+                LOGGER.info("Task {}, can begin to initiate rebalancing", consumerGroup);
+            }
             for (BlockingBiConsumer<TaskSyncEvent, SyncEventMetadata> eventConsumer : eventConsumers) {
                 boolean canInitiateRebalancing = (record.offset() >= endOffset - 1);
                 eventConsumer.accept(

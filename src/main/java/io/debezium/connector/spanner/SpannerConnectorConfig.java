@@ -193,6 +193,10 @@ public class SpannerConnectorConfig extends BaseSpannerConnectorConfig {
         return getConfig().getInteger(SYNC_EVENT_PUBLISH_WAITING_TIMEOUT);
     }
 
+    public Duration awaitInitializationTimeout() {
+        return getConfig().getDuration(TASK_AWAIT_INITIALIZATION_TMEOUT, ChronoUnit.MILLIS);
+    }
+
     public int syncPollDuration() {
         return getConfig().getInteger(SYNC_POLL_DURATION);
     }
