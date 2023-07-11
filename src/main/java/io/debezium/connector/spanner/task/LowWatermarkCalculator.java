@@ -106,7 +106,7 @@ public class LowWatermarkCalculator {
                             .getStartTimestamp()
                             .toDate()
                             .getTime();
-            long acceptedLag = spannerConnectorConfig.getHeartbeatInterval().getSeconds() * 1000 + OFFSET_MONITORING_LAG_MAX_MS;
+            long acceptedLag = spannerConnectorConfig.getHeartbeatInterval().toMillis() + OFFSET_MONITORING_LAG_MAX_MS;
             if (lag > acceptedLag) {
                 LOGGER.warn(
                         "Partition has a very old start timestamp, lag: {}, token: {}",
@@ -178,7 +178,7 @@ public class LowWatermarkCalculator {
         allPartitions.values().forEach(
                 partitionState -> {
                     Timestamp timestamp = offsets.get(partitionState.getToken());
-                    long acceptedLag = spannerConnectorConfig.getHeartbeatInterval().getSeconds() * 1000 + OFFSET_MONITORING_LAG_MAX_MS;
+                    long acceptedLag = spannerConnectorConfig.getHeartbeatInterval().toMillis() + OFFSET_MONITORING_LAG_MAX_MS;
                     if (timestamp != null) {
                         String token = partitionState.getToken();
                         long lag = now - timestamp.toDate().getTime();
