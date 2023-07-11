@@ -18,7 +18,7 @@
         <google.cloud.spanner.version>6.30.1</google.cloud.spanner.version>
         <version.sketches-java>0.8.2</version.sketches-java>
         <version.google.protos>2.8.3</version.google.protos>
-        <version.com.google.protobuf>3.21.6</version.com.google.protobuf>
+        <version.com.google.protobuf>3.21.7</version.com.google.protobuf>
         <version.joda>2.10.14</version.joda>
         <version.commons-lang3>3.12.0</version.commons-lang3>
         <version.junit>5.8.2</version.junit>
