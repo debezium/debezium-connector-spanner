@@ -29,7 +29,7 @@ public class SpannerErrorHandler extends ErrorHandler {
     private final SpannerConnectorTask task;
 
     public SpannerErrorHandler(SpannerConnectorTask task, ChangeEventQueue<?> queue) {
-        super(SpannerConnector.class, null, queue);
+        super(SpannerConnector.class, null, queue, null);
         this.task = task;
         this.queue = queue;
     }
