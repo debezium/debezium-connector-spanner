@@ -81,7 +81,7 @@ class SpannerStreamingChangeEventSourceTest {
         SpannerConnectorConfig connectorConfig = new SpannerConnectorConfig(configuration);
         ChangeEventQueue<?> changeEventQueue = (ChangeEventQueue<?>) mock(ChangeEventQueue.class);
         doNothing().when(changeEventQueue).producerException((RuntimeException) any());
-        ErrorHandler errorHandler = new ErrorHandler(SourceConnector.class, connectorConfig, changeEventQueue);
+        ErrorHandler errorHandler = new ErrorHandler(SourceConnector.class, connectorConfig, changeEventQueue, null);
 
         Configuration configuration1 = mock(Configuration.class);
         when(configuration1.getString((Field) any())).thenReturn("String");
@@ -143,7 +143,7 @@ class SpannerStreamingChangeEventSourceTest {
         when(configuration5.asProperties()).thenReturn(new Properties());
         SpannerConnectorConfig connectorConfig3 = new SpannerConnectorConfig(configuration5);
         ErrorHandler errorHandler1 = new ErrorHandler(SourceConnector.class, connectorConfig3,
-                (ChangeEventQueue<?>) mock(ChangeEventQueue.class));
+                (ChangeEventQueue<?>) mock(ChangeEventQueue.class), null);
 
         Configuration configuration6 = mock(Configuration.class);
         when(configuration6.getString((Field) any())).thenReturn("String");
@@ -193,7 +193,7 @@ class SpannerStreamingChangeEventSourceTest {
         when(configuration.asProperties()).thenReturn(new Properties());
         SpannerConnectorConfig connectorConfig = new SpannerConnectorConfig(configuration);
         ErrorHandler errorHandler = new ErrorHandler(SourceConnector.class, connectorConfig,
-                (ChangeEventQueue<?>) mock(ChangeEventQueue.class));
+                (ChangeEventQueue<?>) mock(ChangeEventQueue.class), null);
 
         Configuration configuration1 = mock(Configuration.class);
         when(configuration1.getString((String) any())).thenReturn("String");
