@@ -64,9 +64,6 @@ public class SpannerHeartbeat implements Heartbeat {
     public void forcedBeat(Map<String, ?> partition, Map<String, ?> offset, BlockingConsumer<SourceRecord> consumer)
             throws InterruptedException {
         LOGGER.debug("Generating heartbeat event");
-        if (offset == null || offset.isEmpty()) {
-            throw new IllegalStateException("Offset is not provided");
-        }
         consumer.accept(heartbeatRecord((Map<String, String>) partition, offset));
     }
 

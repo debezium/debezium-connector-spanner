@@ -29,7 +29,15 @@ public class PartitionOffset {
         this.metadata = metadata;
     }
 
+    public PartitionOffset(StreamEventMetadata metadata) {
+        this.metadata = metadata;
+        this.offset = null;
+    }
+
     public Map<String, String> getOffset() {
+        if (this.offset == null) {
+            return null;
+        }
         return Map.of(OFFSET_KEY, offset.toString(),
                 DEBUG_START_TIME_KEY, metadata.getPartitionStartTimestamp().toString(),
                 DEBUG_QUERY_STARTED_AT_KEY, metadata.getQueryStartedAt() != null ? metadata.getQueryStartedAt().toString() : "");
