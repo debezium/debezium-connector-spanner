@@ -17,6 +17,7 @@ import io.debezium.connector.spanner.SpannerConnectorConfig;
 import io.debezium.connector.spanner.db.stream.ChangeStream;
 import io.debezium.connector.spanner.exception.SpannerConnectorException;
 import io.debezium.connector.spanner.kafka.internal.TaskSyncPublisher;
+import io.debezium.connector.spanner.processor.SpannerEventDispatcher;
 import io.debezium.connector.spanner.task.operation.ChildPartitionOperation;
 import io.debezium.connector.spanner.task.operation.ClearSharedPartitionOperation;
 import io.debezium.connector.spanner.task.operation.ConnectorEndDetectionOperation;
@@ -50,6 +51,7 @@ public class TaskStateChangeEventHandler {
 
     private final Runnable finishingHandler;
     private final SpannerConnectorConfig connectorConfig;
+    private final SpannerEventDispatcher spannerEventDispatcher;
     private final Consumer<RuntimeException> errorHandler;
 
     private final AtomicLong failOverloadedTaskTimer = new AtomicLong(System.currentTimeMillis());
@@ -58,6 +60,7 @@ public class TaskStateChangeEventHandler {
                                        TaskSyncPublisher taskSyncPublisher,
                                        ChangeStream changeStream,
                                        PartitionFactory partitionFactory,
+                                       SpannerEventDispatcher spannerEventDispatcher,
                                        Runnable finishingHandler,
                                        SpannerConnectorConfig connectorConfig,
                                        Consumer<RuntimeException> errorHandler) {
@@ -68,6 +71,7 @@ public class TaskStateChangeEventHandler {
         this.finishingHandler = finishingHandler;
         this.connectorConfig = connectorConfig;
         this.errorHandler = errorHandler;
+        this.spannerEventDispatcher = spannerEventDispatcher;
     }
 
     public void processEvent(TaskStateChangeEvent syncEvent) throws InterruptedException {
@@ -93,7 +97,7 @@ public class TaskStateChangeEventHandler {
                 new PartitionStatusUpdateOperation(event.getToken(), event.getState()),
                 new FindPartitionForStreamingOperation(),
                 new TakePartitionForStreamingOperation(changeStream, partitionFactory),
-                new RemoveFinishedPartitionOperation());
+                new RemoveFinishedPartitionOperation(spannerEventDispatcher));
     }
 
     private void processEvent(NewPartitionsEvent newPartitionsEvent) throws InterruptedException {
@@ -101,7 +105,7 @@ public class TaskStateChangeEventHandler {
                 new ChildPartitionOperation(newPartitionsEvent.getPartitions()),
                 new FindPartitionForStreamingOperation(),
                 new TakePartitionForStreamingOperation(changeStream, partitionFactory),
-                new RemoveFinishedPartitionOperation());
+                new RemoveFinishedPartitionOperation(spannerEventDispatcher));
     }
 
     private void processSyncEvent() throws InterruptedException {
@@ -110,7 +114,7 @@ public class TaskStateChangeEventHandler {
                 new TakeSharedPartitionOperation(),
                 new FindPartitionForStreamingOperation(),
                 new TakePartitionForStreamingOperation(changeStream, partitionFactory),
-                new RemoveFinishedPartitionOperation(),
+                new RemoveFinishedPartitionOperation(spannerEventDispatcher),
                 new ConnectorEndDetectionOperation(finishingHandler, connectorConfig.endTime()));
 
         failOverloadedTaskByTimer(taskSyncContext);

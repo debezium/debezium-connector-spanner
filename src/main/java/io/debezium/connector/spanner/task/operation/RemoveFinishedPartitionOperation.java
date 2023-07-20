@@ -19,18 +19,28 @@ import org.slf4j.Logger;
 import com.google.cloud.Timestamp;
 
 import io.debezium.DebeziumException;
+import io.debezium.connector.spanner.SpannerPartition;
+import io.debezium.connector.spanner.context.offset.PartitionOffset;
+import io.debezium.connector.spanner.context.offset.SpannerOffsetContext;
 import io.debezium.connector.spanner.kafka.internal.model.PartitionState;
 import io.debezium.connector.spanner.kafka.internal.model.PartitionStateEnum;
 import io.debezium.connector.spanner.kafka.internal.model.TaskState;
+import io.debezium.connector.spanner.processor.SpannerEventDispatcher;
 import io.debezium.connector.spanner.task.TaskSyncContext;
+import io.debezium.pipeline.txmetadata.TransactionContext;
 
 /** Remove finished partition from the task state, as it is not needed anymore */
 public class RemoveFinishedPartitionOperation implements Operation {
     private static final Logger LOGGER = getLogger(RemoveFinishedPartitionOperation.class);
 
     private static final Duration DELETION_DELAY = Duration.ofMinutes(60);
+    private final SpannerEventDispatcher spannerEventDispatcher;
 
     private boolean isRequiredPublishSyncEvent = false;
+
+    public RemoveFinishedPartitionOperation(SpannerEventDispatcher spannerEventDispatcher) {
+        this.spannerEventDispatcher = spannerEventDispatcher;
+    }
 
     private TaskSyncContext removeFinishedPartitions(TaskSyncContext taskSyncContext) {
 
@@ -60,6 +70,18 @@ public class RemoveFinishedPartitionOperation implements Operation {
                                             partitionState.getFinishedTimestamp(),
                                             deletionTime,
                                             currentTime);
+
+                                    LOGGER.info("Task {}, Dispatching null offset for partition {} because it is removed", taskSyncContext.getTaskUid(),
+                                            partitionState.getToken());
+                                    PartitionOffset partitionOffset = new PartitionOffset();
+                                    SpannerOffsetContext spannerOffsetContext = new SpannerOffsetContext(partitionOffset, new TransactionContext());
+                                    SpannerPartition partition = new SpannerPartition(partitionState.getToken());
+                                    try {
+                                        spannerEventDispatcher.alwaysDispatchHeartbeatEvent(partition, spannerOffsetContext);
+                                    }
+                                    catch (InterruptedException e) {
+                                        LOGGER.error("Task {}, Failed to send null offset for partition {}", taskSyncContext.getTaskUid(), partitionState.getToken());
+                                    }
                                     return null;
                                 }
                                 return partitionState;

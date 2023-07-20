@@ -29,8 +29,8 @@ public class PartitionOffset {
         this.metadata = metadata;
     }
 
-    public PartitionOffset(StreamEventMetadata metadata) {
-        this.metadata = metadata;
+    public PartitionOffset() {
+        this.metadata = null;
         this.offset = null;
     }
 

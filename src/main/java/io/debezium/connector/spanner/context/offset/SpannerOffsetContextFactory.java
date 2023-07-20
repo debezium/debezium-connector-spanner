@@ -8,7 +8,6 @@ package io.debezium.connector.spanner.context.offset;
 import io.debezium.connector.spanner.context.source.SourceInfo;
 import io.debezium.connector.spanner.context.source.SourceInfoFactory;
 import io.debezium.connector.spanner.db.model.event.DataChangeEvent;
-import io.debezium.connector.spanner.db.model.event.FinishPartitionEvent;
 import io.debezium.connector.spanner.db.model.event.HeartbeatEvent;
 import io.debezium.pipeline.txmetadata.TransactionContext;
 
@@ -30,11 +29,6 @@ public class SpannerOffsetContextFactory {
 
     public SpannerOffsetContext getOffsetContextFromHeartbeatEvent(HeartbeatEvent heartbeatEvent) {
         PartitionOffset partitionOffset = new PartitionOffset(heartbeatEvent.getRecordTimestamp(), heartbeatEvent.getMetadata());
-        return new SpannerOffsetContext(partitionOffset, transactionContext);
-    }
-
-    public SpannerOffsetContext getNullOffsetContext(FinishPartitionEvent finishPartitionEvent) {
-        PartitionOffset partitionOffset = new PartitionOffset(finishPartitionEvent.getMetadata());
         return new SpannerOffsetContext(partitionOffset, transactionContext);
     }
 }

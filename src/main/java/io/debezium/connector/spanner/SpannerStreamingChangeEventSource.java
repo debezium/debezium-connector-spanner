@@ -192,11 +192,7 @@ public class SpannerStreamingChangeEventSource implements CommittingRecordsStrea
                         processChildPartitionsEvent(childPartitionsEvent);
                     }
                     else if (event instanceof FinishPartitionEvent) {
-                        LOGGER.info("Received FinishPartitionEvent for partition {}, dispatching null offset", event.getMetadata().getPartitionToken());
-
-                        SpannerOffsetContext nullOffsetContext = offsetContextFactory.getNullOffsetContext((FinishPartitionEvent) event);
-                        SpannerPartition partition = new SpannerPartition(event.getMetadata().getPartitionToken());
-                        spannerEventDispatcher.alwaysDispatchHeartbeatEvent(partition, nullOffsetContext);
+                        LOGGER.info("Received FinishPartitionEvent for partition {}", event.getMetadata().getPartitionToken());
 
                         if (finishPartitionStrategy.equals(FinishPartitionStrategy.AFTER_COMMIT)) {
                             this.finishingPartitionManager.onPartitionFinishEvent(event.getMetadata().getPartitionToken());
