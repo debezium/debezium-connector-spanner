@@ -48,6 +48,11 @@ public class SyncEventMerger {
 
         var builder = context.toBuilder();
 
+        // Skip processing messages that this task has already produced.
+        if (inSync.getTaskUid().equals(context.getTaskUid())) {
+            return builder.build();
+        }
+
         Set<String> updatedStatesUids = new HashSet<>();
 
         // We only update our internal copies of other task states from received sync event messages.
@@ -96,7 +101,6 @@ public class SyncEventMerger {
             if (inSync.getMessageType() != MessageTypeEnum.REGULAR && !foundDuplication) {
                 if (result.checkDuplication(true, inSync.getMessageType().toString())) {
                     LOGGER.info("Task {} found duplication after processing {}", context.getTaskUid(), inSync);
-                    LOGGER.info("Task {} final message {}", context.getTaskUid(), result);
                 }
             }
 
