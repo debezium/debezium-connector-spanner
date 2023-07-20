@@ -149,8 +149,14 @@ public class SyncEventHandler {
 
         taskSyncContextHolder.lock();
         try {
-
             if (!taskSyncContextHolder.get().getRebalanceState().equals(RebalanceState.NEW_EPOCH_STARTED)) {
+                return;
+            }
+
+            if (inSync.getMessageType() == MessageTypeEnum.NEW_EPOCH
+                    || inSync.getMessageType() == MessageTypeEnum.REBALANCE_ANSWER) {
+                LOGGER.warn("Task {} - should have already processed sync message from task {} with message type {}",
+                        taskSyncContextHolder.get().getTaskUid(), inSync.getTaskUid(), inSync.getMessageType());
                 return;
             }
 

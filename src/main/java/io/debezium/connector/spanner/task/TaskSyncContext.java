@@ -370,8 +370,8 @@ public class TaskSyncContext {
         if (!duplicatesInPartitions.isEmpty()) {
             if (printOffsets) {
                 LOGGER.warn(
-                        "task: {}, logging {}, taskSyncContext: found duplication in partitionsMap with size {}: {}, {}", getTaskUid(), loggingString, numPartitions,
-                        duplicatesInPartitions, getAllTaskStates());
+                        "task: {}, logging {}, taskSyncContext: found duplication in partitionsMap with size {}: {}", getTaskUid(), loggingString, numPartitions,
+                        duplicatesInPartitions);
             }
             return true;
         }
@@ -391,8 +391,8 @@ public class TaskSyncContext {
         if (!duplicatesInSharedPartitions.isEmpty()) {
             if (printOffsets) {
                 LOGGER.warn(
-                        "task: {}, logging {}, taskSyncContext: found duplication in sharedPartitionsMap with size {}: {}, {}",
-                        getTaskUid(), loggingString, numSharedPartitions, duplicatesInSharedPartitions, getAllTaskStates());
+                        "task: {}, logging {}, taskSyncContext: found duplication in sharedPartitionsMap with size {}: {}",
+                        getTaskUid(), loggingString, numSharedPartitions, duplicatesInSharedPartitions);
             }
             return true;
         }
