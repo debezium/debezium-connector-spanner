@@ -50,13 +50,34 @@ class SpannerHeartbeatTest {
     }
 
     @Test
-    void testHeartbeatThrows() {
+    void testHeartbeatWithNullOffset() throws InterruptedException {
         SchemaNameAdjuster schemaNameAdjuster = mock(SchemaNameAdjuster.class);
         when(schemaNameAdjuster.adjust(any())).thenReturn("Adjust");
-        try (SpannerHeartbeat spannerHeartbeat = new SpannerHeartbeat("Topic Name", schemaNameAdjuster)) {
+        try (SpannerHeartbeat spannerHeartbeat = spy(new SpannerHeartbeat("Topic Name", schemaNameAdjuster))) {
             HashMap<String, Object> partition = new HashMap<>();
-            assertThrows(IllegalStateException.class, () -> spannerHeartbeat.heartbeat(partition, new HashMap<>(),
-                    (BlockingConsumer<SourceRecord>) mock(BlockingConsumer.class)));
+            partition.put("partitionToken", "v1");
+            BlockingConsumer<SourceRecord> consumer = mock(BlockingConsumer.class);
+            doNothing().when(consumer).accept(any());
+            Map<String, Object> nullOffset = null;
+            spannerHeartbeat.heartbeat(partition, nullOffset, consumer);
+            verify(consumer).accept(any());
+            verify(spannerHeartbeat).forcedBeat(any(), any(), any());
+        }
+        verify(schemaNameAdjuster, atLeast(1)).adjust(any());
+    }
+
+    @Test
+    void testHeartbeatWithEmptyOffset() throws InterruptedException {
+        SchemaNameAdjuster schemaNameAdjuster = mock(SchemaNameAdjuster.class);
+        when(schemaNameAdjuster.adjust(any())).thenReturn("Adjust");
+        try (SpannerHeartbeat spannerHeartbeat = spy(new SpannerHeartbeat("Topic Name", schemaNameAdjuster))) {
+            HashMap<String, Object> partition = new HashMap<>();
+            partition.put("partitionToken", "v1");
+            BlockingConsumer<SourceRecord> consumer = mock(BlockingConsumer.class);
+            doNothing().when(consumer).accept(any());
+            spannerHeartbeat.heartbeat(partition, new HashMap<>(), consumer);
+            verify(consumer).accept(any());
+            verify(spannerHeartbeat).forcedBeat(any(), any(), any());
         }
         verify(schemaNameAdjuster, atLeast(1)).adjust(any());
     }
@@ -80,13 +101,17 @@ class SpannerHeartbeatTest {
     }
 
     @Test
-    void testForcedBeatThrow() {
+    void testForcedBeatWithEmptyOffset() throws InterruptedException {
         SchemaNameAdjuster schemaNameAdjuster = mock(SchemaNameAdjuster.class);
         when(schemaNameAdjuster.adjust(any())).thenReturn("Adjust");
-        try (SpannerHeartbeat spannerHeartbeat = new SpannerHeartbeat("Topic Name", schemaNameAdjuster)) {
-            HashMap<String, Object> partition = new HashMap<>();
-            assertThrows(IllegalStateException.class, () -> spannerHeartbeat.forcedBeat(partition, new HashMap<>(),
-                    (BlockingConsumer<SourceRecord>) mock(BlockingConsumer.class)));
+        try (SpannerHeartbeat spannerHeartbeat = spy(new SpannerHeartbeat("Topic Name", schemaNameAdjuster))) {
+            Map<String, Object> partition = new HashMap<>();
+            partition.put("partitionToken", "v1");
+            BlockingConsumer<SourceRecord> consumer = mock(BlockingConsumer.class);
+            doNothing().when(consumer).accept(any());
+            spannerHeartbeat.heartbeat(partition, new HashMap<>(), consumer);
+            verify(consumer).accept(any());
+            verify(spannerHeartbeat).forcedBeat(any(), any(), any());
         }
         verify(schemaNameAdjuster, atLeast(1)).adjust(any());
     }
