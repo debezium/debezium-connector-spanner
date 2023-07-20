@@ -157,7 +157,6 @@ public class SyncEventHandler {
                     || inSync.getMessageType() == MessageTypeEnum.REBALANCE_ANSWER) {
                 LOGGER.warn("Task {} - should have already processed sync message from task {} with message type {}",
                         taskSyncContextHolder.get().getTaskUid(), inSync.getTaskUid(), inSync.getMessageType());
-                return;
             }
 
             LOGGER.debug("Task {} - process sync event", taskSyncContextHolder.get().getTaskUid());
