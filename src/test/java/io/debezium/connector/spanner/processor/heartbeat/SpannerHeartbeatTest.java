@@ -117,6 +117,23 @@ class SpannerHeartbeatTest {
     }
 
     @Test
+    void testForcedBeatWithNullOffset() throws InterruptedException {
+        SchemaNameAdjuster schemaNameAdjuster = mock(SchemaNameAdjuster.class);
+        when(schemaNameAdjuster.adjust(any())).thenReturn("Adjust");
+        try (SpannerHeartbeat spannerHeartbeat = spy(new SpannerHeartbeat("Topic Name", schemaNameAdjuster))) {
+            Map<String, Object> partition = new HashMap<>();
+            partition.put("partitionToken", "v1");
+            BlockingConsumer<SourceRecord> consumer = mock(BlockingConsumer.class);
+            doNothing().when(consumer).accept(any());
+            Map<String, Object> nullOffset = null;
+            spannerHeartbeat.heartbeat(partition, nullOffset, consumer);
+            verify(consumer).accept(any());
+            verify(spannerHeartbeat).forcedBeat(any(), any(), any());
+        }
+        verify(schemaNameAdjuster, atLeast(1)).adjust(any());
+    }
+
+    @Test
     void testPartitionTokenKey() {
         SchemaNameAdjuster schemaNameAdjuster = mock(SchemaNameAdjuster.class);
         when(schemaNameAdjuster.adjust(any())).thenReturn("Adjust");
