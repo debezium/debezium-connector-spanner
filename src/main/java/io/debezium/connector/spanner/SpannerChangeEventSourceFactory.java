@@ -14,6 +14,8 @@ import io.debezium.connector.spanner.metrics.SpannerMeter;
 import io.debezium.connector.spanner.processor.SpannerEventDispatcher;
 import io.debezium.pipeline.ErrorHandler;
 import io.debezium.pipeline.notification.NotificationService;
+import io.debezium.pipeline.signal.actions.snapshotting.SnapshotConfiguration;
+import io.debezium.pipeline.source.SnapshottingTask;
 import io.debezium.pipeline.source.spi.ChangeEventSourceFactory;
 import io.debezium.pipeline.source.spi.SnapshotChangeEventSource;
 import io.debezium.pipeline.source.spi.SnapshotProgressListener;
@@ -61,7 +63,24 @@ public class SpannerChangeEventSourceFactory implements ChangeEventSourceFactory
     public SnapshotChangeEventSource<SpannerPartition, SpannerOffsetContext> getSnapshotChangeEventSource(
                                                                                                           SnapshotProgressListener<SpannerPartition> snapshotProgressListener,
                                                                                                           NotificationService<SpannerPartition, SpannerOffsetContext> notificationService) {
-        return (context, partition, previousOffset) -> SnapshotResult.skipped(null);
+        return new SnapshotChangeEventSource<>() {
+            @Override
+            public SnapshotResult<SpannerOffsetContext> execute(ChangeEventSourceContext context, SpannerPartition partition, SpannerOffsetContext previousOffset,
+                                                                SnapshottingTask snapshottingTask) {
+                return SnapshotResult.skipped(null);
+            }
+
+            @Override
+            public SnapshottingTask getSnapshottingTask(SpannerPartition partition, SpannerOffsetContext previousOffset) {
+                throw new UnsupportedOperationException("Snapshotting is not supported");
+            }
+
+            @Override
+            public SnapshottingTask getBlockingSnapshottingTask(SpannerPartition partition, SpannerOffsetContext previousOffset,
+                                                                SnapshotConfiguration snapshotConfiguration) {
+                throw new UnsupportedOperationException("Snapshotting is not supported");
+            }
+        };
     }
 
     @Override
