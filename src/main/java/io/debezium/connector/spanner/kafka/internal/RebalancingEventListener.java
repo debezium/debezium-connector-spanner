@@ -78,20 +78,23 @@ public class RebalancingEventListener {
             @Override
             public void onPartitionsAssigned(Collection<TopicPartition> partitions) {
 
-                LOGGER.info("Task {} - Rebalance happened", task.getTaskUid());
+                LOGGER.info("Task {} - Rebalance happened, consumer ID {}", task.getTaskUid(), task.getConsumerId());
 
                 ConsumerGroupMetadata meta = consumer.groupMetadata();
                 lastRebalanceEventMetadata = new RebalanceEventMetadata(meta.memberId(), meta.generationId(), isLeader(partitions));
 
                 LOGGER.info("Task {} - Rebalance: Waiting for other tasks to connect", task.getTaskUid());
                 resettableDelayedAction.set(() -> {
-                    LOGGER.info("Task {} -Rebalance finished", task.getTaskUid());
+                    LOGGER.info("Task {} -Rebalance finished with consumer Id {}", task.getTaskUid(), task.getConsumerId());
 
                     try {
                         rebalancingAction.accept(lastRebalanceEventMetadata);
                     }
                     catch (InterruptedException ex) {
                         Thread.currentThread().interrupt();
+                    }
+                    catch (Exception e) {
+                      LOGGER.error("Task {} - rebalance error with consumer ID {}", task.getTaskUid(), task.getConsumerId());
                     }
                 });
             }
