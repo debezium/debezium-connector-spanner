@@ -76,6 +76,7 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
     public static final String CONNECTOR_SPANNER_SYNC_TOPIC_CONFIG_PREFIX = "connector.spanner.sync.topic.config.";
 
     private static final String CONNECTOR_SPANNER_PARTITION_FINISHING_AFTER_COMMIT_PROPERTY_NAME = "connector.spanner.partition.finishing.afterCommit";
+    private static final String CONNECTOR_SPANNER_FINISHED_PRTITION_DELETION_DELAY_PROPERTY_NAME = "connector.spanner.finished.partition.deletion.delay";
 
     private static final String CONNECTOR_SPANNER_REBALANCING_TASK_WAITING_TIMEOUT_PROPERTY_NAME = "connector.spanner.rebalancing.task.wait.timeout";
     private static final String CONNECTOR_SPANNER_SYNC_EVENT_PUBLISH_WAITING_TIMEOUT_PROPERTY_NAME = "connector.spanner.sync.publisher.wait.timeout";
@@ -506,6 +507,16 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
             .withDefault(true)
             .withDescription("default true");
 
+    protected static final Field CONNECTOR_SPANNER_FINISHED_PARTITION_DELETION_DELAY_FIELD = Field
+            .create(CONNECTOR_SPANNER_FINISHED_PRTITION_DELETION_DELAY_PROPERTY_NAME)
+            .withDisplayName("Connector spanner partition deletion delay after finished(seconds)")
+            .withType(Type.INT)
+            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR, 14))
+            .withWidth(Width.MEDIUM)
+            .withImportance(Importance.LOW)
+            .withDefault(7200)
+            .withDescription("Defines deletion delay after partitions finished, default 2 hours");
+
     protected static final Field REBALANCING_TASK_WAITING_TIMEOUT = Field.create(CONNECTOR_SPANNER_REBALANCING_TASK_WAITING_TIMEOUT_PROPERTY_NAME)
             .withDisplayName("Rebalancing Task waiting timeout")
             .withType(Type.INT)
@@ -587,6 +598,7 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
                     SYNC_EVENT_PUBLISH_WAITING_TIMEOUT,
                     TASK_AWAIT_INITIALIZATION_TMEOUT,
                     CONNECTOR_SPANNER_PARTITION_FINISHING_AFTER_COMMIT_FIELD,
+                    CONNECTOR_SPANNER_FINISHED_PARTITION_DELETION_DELAY_FIELD,
                     PERCENTAGE_METRICS_CLEAR_INTERVAL,
 
                     SYNC_TOPIC,

@@ -97,7 +97,7 @@ public class TaskStateChangeEventHandler {
                 new PartitionStatusUpdateOperation(event.getToken(), event.getState()),
                 new FindPartitionForStreamingOperation(),
                 new TakePartitionForStreamingOperation(changeStream, partitionFactory),
-                new RemoveFinishedPartitionOperation(spannerEventDispatcher));
+                new RemoveFinishedPartitionOperation(spannerEventDispatcher, connectorConfig));
     }
 
     private void processEvent(NewPartitionsEvent newPartitionsEvent) throws InterruptedException {
@@ -105,7 +105,7 @@ public class TaskStateChangeEventHandler {
                 new ChildPartitionOperation(newPartitionsEvent.getPartitions()),
                 new FindPartitionForStreamingOperation(),
                 new TakePartitionForStreamingOperation(changeStream, partitionFactory),
-                new RemoveFinishedPartitionOperation(spannerEventDispatcher));
+                new RemoveFinishedPartitionOperation(spannerEventDispatcher, connectorConfig));
     }
 
     private void processSyncEvent() throws InterruptedException {
@@ -114,7 +114,7 @@ public class TaskStateChangeEventHandler {
                 new TakeSharedPartitionOperation(),
                 new FindPartitionForStreamingOperation(),
                 new TakePartitionForStreamingOperation(changeStream, partitionFactory),
-                new RemoveFinishedPartitionOperation(spannerEventDispatcher),
+                new RemoveFinishedPartitionOperation(spannerEventDispatcher, connectorConfig),
                 new ConnectorEndDetectionOperation(finishingHandler, connectorConfig.endTime()));
 
         failOverloadedTaskByTimer(taskSyncContext);

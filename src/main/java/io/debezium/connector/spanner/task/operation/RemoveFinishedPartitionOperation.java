@@ -7,7 +7,6 @@ package io.debezium.connector.spanner.task.operation;
 
 import static org.slf4j.LoggerFactory.getLogger;
 
-import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -19,6 +18,7 @@ import org.slf4j.Logger;
 import com.google.cloud.Timestamp;
 
 import io.debezium.DebeziumException;
+import io.debezium.connector.spanner.SpannerConnectorConfig;
 import io.debezium.connector.spanner.SpannerPartition;
 import io.debezium.connector.spanner.context.offset.PartitionOffset;
 import io.debezium.connector.spanner.context.offset.SpannerOffsetContext;
@@ -33,13 +33,13 @@ import io.debezium.pipeline.txmetadata.TransactionContext;
 public class RemoveFinishedPartitionOperation implements Operation {
     private static final Logger LOGGER = getLogger(RemoveFinishedPartitionOperation.class);
 
-    private static final Duration DELETION_DELAY = Duration.ofMinutes(60);
     private final SpannerEventDispatcher spannerEventDispatcher;
-
+    private final SpannerConnectorConfig connectorConfig;
     private boolean isRequiredPublishSyncEvent = false;
 
-    public RemoveFinishedPartitionOperation(SpannerEventDispatcher spannerEventDispatcher) {
+    public RemoveFinishedPartitionOperation(SpannerEventDispatcher spannerEventDispatcher, SpannerConnectorConfig spannerConnectorConfig) {
         this.spannerEventDispatcher = spannerEventDispatcher;
+        this.connectorConfig = spannerConnectorConfig;
     }
 
     private TaskSyncContext removeFinishedPartitions(TaskSyncContext taskSyncContext) {
@@ -57,7 +57,7 @@ public class RemoveFinishedPartitionOperation implements Operation {
 
                                 Timestamp deletionTime = Timestamp.ofTimeSecondsAndNanos(
                                         partitionState.getFinishedTimestamp().getSeconds()
-                                                + DELETION_DELAY.getSeconds(),
+                                                + connectorConfig.getFinishedPartitionDeletionDelay().getSeconds(),
                                         0);
                                 Timestamp currentTime = Timestamp.now();
                                 if (deletionTime.compareTo(currentTime) < 0 &&
