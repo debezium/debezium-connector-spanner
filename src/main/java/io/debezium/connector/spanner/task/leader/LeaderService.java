@@ -101,7 +101,7 @@ public class LeaderService {
         Map<String, String> consumerToTaskMap = new HashMap<>();
         LOGGER.info("awaitAllNewTaskStateUpdates: wait taskSyncContextHolder for all new task updates");
 
-        TimeoutMeter timeoutMeter = TimeoutMeter.setTimeout(Duration.of(connectorConfig.getAwaitTaskAnswerTimeout(), ChronoUnit.MILLIS));
+        TimeoutMeter timeoutMeter = TimeoutMeter.setTimeout(connectorConfig.getAwaitTaskAnswerTimeout());
 
         while (consumerToTaskMap.size() < consumers.size()) {
 
