@@ -44,7 +44,7 @@ public class LeaderService {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(LeaderService.class);
 
-    private static final int POLL_INTERVAL_MILLIS = 20;
+    private static final int POLL_INTERVAL_MILLIS = 500;
     private static final Duration AWAIT_TASK_ANSWER_DURATION = Duration.of(60, ChronoUnit.SECONDS);
 
     private final TaskSyncContextHolder taskSyncContextHolder;

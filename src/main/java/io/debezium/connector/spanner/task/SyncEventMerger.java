@@ -167,9 +167,9 @@ public class SyncEventMerger {
 
         // Check that there is no partition duplication after processing the new epoch message.
         if (!foundDuplication && result.checkDuplication(true, "NEW_EPOCH")) {
-            LOGGER.warn("Task {}, duplication exists after processing new epoch, old context {}", result.getTaskUid(), currentContext);
-            LOGGER.warn("Task {}, duplication exists after processing new epoch, new message {}", result.getTaskUid(), inSync);
-            LOGGER.warn("Task {}, duplication exists after processing new epoch, resulting context {}", result.getTaskUid(), result);
+            LOGGER.debug("Task {}, duplication exists after processing new epoch, old context {}", result.getTaskUid(), currentContext);
+            LOGGER.debug("Task {}, duplication exists after processing new epoch, new message {}", result.getTaskUid(), inSync);
+            LOGGER.debug("Task {}, duplication exists after processing new epoch, resulting context {}", result.getTaskUid(), result);
         }
 
         return result;

@@ -97,6 +97,10 @@ public class SpannerConnectorConfig extends BaseSpannerConnectorConfig {
         return getConfig().getDuration(LOW_WATERMARK_STAMP_INTERVAL, ChronoUnit.MILLIS);
     }
 
+    public Duration getFinishedPartitionDeletionDelay() {
+        return getConfig().getDuration(CONNECTOR_SPANNER_FINISHED_PARTITION_DELETION_DELAY_FIELD, ChronoUnit.SECONDS);
+    }
+
     public String projectId() {
         return getConfig().getString(GCP_SPANNER_PROJECT_ID_PROPERTY_NAME);
     }

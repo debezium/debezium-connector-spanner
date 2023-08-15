@@ -92,6 +92,13 @@ public class BufferedPublisher<V> {
                 "Stopping BufferedPublisher for Task Uid {}",
                 this.taskUid,
                 (this.value.get() == null));
+        if (thread == null) {
+            LOGGER.info(
+                    "BufferedPublisher thread is already terminated for Task Uid {}",
+                    this.taskUid,
+                    (this.value.get() == null));
+            return;
+        }
         thread.interrupt();
         final Metronome metronome = Metronome.sleeper(sleepInterval, clock);
         while (!thread.getState().equals(Thread.State.TERMINATED)) {
