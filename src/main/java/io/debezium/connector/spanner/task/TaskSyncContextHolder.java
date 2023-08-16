@@ -31,6 +31,7 @@ public class TaskSyncContextHolder {
 
     private final MetricsEventPublisher metricsEventPublisher;
     private final ReentrantLock lock = new ReentrantLock();
+    private final AtomicReference<Boolean> saw_duplication = new AtomicReference<>();
 
     private final AtomicReference<TaskSyncContext> taskSyncContextRef = new AtomicReference<>();
 
@@ -40,6 +41,7 @@ public class TaskSyncContextHolder {
     public TaskSyncContextHolder(MetricsEventPublisher metricsEventPublisher) {
         this.metricsEventPublisher = metricsEventPublisher;
         this.clock = Clock.system();
+        this.saw_duplication.set(false);
     }
 
     public final void init(TaskSyncContext taskSyncContext) {
@@ -82,10 +84,14 @@ public class TaskSyncContextHolder {
     public void unlock() {
         lock.unlock();
     }
+  
+    public boolean isHeldByCurrentThread() {
+        return lock.isHeldByCurrentThread();
+    }
 
-    public void awaitInitialization(Duration awaitTimeout) {
-        LOGGER.info("awaitInitialization: start");
-        TimeoutMeter timeout = TimeoutMeter.setTimeout(awaitTimeout);
+    public void awaitInitialization() {
+        LOGGER.debug("awaitInitialization: start");
+        TimeoutMeter timeout = TimeoutMeter.setTimeout(AWAIT_TIME_TIME_OUT);
         while (RebalanceState.START_INITIAL_SYNC.equals(this.get().getRebalanceState())) {
             if (timeout.isExpired()) {
                 LOGGER.info("Await task initialization timeout expired");
@@ -98,6 +104,7 @@ public class TaskSyncContextHolder {
     public void awaitNewEpoch() {
         while (!RebalanceState.NEW_EPOCH_STARTED.equals(this.get().getRebalanceState())) {
             if (Thread.interrupted()) {
+                LOGGER.info("Interrupting awaitNewEpoch task {}", taskSyncContextRef.get().getTaskUid());
                 Thread.currentThread().interrupt();
                 return;
             }
@@ -108,6 +115,7 @@ public class TaskSyncContextHolder {
                 metronome.pause();
             }
             catch (InterruptedException e) {
+                LOGGER.info("Interrupting awaitNewEpoch task {}", taskSyncContextRef.get().getTaskUid());
                 Thread.currentThread().interrupt();
             }
         }

@@ -5,6 +5,8 @@
  */
 package io.debezium.connector.spanner.task.operation;
 
+import java.util.List;
+
 import io.debezium.connector.spanner.task.TaskSyncContext;
 
 /**
@@ -16,6 +18,14 @@ public interface Operation {
     // should other tasks be informed about a state change
     // after this operation
     boolean isRequiredPublishSyncEvent();
+
+    List<String> updatedOwnedPartitions();
+
+    List<String> updatedSharedPartitions();
+
+    List<String> removedOwnedPartitions();
+
+    List<String> removedSharedPartitions();
 
     TaskSyncContext doOperation(TaskSyncContext taskSyncContext);
 }

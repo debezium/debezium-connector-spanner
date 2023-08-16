@@ -5,7 +5,9 @@
  */
 package io.debezium.connector.spanner.task.operation;
 
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
@@ -32,6 +34,8 @@ public class TakePartitionForStreamingOperation implements Operation {
 
     private final ChangeStream changeStream;
     private final PartitionFactory partitionFactory;
+    private List<String> tokensScheduled = new ArrayList<String>();
+    private List<String> tokensRemoved = new ArrayList<String>();
 
     private boolean isRequiredPublishSyncEvent = false;
 
@@ -59,6 +63,7 @@ public class TakePartitionForStreamingOperation implements Operation {
         List<PartitionState> partitions = taskState.getPartitions().stream()
                 .map(partitionState -> {
                     if (toSchedule.contains(partitionState.getToken())) {
+                        tokensScheduled.add(partitionState.getToken());
                         return partitionState.toBuilder()
                                 .state(PartitionStateEnum.SCHEDULED)
                                 .build();
@@ -90,9 +95,10 @@ public class TakePartitionForStreamingOperation implements Operation {
         List<PartitionState> partitions = taskSyncContext.getCurrentTaskState().getPartitions().stream()
                 .map(partitionState -> {
                     if (partitionState.getState().equals(PartitionStateEnum.READY_FOR_STREAMING) &&
-                            isPartitionStreamingAlready(taskSyncContext.getTaskStates().values(), partitionState.getToken())) {
+                            isPartitionStreamingAlready(taskSyncContext.getTaskStates().values(), partitionState.getToken(), taskState.getTaskUid())) {
                         LOGGER.info("Removing streaming partition {} with state {} since partition is already streaming", partitionState.getToken(),
                                 partitionState.getState());
+                        tokensRemoved.add(partitionState.getToken());
                         return null;
                     }
                     return partitionState;
@@ -105,13 +111,14 @@ public class TakePartitionForStreamingOperation implements Operation {
                 .build();
     }
 
-    private boolean isPartitionStreamingAlready(Collection<TaskState> taskStates, String token) {
-        return taskStates.stream().flatMap(taskState -> taskState.getPartitions().stream())
+    private boolean isPartitionStreamingAlready(Collection<TaskState> taskStates, String token, String taskUid) {
+        boolean isPartitionStreamingAlready = taskStates.stream().flatMap(taskState -> taskState.getPartitions().stream())
                 .filter(partitionState -> partitionState.getToken().equals(token))
                 .anyMatch(partitionState -> partitionState.getState().equals(PartitionStateEnum.SCHEDULED)
                         || partitionState.getState().equals(PartitionStateEnum.RUNNING)
                         || partitionState.getState().equals(PartitionStateEnum.FINISHED)
                         || partitionState.getState().equals(PartitionStateEnum.REMOVED));
+        return isPartitionStreamingAlready;
     }
 
     private boolean isPartition(Collection<TaskState> taskStates, String token) {
@@ -131,6 +138,28 @@ public class TakePartitionForStreamingOperation implements Operation {
     @Override
     public TaskSyncContext doOperation(TaskSyncContext taskSyncContext) {
         taskSyncContext = removeAlreadyStreamingPartitions(taskSyncContext);
-        return takePartitionForStreaming(taskSyncContext);
+        TaskSyncContext tookPartitionForStreaming = takePartitionForStreaming(taskSyncContext);
+        return tookPartitionForStreaming;
     }
+
+    @Override
+    public List<String> updatedOwnedPartitions() {
+        return tokensScheduled;
+    }
+
+    @Override
+    public List<String> updatedSharedPartitions() {
+        return Collections.emptyList();
+    }
+
+    @Override
+    public List<String> removedOwnedPartitions() {
+        return tokensRemoved;
+    }
+
+    @Override
+    public List<String> removedSharedPartitions() {
+        return Collections.emptyList();
+    }
+
 }

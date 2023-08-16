@@ -16,6 +16,8 @@ import org.apache.kafka.clients.admin.DescribeTopicsResult;
 import org.apache.kafka.clients.admin.NewPartitions;
 import org.apache.kafka.common.KafkaException;
 import org.apache.kafka.common.config.TopicConfig;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import io.debezium.connector.spanner.SpannerConnectorConfig;
 import io.debezium.connector.spanner.config.BaseSpannerConnectorConfig;
@@ -25,6 +27,8 @@ import io.debezium.connector.spanner.kafka.KafkaUtils;
  * Provides functionality to create and change Rebalance and Sync topics
  */
 public class KafkaInternalTopicAdminService {
+    private static final Logger LOGGER = LoggerFactory.getLogger(KafkaInternalTopicAdminService.class);
+
     private final AdminClient adminClient;
     private final SpannerConnectorConfig config;
 
@@ -34,8 +38,8 @@ public class KafkaInternalTopicAdminService {
     }
 
     public void createAdjustRebalanceTopic() {
+        String rebalancingTopic = config.rebalancingTopic();
         try {
-            String rebalancingTopic = config.rebalancingTopic();
             int maxTasks = config.getMaxTasks();
             Map<String, String> rebalancingTopicPassThroughProps = config.getConfig()
                     .subset(BaseSpannerConnectorConfig.CONNECTOR_SPANNER_REBALANCING_TOPIC_CONFIG_PREFIX, true).asMap();
@@ -49,6 +53,7 @@ public class KafkaInternalTopicAdminService {
             }
         }
         catch (InterruptedException e) {
+            LOGGER.info("Interrupting creation of rebalance topic {}", rebalancingTopic);
             Thread.currentThread().interrupt();
         }
         catch (Exception e) {
@@ -57,8 +62,8 @@ public class KafkaInternalTopicAdminService {
     }
 
     public void createVerifySyncTopic() {
+        String syncTopic = config.taskSyncTopic();
         try {
-            String syncTopic = config.taskSyncTopic();
             if (!topicExists(syncTopic)) {
                 Map<String, String> topicProps = new HashMap<>();
                 topicProps.put(TopicConfig.CLEANUP_POLICY_CONFIG, config.syncCleanupPolicy());
@@ -82,6 +87,7 @@ public class KafkaInternalTopicAdminService {
             }
         }
         catch (InterruptedException e) {
+            LOGGER.info("Interrupting creation of sync topic {}", syncTopic);
             Thread.currentThread().interrupt();
         }
         catch (Exception e) {

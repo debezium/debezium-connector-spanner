@@ -7,6 +7,9 @@ package io.debezium.connector.spanner.task.operation;
 
 import static org.slf4j.LoggerFactory.getLogger;
 
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -36,6 +39,7 @@ public class RemoveFinishedPartitionOperation implements Operation {
     private final SpannerEventDispatcher spannerEventDispatcher;
     private final SpannerConnectorConfig connectorConfig;
     private boolean isRequiredPublishSyncEvent = false;
+    private final List<String> removedFinishedPartitions = new ArrayList<>();
 
     public RemoveFinishedPartitionOperation(SpannerEventDispatcher spannerEventDispatcher, SpannerConnectorConfig spannerConnectorConfig) {
         this.spannerEventDispatcher = spannerEventDispatcher;
@@ -94,7 +98,6 @@ public class RemoveFinishedPartitionOperation implements Operation {
         if (taskState.getPartitions().size() != partitions.size()) {
             this.isRequiredPublishSyncEvent = true;
         }
-
         return taskSyncContext.toBuilder()
                 .currentTaskState(taskState.toBuilder().partitions(partitions).build())
                 .build();
@@ -138,5 +141,25 @@ public class RemoveFinishedPartitionOperation implements Operation {
     @Override
     public TaskSyncContext doOperation(TaskSyncContext taskSyncContext) {
         return removeFinishedPartitions(taskSyncContext);
+    }
+
+    @Override
+    public List<String> updatedOwnedPartitions() {
+        return Collections.emptyList();
+    }
+
+    @Override
+    public List<String> updatedSharedPartitions() {
+        return Collections.emptyList();
+    }
+
+    @Override
+    public List<String> removedOwnedPartitions() {
+        return removedFinishedPartitions;
+    }
+
+    @Override
+    public List<String> removedSharedPartitions() {
+        return Collections.emptyList();
     }
 }

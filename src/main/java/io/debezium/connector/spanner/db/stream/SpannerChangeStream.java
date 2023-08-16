@@ -89,6 +89,7 @@ public class SpannerChangeStream implements ChangeStream {
         try {
             while (runningFlagSupplier.getAsBoolean()) {
                 if (signal.await(WAIT_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS) && exception.get() != null) {
+                    LOGGER.warn("Task {}, is throwing exception during streaming {}", exception.get());
                     throw exception.get();
                 }
 
@@ -124,6 +125,7 @@ public class SpannerChangeStream implements ChangeStream {
                 Thread.currentThread().interrupt();
             }
             catch (Exception ex) {
+
                 LOGGER.info("Exception during streaming {} from partition with token {}", ex.getMessage(), partition.getToken());
 
                 if (this.onError(partition, ex)) {
@@ -135,7 +137,8 @@ public class SpannerChangeStream implements ChangeStream {
                     partitionEventListener.onException(partition, ex);
                 }
                 catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
+                    LOGGER.info("Interrupting streaming partition task with token {} and exception {}, SHOULD NEVER REACH THIS POINT, CHECK IF TASK FAILED",
+                            partition.getToken(), e);
                 }
             }
             finally {

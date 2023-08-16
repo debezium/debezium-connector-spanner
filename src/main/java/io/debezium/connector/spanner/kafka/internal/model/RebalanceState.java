@@ -11,6 +11,7 @@ public enum RebalanceState {
     INITIAL_INCREMENTED_STATE_COMPLETED, // State when the task has finished building the internal
                                          // TaskSyncEvent state and is ready to connect to the
                                          // rebalance topic.
-    NEW_EPOCH_STARTED // State when the task has received a NEW_EPOCH message and is ready to
-                      // start sharing change stream partitions.
+    NEW_EPOCH_STARTED, // State when the task has received a NEW_EPOCH message and is ready to
+                       // start sharing change stream partitions.
+    ZOMBIE_STATE // State when the task is not part of the new epoch and should stop sending messages.
 }

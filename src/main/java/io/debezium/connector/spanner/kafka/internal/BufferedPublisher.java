@@ -9,12 +9,19 @@ import static org.slf4j.LoggerFactory.getLogger;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
+import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 
+import io.debezium.connector.spanner.kafka.internal.model.PartitionState;
+import io.debezium.connector.spanner.kafka.internal.model.TaskState;
+import io.debezium.connector.spanner.kafka.internal.model.TaskSyncEvent;
 import io.debezium.util.Clock;
 import io.debezium.util.Metronome;
 
@@ -23,20 +30,20 @@ import io.debezium.util.Metronome;
  * once per time period, except the case: if the value is required
  * to be published immediately.
  */
-public class BufferedPublisher<V> {
+public class BufferedPublisher {
 
     private static final Logger LOGGER = getLogger(BufferedPublisher.class);
 
     private volatile Thread thread;
-    private final AtomicReference<V> value = new AtomicReference<>();
-    private final Predicate<V> publishImmediately;
-    private final Consumer<V> onPublish;
+    private final AtomicReference<TaskSyncEvent> value = new AtomicReference<TaskSyncEvent>();
+    private final Predicate<TaskSyncEvent> publishImmediately;
+    private final Consumer<TaskSyncEvent> onPublish;
     private final String taskUid;
 
     private final Duration sleepInterval = Duration.ofMillis(100);
     private final Clock clock;
 
-    public BufferedPublisher(String taskUid, String name, long timeout, Predicate<V> publishImmediately, Consumer<V> onPublish) {
+    public BufferedPublisher(String taskUid, String name, long timeout, Predicate<TaskSyncEvent> publishImmediately, Consumer<TaskSyncEvent> onPublish) {
         this.publishImmediately = publishImmediately;
         this.onPublish = onPublish;
         this.taskUid = taskUid;
@@ -57,33 +64,101 @@ public class BufferedPublisher<V> {
                     Thread.sleep(timeout);
                 }
                 catch (InterruptedException e) {
+                    LOGGER.info("Task Uid {} caught interrupted exception", taskUid);
                     return;
                 }
             }
+            LOGGER.info("Terminating BufferedPublisher for task {}", taskUid);
         }, "SpannerConnector-" + name);
     }
 
-    public void buffer(V update) {
+    public synchronized void buffer(TaskSyncEvent update) {
         if (publishImmediately.test(update)) {
-            synchronized (this) {
-                this.value.set(null);
-                this.onPublish.accept(update);
-            }
+            // We publish without affecting the updated values.
+            this.onPublish.accept(update);
         }
         else {
-            value.set(update);
+            TaskSyncEvent updatedValue = value.updateAndGet(
+                    originalValue -> mergeTaskSyncEvent(taskUid, originalValue, update));
         }
     }
 
-    private synchronized void publishBuffered() {
-        V item = this.value.getAndSet(null);
+    public static TaskSyncEvent mergeTaskSyncEvent(String task, TaskSyncEvent originalValue, TaskSyncEvent newValue) {
+        TaskSyncEvent toMerge = newValue;
+        TaskSyncEvent existing = originalValue;
+        TaskState toMergeTask = toMerge.getTaskStates().get(task);
+
+        if (toMergeTask == null) {
+            if (existing == null) {
+                return null;
+            }
+            // Since there is nothing to merge, we should just return the existing TaskSyncEvent.
+            return existing;
+        }
+
+        if (existing == null) {
+            // If there is no existing value, we should just return the new task sync event.
+            return toMerge;
+        }
+
+        TaskState existingTask = existing.getTaskStates().get(task);
+
+        // Get a list of partition tokens that are newly modified by new message
+        List<String> newlyOwnedPartitions = toMergeTask.getPartitions().stream()
+                .map(partitionState -> partitionState.getToken())
+                .collect(Collectors.toList());
+
+        // Get a list of partition tokens that are newly shared by new message
+        List<String> newlySharedPartitions = toMergeTask.getSharedPartitions().stream()
+                .map(partitionState -> partitionState.getToken())
+                .collect(Collectors.toList());
+
+        // Get a list of partition tokens that the old message contained that the new message
+        // didn't
+        List<PartitionState> previouslyOwnedPartitions = existingTask.getPartitions().stream()
+                .filter(partitionState -> !newlyOwnedPartitions.contains(
+                        partitionState.getToken()))
+                .collect(Collectors.toList());
+
+        // Get a list of shared partition tokens that the old message contained that the
+        // new message didn't
+        List<PartitionState> previouslySharedPartitions = existingTask.getSharedPartitions().stream()
+                .filter(partitionState -> !newlySharedPartitions.contains(
+                        partitionState.getToken()))
+                .collect(Collectors.toList());
+
+        // Get the total list of shared + modified tokens.
+        List<PartitionState> finalOwnedPartitions = toMergeTask.getPartitions().stream()
+                .collect(Collectors.toList());
+        finalOwnedPartitions.addAll(previouslyOwnedPartitions);
+        List<PartitionState> finalSharedPartitions = toMergeTask.getSharedPartitions().stream()
+                .collect(Collectors.toList());
+        finalSharedPartitions.addAll(previouslySharedPartitions);
+
+        // Put the total list of shared + modified tokens into the final task state.
+        TaskState finalTaskState = toMergeTask.toBuilder().partitions(finalOwnedPartitions)
+                .sharedPartitions(finalSharedPartitions).build();
+
+        Map<String, TaskState> taskStates = new HashMap<>(toMerge.getTaskStates());
+        taskStates.remove(toMergeTask.getTaskUid());
+        // Put the final task state into the merged task sync event.
+        taskStates.put(task, finalTaskState);
+        TaskSyncEvent mergedSyncEvent = toMerge.toBuilder().taskStates(taskStates).build();
+
+        return mergedSyncEvent;
+    }
+
+    public synchronized void publishBuffered() {
+        TaskSyncEvent item = this.value.getAndSet(null);
 
         if (item != null) {
+            LOGGER.info("Publishing task sync event for task {}: {}", item.getTaskUid(), item);
             this.onPublish.accept(item);
         }
     }
 
     public void start() {
+        LOGGER.info("Starting buffered publisher for {}", taskUid);
         this.thread.start();
     }
 

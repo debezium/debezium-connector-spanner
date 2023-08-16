@@ -6,6 +6,7 @@
 package io.debezium.connector.spanner.task.operation;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Random;
 import java.util.Set;
@@ -26,11 +27,13 @@ public class ClearSharedPartitionOperation implements Operation {
     private static final Logger LOGGER = LoggerFactory.getLogger(ClearSharedPartitionOperation.class);
 
     private boolean isRequiredPublishSyncEvent = false;
+    List<String> removedSharedTokens = new ArrayList<String>();
 
     private TaskSyncContext clear(TaskSyncContext taskSyncContext) {
 
         TaskState currentTaskState = taskSyncContext.getCurrentTaskState();
 
+<<<<<<< HEAD
         List<String> removedSharedTokens = new ArrayList<String>();
 
         // Retrieve the tokens that are owned by other tasks.
@@ -97,6 +100,18 @@ public class ClearSharedPartitionOperation implements Operation {
                     currentTaskState.getSharedPartitions());
         }
 
+        for (PartitionState partition : currentTaskState.getSharedPartitions()) {
+            if (!newSharedList.contains(partition)) {
+                if (!tokens.contains(partition.getToken())) {
+                    LOGGER.info("TaskUid: {}, cleared shared token {}, because already owned by another task", taskSyncContext.getTaskUid(), partition);
+                }
+                else {
+                    LOGGER.info("TaskUid: {}, cleared shared token {}, because shared to dead task", taskSyncContext.getTaskUid(), partition);
+                }
+                removedSharedTokens.add(partition.getToken());
+            }
+        }
+
         return taskSyncContext.toBuilder().currentTaskState(currentTaskState.toBuilder()
                 .sharedPartitions(finalSharedList)
                 .build()).build();
@@ -110,5 +125,25 @@ public class ClearSharedPartitionOperation implements Operation {
     @Override
     public TaskSyncContext doOperation(TaskSyncContext taskSyncContext) {
         return clear(taskSyncContext);
+    }
+
+    @Override
+    public List<String> updatedOwnedPartitions() {
+        return Collections.emptyList();
+    }
+
+    @Override
+    public List<String> updatedSharedPartitions() {
+        return Collections.emptyList();
+    };
+
+    @Override
+    public List<String> removedOwnedPartitions() {
+        return Collections.emptyList();
+    }
+
+    @Override
+    public List<String> removedSharedPartitions() {
+        return removedSharedTokens;
     }
 }

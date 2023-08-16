@@ -20,7 +20,6 @@ import org.slf4j.LoggerFactory;
 import io.debezium.DebeziumException;
 import io.debezium.connector.spanner.kafka.internal.KafkaConsumerAdminService;
 import io.debezium.connector.spanner.kafka.internal.TaskSyncPublisher;
-import io.debezium.connector.spanner.kafka.internal.model.MessageTypeEnum;
 import io.debezium.connector.spanner.kafka.internal.model.RebalanceState;
 import io.debezium.connector.spanner.kafka.internal.model.TaskState;
 import io.debezium.connector.spanner.kafka.internal.model.TaskSyncEvent;
@@ -115,9 +114,9 @@ public class LeaderAction {
                 .epochOffsetHolder(oldContext.getEpochOffsetHolder().nextOffset(oldContext.getCurrentKafkaRecordOffset()))
                 .build());
 
-        taskSyncPublisher.send(taskSyncContext.buildTaskSyncEvent(MessageTypeEnum.UPDATE_EPOCH));
+        taskSyncPublisher.send(taskSyncContext.buildUpdateEpochTaskSyncEvent());
 
-        LOGGER.info("Task {} - Epoch offset has been incremented and published {}:{}",
+        LOGGER.info("Task {} - Leader task has updated the epoch offset with rebalance generation ID: {} and epoch offset: {}",
                 taskSyncContextHolder.get().getTaskUid(), taskSyncContext.getRebalanceGenerationId(), taskSyncContext.getEpochOffsetHolder().getEpochOffset());
 
         return taskSyncContext;
@@ -170,6 +169,7 @@ public class LeaderAction {
         boolean foundDuplication = false;
         if (staleContext.checkDuplication(false, "NEW EPOCH rebalance event, initial context")) {
             foundDuplication = true;
+
         }
 
         TaskSyncContext taskSyncContext = taskSyncContextHolder.updateAndGet(oldContext -> {
