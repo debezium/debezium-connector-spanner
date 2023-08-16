@@ -59,6 +59,8 @@ public class LeaderService {
 
     private final PartitionFactory partitionFactory;
 
+    private final Duration awaitTaskAnswerDuration;
+
     public LeaderService(TaskSyncContextHolder taskSyncContextHolder,
                          SpannerConnectorConfig spannerConnectorConfig,
                          BlockingConsumer<TaskStateChangeEvent> eventConsumer,
@@ -69,6 +71,7 @@ public class LeaderService {
 
         this.startTime = spannerConnectorConfig.startTime();
         this.endTime = spannerConnectorConfig.endTime() != null ? spannerConnectorConfig.endTime() : null;
+        this.awaitTaskAnswerDuration = spannerConnectorConfig.getAwaitTaskAnswerTimeout();
 
         this.eventConsumer = eventConsumer;
         this.errorHandler = errorHandler;
@@ -101,7 +104,7 @@ public class LeaderService {
         Map<String, String> consumerToTaskMap = new HashMap<>();
         LOGGER.info("awaitAllNewTaskStateUpdates: wait taskSyncContextHolder for all new task updates");
 
-        TimeoutMeter timeoutMeter = TimeoutMeter.setTimeout(connectorConfig.getAwaitTaskAnswerTimeout());
+        TimeoutMeter timeoutMeter = TimeoutMeter.setTimeout(awaitTaskAnswerDuration);
 
         while (consumerToTaskMap.size() < consumers.size()) {
 

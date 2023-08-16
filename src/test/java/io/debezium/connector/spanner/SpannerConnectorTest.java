@@ -132,7 +132,7 @@ class SpannerConnectorTest {
     void testConfig() {
         ConfigDef actualConfigResult = new SpannerConnector().config();
         Map<String, ConfigDef.ConfigKey> configKeysResult = actualConfigResult.configKeys();
-        assertEquals(55, configKeysResult.size());
+        assertEquals(56, configKeysResult.size());
         List<String> groupsResult = actualConfigResult.groups();
         assertEquals(3, groupsResult.size());
         assertEquals("Spanner", groupsResult.get(0));

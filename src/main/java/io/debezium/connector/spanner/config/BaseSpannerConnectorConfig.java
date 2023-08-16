@@ -544,12 +544,12 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
             .withImportance(Importance.LOW)
             .withDefault(120000)
             .withDescription("Connector task await initialization timeout, default 120000 ms");
-  
+
     protected static final Field TASK_AWAIT_ANSWER_TIMEOUT = Field.create(CONNECTOR_SPANNER_TASK_AWAIT_TASK_ANSWER_TIMEOUT_PROPERTY_NAME)
             .withDisplayName("Task await answer timeout")
             .withType(Type.INT)
             .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR, 16))
-            .withWidth(Width.SHORT)
+            .withWidth(Width.MEDIUM)
             .withImportance(Importance.LOW)
             .withDefault(120000)
             .withDescription("Connector leader task await answer timeout, default 120000 ms");
@@ -607,6 +607,7 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
                     REBALANCING_TASK_WAITING_TIMEOUT,
                     SYNC_EVENT_PUBLISH_WAITING_TIMEOUT,
                     TASK_AWAIT_INITIALIZATION_TMEOUT,
+                    TASK_AWAIT_ANSWER_TIMEOUT,
                     CONNECTOR_SPANNER_PARTITION_FINISHING_AFTER_COMMIT_FIELD,
                     CONNECTOR_SPANNER_FINISHED_PARTITION_DELETION_DELAY_FIELD,
                     PERCENTAGE_METRICS_CLEAR_INTERVAL,

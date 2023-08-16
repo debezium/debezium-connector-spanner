@@ -298,7 +298,7 @@ public class SpannerConnectorConfig extends BaseSpannerConnectorConfig {
     public String syncTopicMaxMessageSize() {
         return getConfig().getString(SYNC_TOPIC_MAX_MESSAGE_BYTES);
     }
-  
+
     public Duration getAwaitTaskAnswerTimeout() {
         return getConfig().getDuration(TASK_AWAIT_ANSWER_TIMEOUT, ChronoUnit.MILLIS);
     }

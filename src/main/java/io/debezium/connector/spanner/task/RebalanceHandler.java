@@ -7,9 +7,9 @@ package io.debezium.connector.spanner.task;
 
 import static org.slf4j.LoggerFactory.getLogger;
 
-import org.slf4j.Logger;
-
 import java.time.Instant;
+
+import org.slf4j.Logger;
 
 import io.debezium.connector.spanner.kafka.internal.TaskSyncPublisher;
 import io.debezium.connector.spanner.kafka.internal.model.MessageTypeEnum;
@@ -43,14 +43,15 @@ public class RebalanceHandler {
     }
 
     public void process(boolean isLeader, String consumerId, long rebalanceGenerationId) throws InterruptedException {
-        LOGGER.info("processRebalancingEvent: start, consumerId: {}, taskId{}, rebalanceGenerationId: {}", consumerId, taskSyncContextHolder.get().getTaskUid(), rebalanceGenerationId);
+        LOGGER.info("processRebalancingEvent: start, consumerId: {}, taskId{}, rebalanceGenerationId: {}", consumerId, taskSyncContextHolder.get().getTaskUid(),
+                rebalanceGenerationId);
 
         this.leaderAction.stop();
-      
-      
+
         long beforeInstant = Instant.now().toEpochMilli();
-        LOGGER.info("processRebalancingEvent: preparing to update task sync context, consumerId: {}, taskId{}, rebalanceGenerationId: {}", consumerId, taskSyncContextHolder.get().getTaskUid(), rebalanceGenerationId);
-        
+        LOGGER.info("processRebalancingEvent: preparing to update task sync context, consumerId: {}, taskId{}, rebalanceGenerationId: {}", consumerId,
+                taskSyncContextHolder.get().getTaskUid(), rebalanceGenerationId);
+
         TaskSyncContext context = taskSyncContextHolder.updateAndGet(oldContext -> {
             TaskState updatedState = oldContext.getCurrentTaskState()
                     .toBuilder()
@@ -74,11 +75,11 @@ public class RebalanceHandler {
         });
         long afterInstant = Instant.now().toEpochMilli();
         LOGGER.info("processRebalancingEvent: finished updating task sync context, consumerId: {}, taskId{}, rebalanceGenerationId: {}", consumerId,
-            taskSyncContextHolder.get().getTaskUid(), rebalanceGenerationId);
+                taskSyncContextHolder.get().getTaskUid(), rebalanceGenerationId);
 
         if (afterInstant - beforeInstant > 10000) {
-          LOGGER.warn("processRebalancingEvent: took long time to update task sync context {}, consumerId: {}, taskId{}, rebalanceGenerationId: {}",
-              afterInstant - beforeInstant, consumerId, taskSyncContextHolder.get().getTaskUid(), rebalanceGenerationId);
+            LOGGER.warn("processRebalancingEvent: took long time to update task sync context {}, consumerId: {}, taskId{}, rebalanceGenerationId: {}",
+                    afterInstant - beforeInstant, consumerId, taskSyncContextHolder.get().getTaskUid(), rebalanceGenerationId);
         }
         TaskSyncEvent taskSyncEvent = context.buildTaskSyncEvent(MessageTypeEnum.REBALANCE_ANSWER);
 
@@ -88,7 +89,7 @@ public class RebalanceHandler {
         taskSyncPublisher.send(taskSyncEvent);
 
         LOGGER.info("processRebalancingEvent: Task {} rebalance answer has been sent for consumer ID {}",
-                     taskSyncContextHolder.get().getTaskUid(), consumerId);
+                taskSyncContextHolder.get().getTaskUid(), consumerId);
         if (isLeader) {
             LOGGER.info("Task {} is leader", context.getTaskUid());
             this.leaderAction.start();
