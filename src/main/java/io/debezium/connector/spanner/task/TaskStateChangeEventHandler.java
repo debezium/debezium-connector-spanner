@@ -19,6 +19,7 @@ import io.debezium.connector.spanner.SpannerConnectorConfig;
 import io.debezium.connector.spanner.db.stream.ChangeStream;
 import io.debezium.connector.spanner.exception.SpannerConnectorException;
 import io.debezium.connector.spanner.kafka.internal.TaskSyncPublisher;
+import io.debezium.connector.spanner.kafka.internal.model.TaskSyncEvent;
 import io.debezium.connector.spanner.processor.SpannerEventDispatcher;
 import io.debezium.connector.spanner.task.operation.ChildPartitionOperation;
 import io.debezium.connector.spanner.task.operation.ClearSharedPartitionOperation;
@@ -213,9 +214,9 @@ public class TaskStateChangeEventHandler {
         }
 
         if (publishTaskSyncEvent.get()) {
-            LOGGER.debug("Task {} - send sync event", taskSyncContext.getTaskUid());
-            taskSyncPublisher.send(taskSyncContext.buildIncrementalTaskSyncEvent(
-                    ownedPartitions, sharedPartitions, removedOwnedPartitions, removedSharedPartitions));
+            TaskSyncEvent incrementalEvent = taskSyncContext.buildIncrementalTaskSyncEvent(
+                    ownedPartitions, sharedPartitions, removedOwnedPartitions, removedSharedPartitions);
+            taskSyncPublisher.send(incrementalEvent);
         }
 
         return taskSyncContext;

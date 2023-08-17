@@ -34,8 +34,6 @@ public class ClearSharedPartitionOperation implements Operation {
 
         TaskState currentTaskState = taskSyncContext.getCurrentTaskState();
 
-        List<String> removedSharedTokens = new ArrayList<String>();
-
         // Retrieve the tokens that are owned by other tasks.
         Set<String> otherTokens = taskSyncContext.getTaskStates().values().stream().flatMap(taskState -> taskState.getPartitions().stream()).map(PartitionState::getToken)
                 .collect(Collectors.toSet());
@@ -98,14 +96,15 @@ public class ClearSharedPartitionOperation implements Operation {
 
         if (finalSharedList.size() != currentSharedList.size() || reassignedPartition) {
             this.isRequiredPublishSyncEvent = true;
-            LOGGER.info("Task cleared some shared partitions, taskUid: {}, final shared list {}, original list {}", taskSyncContext.getTaskUid(), finalSharedList,
-                    currentTaskState.getSharedPartitions());
         }
 
         for (PartitionState partition : currentTaskState.getSharedPartitions()) {
             if (!finalSharedList.contains(partition)) {
                 removedSharedTokens.add(partition.getToken());
             }
+        }
+        if (!removedSharedTokens.isEmpty()) {
+            LOGGER.info("Task {} removed shared partitions {}", taskSyncContext.getTaskUid(), removedSharedTokens);
         }
 
         return taskSyncContext.toBuilder().currentTaskState(currentTaskState.toBuilder()

@@ -186,14 +186,15 @@ public class LowWatermarkCalculator {
                         String token = partitionState.getToken();
                         long lag = now - timestamp.toDate().getTime();
                         if (lag > acceptedLag) {
-                            LOGGER.warn("Task {}, Partition has a very old offset, lag: {}, token: {}", taskSyncContextHolder.get().getTaskUid(), lag, token);
+                            LOGGER.warn("Task {}, Partition has a very old offset, lag: {}, token: {}", taskSyncContextHolder.get().getTaskUid(), lag, partitionState);
                         }
                     }
                     else if (partitionState.getStartTimestamp() != null) {
                         String token = partitionState.getToken();
                         long lag = now - partitionState.getStartTimestamp().toDate().getTime();
                         if (lag > acceptedLag) {
-                            LOGGER.warn("Task {}, Partition has a very old start time, lag: {}, token: {}", taskSyncContextHolder.get().getTaskUid(), lag, token);
+                            LOGGER.warn("Task {}, Partition has a very old start time, lag: {}, token: {}", taskSyncContextHolder.get().getTaskUid(), lag,
+                                    partitionState);
                         }
                     }
                 });

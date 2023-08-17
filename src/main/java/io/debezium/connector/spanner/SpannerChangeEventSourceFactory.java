@@ -72,7 +72,7 @@ public class SpannerChangeEventSourceFactory implements ChangeEventSourceFactory
 
             @Override
             public SnapshottingTask getSnapshottingTask(SpannerPartition partition, SpannerOffsetContext previousOffset) {
-                throw new UnsupportedOperationException("Snapshotting is not supported");
+                return null;
             }
 
             @Override
