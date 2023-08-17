@@ -9,8 +9,6 @@ import static io.debezium.connector.spanner.task.LoggerUtils.debug;
 import static java.util.stream.Collectors.toUnmodifiableMap;
 import static org.slf4j.LoggerFactory.getLogger;
 
-import java.time.Instant;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -22,7 +20,6 @@ import java.util.stream.Stream;
 import org.slf4j.Logger;
 
 import io.debezium.DebeziumException;
-import io.debezium.connector.spanner.kafka.internal.model.MessageTypeEnum;
 import io.debezium.connector.spanner.kafka.internal.model.PartitionState;
 import io.debezium.connector.spanner.kafka.internal.model.PartitionStateEnum;
 import io.debezium.connector.spanner.kafka.internal.model.RebalanceState;
@@ -176,7 +173,7 @@ public class SyncEventMerger {
         }
 
         // Skip processing messages that this task has already produced.
-        if (inSync.getTaskUid().equals(context.getTaskUid())) {
+        if (newMessage.getTaskUid().equals(currentContext.getTaskUid())) {
             return builder.build();
         }
 
@@ -200,10 +197,10 @@ public class SyncEventMerger {
             }
         }
 
-        if (inSync.getMessageType() == MessageTypeEnum.UPDATE_EPOCH && !inSync.getTaskUid().equals(context.getTaskUid())) {
-            LOGGER.info("Task {}, updating the epoch offset from the leader's UPDATE_EPOCH message {}: {}", context.getTaskUid(), inSync.getTaskUid(),
-                    inSync.getEpochOffset());
-            builder.epochOffsetHolder(context.getEpochOffsetHolder().nextOffset(inSync.getEpochOffset()));
+        if (!newMessage.getTaskUid().equals(currentContext.getTaskUid())) {
+            LOGGER.info("Task {}, updating the epoch offset from the leader's UPDATE_EPOCH message {}: {}", currentContext.getTaskUid(), newMessage.getTaskUid(),
+                    newMessage.getEpochOffset());
+            builder.epochOffsetHolder(currentContext.getEpochOffsetHolder().nextOffset(newMessage.getEpochOffset()));
         }
 
         if (!updatedStatesUids.isEmpty()) {

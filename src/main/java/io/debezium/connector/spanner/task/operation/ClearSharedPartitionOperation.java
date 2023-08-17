@@ -28,6 +28,7 @@ public class ClearSharedPartitionOperation implements Operation {
 
     private boolean isRequiredPublishSyncEvent = false;
     List<String> removedSharedTokens = new ArrayList<String>();
+    List<String> updatedSharedTokens = new ArrayList<String>();
 
     private TaskSyncContext clear(TaskSyncContext taskSyncContext) {
 
@@ -84,7 +85,9 @@ public class ClearSharedPartitionOperation implements Operation {
                     String assigneeTaskUid = otherTasksArray[rand.nextInt(otherTasks.size())];
                     LOGGER.info("Task {}, reassigning token {} to another task {} since it was not previously assigned to an alive task", taskSyncContext.getTaskUid(),
                             sharedToken, assigneeTaskUid);
-                    finalSharedList.add(PartitionState.builder().token(sharedToken.getToken()).assigneeTaskUid(assigneeTaskUid).build());
+                    PartitionState reassignedToken = PartitionState.builder().token(sharedToken.getToken()).assigneeTaskUid(assigneeTaskUid).build();
+                    finalSharedList.add(reassignedToken);
+                    updatedSharedTokens.add(reassignedToken.getToken());
                 }
             }
             else {
@@ -100,13 +103,7 @@ public class ClearSharedPartitionOperation implements Operation {
         }
 
         for (PartitionState partition : currentTaskState.getSharedPartitions()) {
-            if (!newSharedList.contains(partition)) {
-                if (!tokens.contains(partition.getToken())) {
-                    LOGGER.info("TaskUid: {}, cleared shared token {}, because already owned by another task", taskSyncContext.getTaskUid(), partition);
-                }
-                else {
-                    LOGGER.info("TaskUid: {}, cleared shared token {}, because shared to dead task", taskSyncContext.getTaskUid(), partition);
-                }
+            if (!finalSharedList.contains(partition)) {
                 removedSharedTokens.add(partition.getToken());
             }
         }
@@ -133,7 +130,7 @@ public class ClearSharedPartitionOperation implements Operation {
 
     @Override
     public List<String> updatedSharedPartitions() {
-        return Collections.emptyList();
+        return updatedSharedTokens;
     };
 
     @Override

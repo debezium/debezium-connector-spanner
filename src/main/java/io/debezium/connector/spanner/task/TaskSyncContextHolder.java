@@ -82,7 +82,7 @@ public class TaskSyncContextHolder {
     public void unlock() {
         lock.unlock();
     }
-  
+
     public boolean isHeldByCurrentThread() {
         return lock.isHeldByCurrentThread();
     }

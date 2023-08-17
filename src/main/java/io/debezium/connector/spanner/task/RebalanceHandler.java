@@ -80,7 +80,7 @@ public class RebalanceHandler {
             LOGGER.warn("processRebalancingEvent: took long time to update task sync context {}, consumerId: {}, taskId{}, rebalanceGenerationId: {}",
                     afterInstant - beforeInstant, consumerId, taskSyncContextHolder.get().getTaskUid(), rebalanceGenerationId);
         }
-        TaskSyncEvent taskSyncEvent = context.buildRebalanceAnswerTaskSyncEvent(MessageTypeEnum.REBALANCE_ANSWER);
+        TaskSyncEvent taskSyncEvent = context.buildRebalanceAnswerTaskSyncEvent();
 
         LoggerUtils.debug(LOGGER, "processRebalancingEvent: send: {}", taskSyncEvent);
         LOGGER.info("Task {} - RebalanceHandler sent sync event for consumer ID {}", taskSyncEvent.getTaskUid(), consumerId);

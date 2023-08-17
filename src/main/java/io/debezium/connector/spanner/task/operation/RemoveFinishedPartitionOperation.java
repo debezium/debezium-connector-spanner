@@ -7,7 +7,6 @@ package io.debezium.connector.spanner.task.operation;
 
 import static org.slf4j.LoggerFactory.getLogger;
 
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;

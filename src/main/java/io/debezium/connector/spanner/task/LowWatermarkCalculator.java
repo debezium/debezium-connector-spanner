@@ -67,9 +67,8 @@ public class LowWatermarkCalculator {
                 LOGGER.warn(
                         "Task {}, calculateLowWatermark: found duplication in partitionsMap: {}", taskSyncContextHolder.get().getTaskUid(), duplicatesInPartitions);
             }
-          return null;
+            return null;
         }
-
 
         Map<String, PartitionState> partitions = partitionsMap.entrySet().stream()
                 .map(entry -> new AbstractMap.SimpleEntry<>(entry.getKey(), entry.getValue().get(0)))
@@ -147,7 +146,7 @@ public class LowWatermarkCalculator {
         }
 
         if (printOffsets) {
-            monitorOffsets(offsets, allPartitions, numPartitions, numSharedPartitions);
+            monitorOffsets(offsets, allPartitions);
         }
 
         if (printOffsets) {
@@ -173,7 +172,7 @@ public class LowWatermarkCalculator {
                 .orElse(spannerConnectorConfig.startTime());
     }
 
-    private void monitorOffsets(Map<String, Timestamp> offsets, Map<String, PartitionState> allPartitions, int numPartitions, int numSharedPartitions) {
+    private void monitorOffsets(Map<String, Timestamp> offsets, Map<String, PartitionState> allPartitions) {
         if (offsets == null) {
             return;
         }

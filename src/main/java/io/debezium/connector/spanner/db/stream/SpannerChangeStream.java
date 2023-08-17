@@ -137,7 +137,7 @@ public class SpannerChangeStream implements ChangeStream {
                     partitionEventListener.onException(partition, ex);
                 }
                 catch (InterruptedException e) {
-                  Thread.currentThread().interrupt();
+                    Thread.currentThread().interrupt();
                     LOGGER.info("Interrupting streaming partition task with token {} and exception {}, SHOULD NEVER REACH THIS POINT, CHECK IF TASK FAILED",
                             partition.getToken(), e);
                 }
