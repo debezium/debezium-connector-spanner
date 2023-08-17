@@ -86,6 +86,7 @@ public class RemoveFinishedPartitionOperation implements Operation {
                                     catch (InterruptedException e) {
                                         LOGGER.error("Task {}, Failed to send null offset for partition {}", taskSyncContext.getTaskUid(), partitionState.getToken());
                                     }
+                                    removedFinishedPartitions.add(partitionState.getToken());
                                     return null;
                                 }
                                 return partitionState;

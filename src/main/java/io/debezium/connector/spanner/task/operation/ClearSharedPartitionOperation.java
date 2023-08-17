@@ -33,7 +33,6 @@ public class ClearSharedPartitionOperation implements Operation {
 
         TaskState currentTaskState = taskSyncContext.getCurrentTaskState();
 
-<<<<<<< HEAD
         List<String> removedSharedTokens = new ArrayList<String>();
 
         // Retrieve the tokens that are owned by other tasks.

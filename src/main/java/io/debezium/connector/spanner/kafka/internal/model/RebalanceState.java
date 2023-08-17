@@ -13,5 +13,4 @@ public enum RebalanceState {
                                          // rebalance topic.
     NEW_EPOCH_STARTED, // State when the task has received a NEW_EPOCH message and is ready to
                        // start sharing change stream partitions.
-    ZOMBIE_STATE // State when the task is not part of the new epoch and should stop sending messages.
 }

@@ -196,7 +196,7 @@ public class LeaderAction {
             taskSyncContext.checkDuplication(true, "NEW EPOCH rebalance event, resulting context");
         }
 
-        TaskSyncEvent taskSyncEvent = taskSyncContext.buildTaskSyncEvent(MessageTypeEnum.NEW_EPOCH);
+        TaskSyncEvent taskSyncEvent = taskSyncContext.buildNewEpochTaskSyncEvent();
         LOGGER.debug("Task {} - sent new epoch {}", taskSyncContext.getTaskUid(), taskSyncEvent);
         LOGGER.info("Task {} - LeaderAction sent sync event with rebalance generation ID {}: and epoch offset {}", taskSyncContext.getTaskUid(),
                 taskSyncContext.getRebalanceGenerationId(), taskSyncContext.getEpochOffsetHolder().getEpochOffset());

@@ -60,8 +60,6 @@ public class LowWatermarkCalculator {
                                 && !partitionState.getState().equals(PartitionStateEnum.REMOVED))
                 .collect(Collectors.groupingBy(PartitionState::getToken));
 
-        int numPartitions = partitionsMap.size();
-
         Set<String> duplicatesInPartitions = checkDuplication(partitionsMap);
 
         if (!duplicatesInPartitions.isEmpty()) {
@@ -69,6 +67,7 @@ public class LowWatermarkCalculator {
                 LOGGER.warn(
                         "Task {}, calculateLowWatermark: found duplication in partitionsMap: {}", taskSyncContextHolder.get().getTaskUid(), duplicatesInPartitions);
             }
+          return null;
         }
 
 
@@ -80,8 +79,6 @@ public class LowWatermarkCalculator {
                 .flatMap(taskState -> taskState.getSharedPartitions().stream())
                 .filter(partitionState -> !partitions.containsKey(partitionState.getToken()))
                 .collect(Collectors.groupingBy(PartitionState::getToken));
-
-        int numSharedPartitions = sharedPartitionsMap.size();
 
         Set<String> duplicatesInSharedPartitions = checkDuplication(sharedPartitionsMap);
         if (!duplicatesInSharedPartitions.isEmpty()) {
@@ -103,15 +100,6 @@ public class LowWatermarkCalculator {
 
         allPartitions.putAll(sharedPartitions);
 
-        if (printOffsets) {
-            LOGGER.warn(
-                    "task: {}, numPartitions: {}, numSharedPartitions {}, task sync context {}",
-                    taskSyncContextHolder.get().getTaskUid(),
-                    partitions.size(),
-                    sharedPartitions.size(),
-                    taskSyncContextHolder.get());
-        }
-
         if (allPartitions.containsKey(InitialPartition.PARTITION_TOKEN)) {
             final long now = new Date().getTime();
             long lag = now
@@ -123,7 +111,7 @@ public class LowWatermarkCalculator {
             long acceptedLag = spannerConnectorConfig.getHeartbeatInterval().toMillis() + OFFSET_MONITORING_LAG_MAX_MS;
             if (lag > acceptedLag) {
                 LOGGER.warn(
-                        "task: {}, Partition has a very old start timestamp, lag: {}, token: {}, numPartitions: {}, numSharedPartitions {}",
+                        "task: {}, Partition has a very old start timestamp, lag: {}, token: {}",
                         taskSyncContextHolder.get().getTaskUid(),
                         lag,
                         InitialPartition.PARTITION_TOKEN);

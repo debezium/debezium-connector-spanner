@@ -31,7 +31,6 @@ public class TaskSyncContextHolder {
 
     private final MetricsEventPublisher metricsEventPublisher;
     private final ReentrantLock lock = new ReentrantLock();
-    private final AtomicReference<Boolean> saw_duplication = new AtomicReference<>();
 
     private final AtomicReference<TaskSyncContext> taskSyncContextRef = new AtomicReference<>();
 
@@ -41,7 +40,6 @@ public class TaskSyncContextHolder {
     public TaskSyncContextHolder(MetricsEventPublisher metricsEventPublisher) {
         this.metricsEventPublisher = metricsEventPublisher;
         this.clock = Clock.system();
-        this.saw_duplication.set(false);
     }
 
     public final void init(TaskSyncContext taskSyncContext) {
@@ -89,9 +87,9 @@ public class TaskSyncContextHolder {
         return lock.isHeldByCurrentThread();
     }
 
-    public void awaitInitialization() {
+    public void awaitInitialization(Duration awaitTimeout) {
         LOGGER.debug("awaitInitialization: start");
-        TimeoutMeter timeout = TimeoutMeter.setTimeout(AWAIT_TIME_TIME_OUT);
+        TimeoutMeter timeout = TimeoutMeter.setTimeout(awaitTimeout);
         while (RebalanceState.START_INITIAL_SYNC.equals(this.get().getRebalanceState())) {
             if (timeout.isExpired()) {
                 LOGGER.info("Await task initialization timeout expired");

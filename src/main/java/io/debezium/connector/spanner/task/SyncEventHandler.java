@@ -131,10 +131,8 @@ public class SyncEventHandler {
     }
 
     public void processUpdateEpoch(TaskSyncEvent inSync, SyncEventMetadata metadata) throws InterruptedException {
-
         taskSyncContextHolder.lock();
         try {
-
             boolean start_initial_sync = taskSyncContextHolder.get().getRebalanceState() == RebalanceState.START_INITIAL_SYNC;
 
             if (!start_initial_sync && !taskSyncContextHolder.get().getRebalanceState().equals(RebalanceState.NEW_EPOCH_STARTED)) {
@@ -157,10 +155,12 @@ public class SyncEventHandler {
 
         try {
 
-            if (!taskSyncContextHolder.get().getRebalanceState().equals(RebalanceState.NEW_EPOCH_STARTED)) {
+            boolean start_initial_sync = taskSyncContextHolder.get().getRebalanceState() == RebalanceState.START_INITIAL_SYNC;
+
+            if (!start_initial_sync && !taskSyncContextHolder.get().getRebalanceState().equals(RebalanceState.NEW_EPOCH_STARTED)) {
                 return;
             }
-
+          
             LOGGER.debug("Task {} - process sync event", taskSyncContextHolder.get().getTaskUid());
 
             taskSyncContextHolder.update(context -> SyncEventMerger.mergeIncrementalTaskSyncEvent(context, inSync));
@@ -174,7 +174,6 @@ public class SyncEventHandler {
     }
 
     public void processRebalanceAnswer(TaskSyncEvent inSync, SyncEventMetadata metadata) {
-
         taskSyncContextHolder.lock();
 
         try {
@@ -194,6 +193,19 @@ public class SyncEventHandler {
         }
     }
 
+    private boolean skipFromPreviousGeneration(TaskSyncEvent inSync) {
+        if (inSync != null) {
+            long inGeneration = inSync.getRebalanceGenerationId();
+            long currentGeneration = taskSyncContextHolder.get().getRebalanceGenerationId();
+
+            if (inGeneration < currentGeneration) {
+                LOGGER.info("skipFromPreviousGeneration: currentGen: {}, inGen: {}, inTaskUid: {}", currentGeneration, inGeneration, inSync.getTaskUid());
+                return true;
+            }
+        }
+        return false;
+    }
+  
     public void process(TaskSyncEvent inSync, SyncEventMetadata metadata) throws InterruptedException, IllegalStateException {
         if (inSync == null) {
             return;
@@ -221,18 +233,5 @@ public class SyncEventHandler {
             LOGGER.error("Exception during processing task message {}, {}", inSync, e);
             throw e;
         }
-    }
-
-    private boolean skipFromPreviousGeneration(TaskSyncEvent inSync) {
-        if (inSync != null) {
-            long inGeneration = inSync.getRebalanceGenerationId();
-            long currentGeneration = taskSyncContextHolder.get().getRebalanceGenerationId();
-
-            if (inGeneration < currentGeneration) {
-                LOGGER.info("skipFromPreviousGeneration: currentGen: {}, inGen: {}, inTaskUid: {}", currentGeneration, inGeneration, inSync.getTaskUid());
-                return true;
-            }
-        }
-        return false;
     }
 }

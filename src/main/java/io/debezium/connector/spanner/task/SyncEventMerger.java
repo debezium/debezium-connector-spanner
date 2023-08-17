@@ -41,9 +41,7 @@ public class SyncEventMerger {
 
     // Apply the deltas from the new message onto the current task state.
     public static TaskSyncContext mergeIncrementalTaskSyncEvent(TaskSyncContext currentContext, TaskSyncEvent newMessage) {
-        boolean foundDuplication = false;
-        // Only check for duplicate partition errors for messages that are NEW_EPOCH, UPDATE_EPOCH,
-        // or REBALANCE_ANSWER.
+
         Map<String, TaskState> newTaskStatesMap = newMessage.getTaskStates();
         debug(LOGGER, "merge: state before {}, \nIncoming states: {}", currentContext, newTaskStatesMap);
 
@@ -72,7 +70,6 @@ public class SyncEventMerger {
             return builder.build();
         }
         else if (newTask.getStateTimestamp() > currentTask.getStateTimestamp()) {
-            Instant beforeProcessing = Instant.now();
             // Remove the task state from our map.
             Map<String, TaskState> currentTaskStates = new HashMap<>(currentContext.getTaskStates());
             currentTaskStates.remove(newMessage.getTaskUid());

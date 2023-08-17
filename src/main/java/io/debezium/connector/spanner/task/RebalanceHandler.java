@@ -76,21 +76,14 @@ public class RebalanceHandler {
         LOGGER.info("processRebalancingEvent: finished updating task sync context, consumerId: {}, taskId{}, rebalanceGenerationId: {}", consumerId,
                 taskSyncContextHolder.get().getTaskUid(), rebalanceGenerationId);
 
-<<<<<<< HEAD
         if (afterInstant - beforeInstant > 10000) {
             LOGGER.warn("processRebalancingEvent: took long time to update task sync context {}, consumerId: {}, taskId{}, rebalanceGenerationId: {}",
                     afterInstant - beforeInstant, consumerId, taskSyncContextHolder.get().getTaskUid(), rebalanceGenerationId);
         }
-        TaskSyncEvent taskSyncEvent = context.buildTaskSyncEvent(MessageTypeEnum.REBALANCE_ANSWER);
+        TaskSyncEvent taskSyncEvent = context.buildRebalanceAnswerTaskSyncEvent(MessageTypeEnum.REBALANCE_ANSWER);
 
         LoggerUtils.debug(LOGGER, "processRebalancingEvent: send: {}", taskSyncEvent);
         LOGGER.info("Task {} - RebalanceHandler sent sync event for consumer ID {}", taskSyncEvent.getTaskUid(), consumerId);
-=======
-        TaskSyncEvent taskSyncEvent = context.buildRebalanceAnswerTaskSyncEvent();
-
-        LoggerUtils.debug(LOGGER, "processRebalancingEvent: send: {}", taskSyncEvent);
-        LOGGER.info("Task {} - RebalanceHandler sent sync event {}", taskSyncEvent.getTaskUid(), taskSyncEvent);
->>>>>>> upstream2/publishDeltas
 
         taskSyncPublisher.send(taskSyncEvent);
 
