@@ -192,7 +192,7 @@ public class TaskSyncContext {
 
     public TaskSyncEvent buildCurrentTaskSyncEvent() {
         return TaskSyncEvent.builder().epochOffset(this.epochOffsetHolder.getEpochOffset()).taskStates(
-                this.getAllTaskStates())
+                this.getCurrentTaskStateMap())
                 .taskUid(this.getTaskUid())
                 .consumerId(this.getConsumerId())
                 .rebalanceGenerationId(this.getRebalanceGenerationId())

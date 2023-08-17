@@ -177,10 +177,6 @@ public class LowWatermarkCalculator {
             return;
         }
         final long now = new Date().getTime();
-        List<String> ownedPartitions = taskSyncContextHolder.get().getCurrentTaskState().getPartitions().stream().map(partitionState -> partitionState.getToken())
-                .collect(Collectors.toList());
-        List<String> sharedPartitions = taskSyncContextHolder.get().getCurrentTaskState().getSharedPartitions().stream().map(partitionState -> partitionState.getToken())
-                .collect(Collectors.toList());
 
         allPartitions.values().forEach(
                 partitionState -> {
