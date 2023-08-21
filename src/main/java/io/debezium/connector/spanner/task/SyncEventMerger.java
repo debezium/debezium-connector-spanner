@@ -172,9 +172,22 @@ public class SyncEventMerger {
             return builder.build();
         }
 
-        // Skip processing messages that this task has already produced.
-        if (newMessage.getTaskUid().equals(currentContext.getTaskUid())) {
-            return builder.build();
+        LOGGER.info("Task {}, updating the epoch offset from the leader's UPDATE_EPOCH message {}: {}", currentContext.getTaskUid(), newMessage.getTaskUid(),
+                newMessage.getEpochOffset());
+        builder.epochOffsetHolder(currentContext.getEpochOffsetHolder().nextOffset(newMessage.getEpochOffset()));
+
+        // Only retrieve the current task states where the task UID is included inside the UPDATE_EPOCH message.
+        Set<String> updateEpochTaskUids = newTaskStatesMap.keySet().stream().collect(Collectors.toSet());
+        Map<String, TaskState> currentTaskStates = currentContext.getTaskStates();
+
+        Map<String, TaskState> filteredTaskStates = new HashMap<String, TaskState>();
+        for (Map.Entry<String, TaskState> currentTaskState : currentTaskStates.entrySet()) {
+            if (!updateEpochTaskUids.contains(currentTaskState.getKey())) {
+                LOGGER.info("Task {}, removing task state {} since it is not included in the UPDATE_EPOCH message {}", currentContext.getTaskUid(),
+                        currentTaskState.getKey(), updateEpochTaskUids);
+                continue;
+            }
+            filteredTaskStates.put(currentTaskState.getKey(), currentTaskState.getValue());
         }
 
         Set<String> updatedStatesUids = new HashSet<>();
@@ -188,7 +201,7 @@ public class SyncEventMerger {
                 continue;
             }
 
-            TaskState currentTaskState = currentContext.getTaskStates().get(newTaskState.getTaskUid());
+            TaskState currentTaskState = filteredTaskStates.get(newTaskState.getTaskUid());
             // We only update our internal copy of another task's state, if the state timestamp
             // in the sync event message is greater than the state timestamp of our internal
             // copy of the other task's state.
@@ -197,39 +210,23 @@ public class SyncEventMerger {
             }
         }
 
-        if (!newMessage.getTaskUid().equals(currentContext.getTaskUid())) {
-            LOGGER.info("Task {}, updating the epoch offset from the leader's UPDATE_EPOCH message {}: {}", currentContext.getTaskUid(), newMessage.getTaskUid(),
-                    newMessage.getEpochOffset());
-            builder.epochOffsetHolder(currentContext.getEpochOffsetHolder().nextOffset(newMessage.getEpochOffset()));
-        }
+        var oldStatesStream = filteredTaskStates.entrySet().stream()
+                .filter(e -> !updatedStatesUids.contains(e.getKey()));
 
-        if (!updatedStatesUids.isEmpty()) {
-            var oldStatesStream = currentContext.getTaskStates().entrySet().stream()
-                    .filter(e -> !updatedStatesUids.contains(e.getKey()));
+        var updatedStatesStream = newTaskStatesMap.entrySet().stream()
+                .filter(e -> updatedStatesUids.contains(e.getKey()));
 
-            var updatedStatesStream = newTaskStatesMap.entrySet().stream()
-                    .filter(e -> updatedStatesUids.contains(e.getKey()));
+        Map<String, TaskState> mergedTaskStates = Stream.concat(oldStatesStream, updatedStatesStream)
+                .collect(toUnmodifiableMap(Map.Entry::getKey, Map.Entry::getValue));
 
-            Map<String, TaskState> mergedTaskStates = Stream.concat(oldStatesStream, updatedStatesStream)
-                    .collect(toUnmodifiableMap(Map.Entry::getKey, Map.Entry::getValue));
+        builder.taskStates(mergedTaskStates)
+                .createdTimestamp(Long.max(currentContext.getCreatedTimestamp(), newMessage.getMessageTimestamp()));
 
-            builder.taskStates(mergedTaskStates)
-                    .createdTimestamp(Long.max(currentContext.getCreatedTimestamp(), newMessage.getMessageTimestamp()));
+        TaskSyncContext result = builder
+                .epochOffsetHolder(currentContext.getEpochOffsetHolder().nextOffset(newMessage.getEpochOffset()))
+                .build();
 
-            // Update the epoch offset from the leader's epoch offset.
-            LOGGER.info("Task {}, updating the epoch offset from the leader update epoch {}: {}", currentContext.getTaskUid(), newMessage.getTaskUid(),
-                    newMessage.getEpochOffset());
-            TaskSyncContext result = builder
-                    .epochOffsetHolder(currentContext.getEpochOffsetHolder().nextOffset(newMessage.getEpochOffset()))
-                    .build();
-
-            debug(LOGGER, "merge: final state {}, \nUpdated uids: {}, epoch: {}",
-                    result, updatedStatesUids, result.getRebalanceGenerationId());
-            return result;
-        }
-        LOGGER.debug("merge: final state is not changed");
-
-        return builder.build();
+        return result;
     }
 
     public static TaskSyncContext mergeNewEpoch(TaskSyncContext currentContext, TaskSyncEvent inSync) {
