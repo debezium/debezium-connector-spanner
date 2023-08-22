@@ -47,8 +47,8 @@ public class FinishPartitionWatchDog {
                         token -> partition.computeIfAbsent(token, token1 -> Instant.now()));
 
                 if (Instant.now().isAfter(lastUpdatedTime.plus(Duration.ofSeconds(600)))) {
-                    LOGGER.info("Get pending to finish partitions: {}", pendingToFinish);
-                    LOGGER.info("Get pending partitions: {}", pending);
+                    LOGGER.info("Get pending partitions: {}", pendingToFinish);
+                    LOGGER.info("Get pending total partitions: {}", pending);
                     lastUpdatedTime = Instant.now();
                 }
 

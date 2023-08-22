@@ -214,6 +214,7 @@ public class SpannerStreamingChangeEventSource implements CommittingRecordsStrea
                             }
                             else {
                                 List<ChildPartitionsEvent> batchedInitialTokens = new ArrayList<>();
+                                // Make sure to send the child partitions downstream in batches.
                                 for (ChildPartitionsEvent childPartitionsEvent : initialChildPartitionTokens) {
                                     batchedInitialTokens.add(childPartitionsEvent);
                                     if (batchedInitialTokens.size() >= INITIAL_TOKEN_BATCH_SIZE) {
@@ -300,7 +301,7 @@ public class SpannerStreamingChangeEventSource implements CommittingRecordsStrea
                 LOGGER.info("A split event occurred {}", event);
             }
             else {
-                LOGGER.info("A move event occurred {}", event);
+                LOGGER.info("A move or merge event occurred {}", event);
 
             }
             List<Partition> partitions = event.getChildPartitions().stream().map(childPartition -> {

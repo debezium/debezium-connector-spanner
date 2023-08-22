@@ -152,7 +152,6 @@ public class BufferedPublisher {
         TaskSyncEvent item = this.value.getAndSet(null);
 
         if (item != null) {
-            LOGGER.info("Publishing task sync event for task {}: {}", item.getTaskUid(), item);
             this.onPublish.accept(item);
         }
     }

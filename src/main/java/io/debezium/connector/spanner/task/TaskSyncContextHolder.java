@@ -83,10 +83,6 @@ public class TaskSyncContextHolder {
         lock.unlock();
     }
 
-    public boolean isHeldByCurrentThread() {
-        return lock.isHeldByCurrentThread();
-    }
-
     public void awaitInitialization(Duration awaitTimeout) {
         LOGGER.debug("awaitInitialization: start");
         TimeoutMeter timeout = TimeoutMeter.setTimeout(awaitTimeout);

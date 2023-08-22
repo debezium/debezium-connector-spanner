@@ -7,8 +7,6 @@ package io.debezium.connector.spanner.task;
 
 import static org.slf4j.LoggerFactory.getLogger;
 
-import java.time.Instant;
-
 import org.slf4j.Logger;
 
 import io.debezium.connector.spanner.kafka.internal.TaskSyncPublisher;
@@ -47,10 +45,6 @@ public class RebalanceHandler {
 
         this.leaderAction.stop();
 
-        long beforeInstant = Instant.now().toEpochMilli();
-        LOGGER.info("processRebalancingEvent: preparing to update task sync context, consumerId: {}, taskId{}, rebalanceGenerationId: {}", consumerId,
-                taskSyncContextHolder.get().getTaskUid(), rebalanceGenerationId);
-
         TaskSyncContext context = taskSyncContextHolder.updateAndGet(oldContext -> {
             TaskState updatedState = oldContext.getCurrentTaskState()
                     .toBuilder()
@@ -72,14 +66,6 @@ public class RebalanceHandler {
                     .rebalanceState(RebalanceState.INITIAL_INCREMENTED_STATE_COMPLETED)
                     .build();
         });
-        long afterInstant = Instant.now().toEpochMilli();
-        LOGGER.info("processRebalancingEvent: finished updating task sync context, consumerId: {}, taskId{}, rebalanceGenerationId: {}", consumerId,
-                taskSyncContextHolder.get().getTaskUid(), rebalanceGenerationId);
-
-        if (afterInstant - beforeInstant > 10000) {
-            LOGGER.warn("processRebalancingEvent: took long time to update task sync context {}, consumerId: {}, taskId{}, rebalanceGenerationId: {}",
-                    afterInstant - beforeInstant, consumerId, taskSyncContextHolder.get().getTaskUid(), rebalanceGenerationId);
-        }
         TaskSyncEvent taskSyncEvent = context.buildRebalanceAnswerTaskSyncEvent();
 
         LoggerUtils.debug(LOGGER, "processRebalancingEvent: send: {}", taskSyncEvent);

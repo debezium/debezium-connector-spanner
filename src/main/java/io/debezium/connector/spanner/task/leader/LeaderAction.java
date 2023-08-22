@@ -10,12 +10,9 @@ import static io.debezium.connector.spanner.task.TaskStateUtil.filterSurvivedTas
 import static io.debezium.connector.spanner.task.TaskStateUtil.splitSurvivedAndObsoleteTaskStates;
 
 import java.time.Duration;
-import java.util.AbstractMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Consumer;
-import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -23,8 +20,6 @@ import org.slf4j.LoggerFactory;
 import io.debezium.DebeziumException;
 import io.debezium.connector.spanner.kafka.internal.KafkaConsumerAdminService;
 import io.debezium.connector.spanner.kafka.internal.TaskSyncPublisher;
-import io.debezium.connector.spanner.kafka.internal.model.PartitionState;
-import io.debezium.connector.spanner.kafka.internal.model.PartitionStateEnum;
 import io.debezium.connector.spanner.kafka.internal.model.RebalanceState;
 import io.debezium.connector.spanner.kafka.internal.model.TaskState;
 import io.debezium.connector.spanner.kafka.internal.model.TaskSyncEvent;
@@ -122,25 +117,9 @@ public class LeaderAction {
         TaskSyncEvent taskSyncEvent = taskSyncContext.buildUpdateEpochTaskSyncEvent();
         taskSyncPublisher.send(taskSyncEvent);
 
-        Map<String, List<PartitionState>> partitionsMap = taskSyncEvent.getTaskStates().values().stream()
-                .flatMap(taskState -> taskState.getPartitions().stream())
-                .filter(
-                        partitionState -> !partitionState.getState().equals(PartitionStateEnum.FINISHED)
-                                && !partitionState.getState().equals(PartitionStateEnum.REMOVED))
-                .collect(Collectors.groupingBy(PartitionState::getToken));
+        int numPartitions = taskSyncEvent.getNumPartitions();
 
-        int numPartitions = partitionsMap.size();
-
-        Map<String, PartitionState> partitions = partitionsMap.entrySet().stream()
-                .map(entry -> new AbstractMap.SimpleEntry<>(entry.getKey(), entry.getValue().get(0)))
-                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
-
-        Map<String, List<PartitionState>> sharedPartitionsMap = taskSyncEvent.getTaskStates().values().stream()
-                .flatMap(taskState -> taskState.getSharedPartitions().stream())
-                .filter(partitionState -> !partitions.containsKey(partitionState.getToken()))
-                .collect(Collectors.groupingBy(PartitionState::getToken));
-
-        int numSharedPartitions = sharedPartitionsMap.size();
+        int numSharedPartitions = taskSyncEvent.getNumSharedPartitions();
 
         LOGGER.info(
                 "Task {} - Leader task has updated the epoch offset with rebalance generation ID: {} and epoch offset: {}, num partitions {}, num shared partitions {}",
@@ -226,30 +205,12 @@ public class LeaderAction {
 
         TaskSyncEvent taskSyncEvent = taskSyncContext.buildNewEpochTaskSyncEvent();
 
-        Map<String, List<PartitionState>> partitionsMap = taskSyncEvent.getTaskStates().values().stream()
-                .flatMap(taskState -> taskState.getPartitions().stream())
-                .filter(
-                        partitionState -> !partitionState.getState().equals(PartitionStateEnum.FINISHED)
-                                && !partitionState.getState().equals(PartitionStateEnum.REMOVED))
-                .collect(Collectors.groupingBy(PartitionState::getToken));
+        int numPartitions = taskSyncEvent.getNumPartitions();
 
-        int numPartitions = partitionsMap.size();
-
-        Map<String, PartitionState> partitions = partitionsMap.entrySet().stream()
-                .map(entry -> new AbstractMap.SimpleEntry<>(entry.getKey(), entry.getValue().get(0)))
-                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
-
-        Map<String, List<PartitionState>> sharedPartitionsMap = taskSyncEvent.getTaskStates().values().stream()
-                .flatMap(taskState -> taskState.getSharedPartitions().stream())
-                .filter(partitionState -> !partitions.containsKey(partitionState.getToken()))
-                .collect(Collectors.groupingBy(PartitionState::getToken));
-
-        int numSharedPartitions = sharedPartitionsMap.size();
+        int numSharedPartitions = taskSyncEvent.getNumSharedPartitions();
 
         LOGGER.info("Task {} - sent new epoch with num tasks {}, num owned partitions {}, num shared partitions {}", taskSyncContext.getTaskUid(),
                 taskSyncEvent.getTaskStates().size(), numPartitions, numSharedPartitions);
-        LOGGER.info("Task {} - LeaderAction sent sync event with rebalance generation ID {}: and epoch offset {}", taskSyncContext.getTaskUid(),
-                taskSyncContext.getRebalanceGenerationId(), taskSyncContext.getEpochOffsetHolder().getEpochOffset());
 
         taskSyncPublisher.send(taskSyncEvent);
 
