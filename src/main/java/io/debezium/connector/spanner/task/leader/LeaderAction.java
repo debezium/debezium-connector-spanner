@@ -119,10 +119,33 @@ public class LeaderAction {
                 .epochOffsetHolder(oldContext.getEpochOffsetHolder().nextOffset(oldContext.getCurrentKafkaRecordOffset()))
                 .build());
 
-        taskSyncPublisher.send(taskSyncContext.buildUpdateEpochTaskSyncEvent());
+        TaskSyncEvent taskSyncEvent = taskSyncContext.buildUpdateEpochTaskSyncEvent();
+        taskSyncPublisher.send(taskSyncEvent);
 
-        LOGGER.info("Task {} - Leader task has updated the epoch offset with rebalance generation ID: {} and epoch offset: {}",
-                taskSyncContextHolder.get().getTaskUid(), taskSyncContext.getRebalanceGenerationId(), taskSyncContext.getEpochOffsetHolder().getEpochOffset());
+        Map<String, List<PartitionState>> partitionsMap = taskSyncEvent.getTaskStates().values().stream()
+                .flatMap(taskState -> taskState.getPartitions().stream())
+                .filter(
+                        partitionState -> !partitionState.getState().equals(PartitionStateEnum.FINISHED)
+                                && !partitionState.getState().equals(PartitionStateEnum.REMOVED))
+                .collect(Collectors.groupingBy(PartitionState::getToken));
+
+        int numPartitions = partitionsMap.size();
+
+        Map<String, PartitionState> partitions = partitionsMap.entrySet().stream()
+                .map(entry -> new AbstractMap.SimpleEntry<>(entry.getKey(), entry.getValue().get(0)))
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+
+        Map<String, List<PartitionState>> sharedPartitionsMap = taskSyncEvent.getTaskStates().values().stream()
+                .flatMap(taskState -> taskState.getSharedPartitions().stream())
+                .filter(partitionState -> !partitions.containsKey(partitionState.getToken()))
+                .collect(Collectors.groupingBy(PartitionState::getToken));
+
+        int numSharedPartitions = sharedPartitionsMap.size();
+
+        LOGGER.info(
+                "Task {} - Leader task has updated the epoch offset with rebalance generation ID: {} and epoch offset: {}, num partitions {}, num shared partitions {}",
+                taskSyncContextHolder.get().getTaskUid(), taskSyncContext.getRebalanceGenerationId(), taskSyncContext.getEpochOffsetHolder().getEpochOffset(),
+                numPartitions, numSharedPartitions);
 
         return taskSyncContext;
     }

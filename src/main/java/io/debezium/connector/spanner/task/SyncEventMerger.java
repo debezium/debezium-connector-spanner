@@ -9,6 +9,7 @@ import static io.debezium.connector.spanner.task.LoggerUtils.debug;
 import static java.util.stream.Collectors.toUnmodifiableMap;
 import static org.slf4j.LoggerFactory.getLogger;
 
+import java.util.AbstractMap;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -171,9 +172,6 @@ public class SyncEventMerger {
         if (newMessage.getTaskUid().equals(currentContext.getTaskUid())) {
             return builder.build();
         }
-
-        LOGGER.info("Task {}, updating the epoch offset from the leader's UPDATE_EPOCH message {}: {}", currentContext.getTaskUid(), newMessage.getTaskUid(),
-                newMessage.getEpochOffset());
         builder.epochOffsetHolder(currentContext.getEpochOffsetHolder().nextOffset(newMessage.getEpochOffset()));
 
         // Only retrieve the current task states where the task UID is included inside the UPDATE_EPOCH message.
@@ -225,6 +223,30 @@ public class SyncEventMerger {
         TaskSyncContext result = builder
                 .epochOffsetHolder(currentContext.getEpochOffsetHolder().nextOffset(newMessage.getEpochOffset()))
                 .build();
+
+        Map<String, List<PartitionState>> partitionsMap = result.getAllTaskStates().values().stream()
+                .flatMap(taskState -> taskState.getPartitions().stream())
+                .filter(
+                        partitionState -> !partitionState.getState().equals(PartitionStateEnum.FINISHED)
+                                && !partitionState.getState().equals(PartitionStateEnum.REMOVED))
+                .collect(Collectors.groupingBy(PartitionState::getToken));
+
+        int numPartitions = partitionsMap.size();
+
+        Map<String, PartitionState> partitions = partitionsMap.entrySet().stream()
+                .map(entry -> new AbstractMap.SimpleEntry<>(entry.getKey(), entry.getValue().get(0)))
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+
+        Map<String, List<PartitionState>> sharedPartitionsMap = result.getAllTaskStates().values().stream()
+                .flatMap(taskState -> taskState.getSharedPartitions().stream())
+                .filter(partitionState -> !partitions.containsKey(partitionState.getToken()))
+                .collect(Collectors.groupingBy(PartitionState::getToken));
+
+        int numSharedPartitions = sharedPartitionsMap.size();
+
+        LOGGER.info("Task {}, updating the epoch offset from the leader's UPDATE_EPOCH message {}: {}, num partitions {}, num shared partitions {}",
+                currentContext.getTaskUid(), newMessage.getTaskUid(),
+                newMessage.getEpochOffset(), numPartitions, numSharedPartitions);
 
         return result;
     }

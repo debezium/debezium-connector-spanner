@@ -42,7 +42,7 @@ public class SyncEventHandler {
         if (inSync == null) {
             return;
         }
-        if (skipFromPreviousGeneration(inSync)) {
+        if (skipFromMismatchingGeneration(inSync)) {
             return;
         }
 
@@ -57,7 +57,7 @@ public class SyncEventHandler {
         if (!RebalanceState.START_INITIAL_SYNC.equals(taskSyncContextHolder.get().getRebalanceState())) {
             return;
         }
-        if (skipFromPreviousGeneration(inSync)) {
+        if (skipFromMismatchingGeneration(inSync)) {
             if (metadata.isCanInitiateRebalancing()) {
                 LOGGER.info("task {}, skipping stale message, finished processing all previous sync event messages with end offset {}, can initiate rebalancing",
                         taskSyncContextHolder.get().getTaskUid(), metadata.getOffset());
@@ -192,13 +192,24 @@ public class SyncEventHandler {
         }
     }
 
-    private boolean skipFromPreviousGeneration(TaskSyncEvent inSync) {
+    private boolean skipFromMismatchingGeneration(TaskSyncEvent inSync) {
         if (inSync != null) {
             long inGeneration = inSync.getRebalanceGenerationId();
             long currentGeneration = taskSyncContextHolder.get().getRebalanceGenerationId();
 
-            if (inGeneration < currentGeneration) {
-                LOGGER.info("skipFromPreviousGeneration: currentGen: {}, inGen: {}, inTaskUid: {}", currentGeneration, inGeneration, inSync.getTaskUid());
+            if ((inSync.getMessageType() == MessageTypeEnum.REGULAR || inSync.getMessageType() == MessageTypeEnum.REBALANCE_ANSWER) &&
+                    inGeneration != currentGeneration) {
+                LOGGER.info("skipFromMismatchingGeneration: currentGen: {}, inGen: {}, inTaskUid: {}, message type {}", currentGeneration, inGeneration,
+                        inSync.getTaskUid(),
+                        inSync.getMessageType());
+                return true;
+            }
+
+            if ((inSync.getMessageType() == MessageTypeEnum.NEW_EPOCH || inSync.getMessageType() == MessageTypeEnum.UPDATE_EPOCH) &&
+                    inGeneration < currentGeneration) {
+                LOGGER.info("skipFromMismatchingGeneration: currentGen: {}, inGen: {}, inTaskUid: {}, message type {}", currentGeneration, inGeneration,
+                        inSync.getTaskUid(),
+                        inSync.getMessageType());
                 return true;
             }
         }
@@ -210,7 +221,7 @@ public class SyncEventHandler {
             return;
         }
 
-        if (skipFromPreviousGeneration(inSync)) {
+        if (skipFromMismatchingGeneration(inSync)) {
             return;
         }
 
