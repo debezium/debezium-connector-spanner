@@ -59,14 +59,14 @@ public class SyncEventHandler {
         }
         if (skipFromMismatchingGeneration(inSync)) {
             if (inSync != null) {
-              long inGeneration = inSync.getRebalanceGenerationId();
-              long currentGeneration = taskSyncContextHolder.get().getRebalanceGenerationId();
-              LOGGER.info("skipFromMismatchingGeneration: currentGen: {}, inGen: {}, inTaskUid: {}, message type {}", currentGeneration, inGeneration,
+                long inGeneration = inSync.getRebalanceGenerationId();
+                long currentGeneration = taskSyncContextHolder.get().getRebalanceGenerationId();
+                LOGGER.info("skipFromMismatchingGeneration: currentGen: {}, inGen: {}, inTaskUid: {}, message type {}", currentGeneration, inGeneration,
                         inSync.getTaskUid(),
                         inSync.getMessageType());
             }
             if (metadata.isCanInitiateRebalancing()) {
-          
+
                 taskSyncContextHolder.update(context -> context.toBuilder()
                         .rebalanceState(RebalanceState.INITIAL_INCREMENTED_STATE_COMPLETED)
                         .epochOffsetHolder(context.getEpochOffsetHolder().nextOffset(context.getCurrentKafkaRecordOffset()))

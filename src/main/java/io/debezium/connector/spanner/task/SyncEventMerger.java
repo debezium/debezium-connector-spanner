@@ -172,16 +172,16 @@ public class SyncEventMerger {
             return builder.build();
         }
         builder.epochOffsetHolder(currentContext.getEpochOffsetHolder().nextOffset(newMessage.getEpochOffset()));
-       
+
         TaskState.TaskStateBuilder currentTaskBuilder = currentContext.getCurrentTaskState().toBuilder();
         if (RebalanceState.START_INITIAL_SYNC.equals(currentContext.getRebalanceState())) {
             // Update the rebalance generation ID for both the task and the overall context
             // in case we are still processing from previous states and haven't connected to
             // the rebalance topic yet.
-            LOGGER.info("Task {}, updating the rebalance generation ID from the leader epoch update {}: {}", currentContext.getTaskUid(), inSync.getTaskUid(),
-                    inSync.getRebalanceGenerationId());
-            builder.rebalanceGenerationId(inSync.getRebalanceGenerationId());
-            currentTaskBuilder.rebalanceGenerationId(inSync.getRebalanceGenerationId());
+            LOGGER.info("Task {}, updating the rebalance generation ID from the leader epoch update {}: {}", currentContext.getTaskUid(), newMessage.getTaskUid(),
+                    newMessage.getRebalanceGenerationId());
+            builder.rebalanceGenerationId(newMessage.getRebalanceGenerationId());
+            currentTaskBuilder.rebalanceGenerationId(newMessage.getRebalanceGenerationId());
         }
 
         // Only retrieve the current task states where the task UID is included inside the UPDATE_EPOCH message.
@@ -227,11 +227,10 @@ public class SyncEventMerger {
         Map<String, TaskState> mergedTaskStates = Stream.concat(oldStatesStream, updatedStatesStream)
                 .collect(toUnmodifiableMap(Map.Entry::getKey, Map.Entry::getValue));
 
-        builder.taskStates(mergedTaskStates)
-                .createdTimestamp(Long.max(currentContext.getCreatedTimestamp(), newMessage.getMessageTimestamp()));
-
         TaskSyncContext result = builder
-                .currentTaskState(currentTaskBuilder.build());
+                .taskStates(mergedTaskStates)
+                .createdTimestamp(Long.max(currentContext.getCreatedTimestamp(), newMessage.getMessageTimestamp()))
+                .currentTaskState(currentTaskBuilder.build())
                 .epochOffsetHolder(currentContext.getEpochOffsetHolder().nextOffset(newMessage.getEpochOffset()))
                 .build();
 
