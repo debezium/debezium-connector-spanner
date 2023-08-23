@@ -203,12 +203,12 @@ public class SyncEventHandler {
             long inGeneration = inSync.getRebalanceGenerationId();
             long currentGeneration = taskSyncContextHolder.get().getRebalanceGenerationId();
 
-            if ((inSync.getMessageType() == MessageTypeEnum.REGULAR || inSync.getMessageType() == MessageTypeEnum.REBALANCE_ANSWER) &&
+            if ((inSync.getMessageType() == MessageTypeEnum.REGULAR) &&
                     inGeneration != currentGeneration) {
                 return true;
             }
 
-            if ((inSync.getMessageType() == MessageTypeEnum.NEW_EPOCH || inSync.getMessageType() == MessageTypeEnum.UPDATE_EPOCH) &&
+            if ((inSync.getMessageType() == MessageTypeEnum.NEW_EPOCH || inSync.getMessageType() == MessageTypeEnum.UPDATE_EPOCH || inSync.getMessageType() == MessageTypeEnum.REBALANCE_ANSWER) &&
                     inGeneration < currentGeneration) {
                 return true;
             }
