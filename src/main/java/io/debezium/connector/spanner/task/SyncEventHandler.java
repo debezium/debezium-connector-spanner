@@ -58,9 +58,15 @@ public class SyncEventHandler {
             return;
         }
         if (skipFromMismatchingGeneration(inSync)) {
+            if (inSync != null) {
+              long inGeneration = inSync.getRebalanceGenerationId();
+              long currentGeneration = taskSyncContextHolder.get().getRebalanceGenerationId();
+              LOGGER.info("skipFromMismatchingGeneration: currentGen: {}, inGen: {}, inTaskUid: {}, message type {}", currentGeneration, inGeneration,
+                        inSync.getTaskUid(),
+                        inSync.getMessageType());
+            }
             if (metadata.isCanInitiateRebalancing()) {
-                LOGGER.info("task {}, skipping stale message, finished processing all previous sync event messages with end offset {}, can initiate rebalancing",
-                        taskSyncContextHolder.get().getTaskUid(), metadata.getOffset());
+          
                 taskSyncContextHolder.update(context -> context.toBuilder()
                         .rebalanceState(RebalanceState.INITIAL_INCREMENTED_STATE_COMPLETED)
                         .epochOffsetHolder(context.getEpochOffsetHolder().nextOffset(context.getCurrentKafkaRecordOffset()))
@@ -199,17 +205,11 @@ public class SyncEventHandler {
 
             if ((inSync.getMessageType() == MessageTypeEnum.REGULAR || inSync.getMessageType() == MessageTypeEnum.REBALANCE_ANSWER) &&
                     inGeneration != currentGeneration) {
-                LOGGER.info("skipFromMismatchingGeneration: currentGen: {}, inGen: {}, inTaskUid: {}, message type {}", currentGeneration, inGeneration,
-                        inSync.getTaskUid(),
-                        inSync.getMessageType());
                 return true;
             }
 
             if ((inSync.getMessageType() == MessageTypeEnum.NEW_EPOCH || inSync.getMessageType() == MessageTypeEnum.UPDATE_EPOCH) &&
                     inGeneration < currentGeneration) {
-                LOGGER.info("skipFromMismatchingGeneration: currentGen: {}, inGen: {}, inTaskUid: {}, message type {}", currentGeneration, inGeneration,
-                        inSync.getTaskUid(),
-                        inSync.getMessageType());
                 return true;
             }
         }
@@ -240,7 +240,7 @@ public class SyncEventHandler {
             }
         }
         catch (Exception e) {
-            LOGGER.error("Exception during processing task message {}, {}", inSync, e);
+            LOGGER.error("Exception during processing task message task Uid {}, message type {}, {}", inSync.getTaskUid(), inSync.getMessageType(), e);
             throw e;
         }
     }
