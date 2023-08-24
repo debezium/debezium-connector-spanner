@@ -38,6 +38,7 @@ public class SyncEventMerger {
 
     // Apply the deltas from the new message onto the current task state.
     public static TaskSyncContext mergeIncrementalTaskSyncEvent(TaskSyncContext currentContext, TaskSyncEvent newMessage) {
+        LOGGER.info("Task {} merging {}", currentContext.getTaskUid(), newMessage);
 
         Map<String, TaskState> newTaskStatesMap = newMessage.getTaskStates();
         debug(LOGGER, "merge: state before {}, \nIncoming states: {}", currentContext, newTaskStatesMap);

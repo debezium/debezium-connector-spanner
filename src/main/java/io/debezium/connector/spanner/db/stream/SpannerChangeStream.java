@@ -102,7 +102,7 @@ public class SpannerChangeStream implements ChangeStream {
 
             this.lock.unlock();
 
-            LOGGER.info("Shutdown all partition streaming...");
+            LOGGER.info("Task {}, Shutdown all partition streaming...");
             this.partitionThreadPool.shutdown();
 
             this.isRunning.set(false);

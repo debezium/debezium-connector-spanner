@@ -150,6 +150,7 @@ public class BufferedPublisher {
 
     public synchronized void publishBuffered() {
         TaskSyncEvent item = this.value.getAndSet(null);
+        LOGGER.info("Task {} publishing {}", this.taskUid, item);
 
         if (item != null) {
             this.onPublish.accept(item);

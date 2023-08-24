@@ -61,7 +61,8 @@ public class SyncEventHandler {
             if (inSync != null) {
                 long inGeneration = inSync.getRebalanceGenerationId();
                 long currentGeneration = taskSyncContextHolder.get().getRebalanceGenerationId();
-                LOGGER.info("Task {}, skipFromMismatchingGeneration: currentGen: {}, inGen: {}, inTaskUid: {}, message type {}", taskSyncContextHolder.get().getTaskUid(), currentGeneration, inGeneration,
+                LOGGER.info("Task {}, skipFromMismatchingGeneration: currentGen: {}, inGen: {}, inTaskUid: {}, message type {}", taskSyncContextHolder.get().getTaskUid(),
+                        currentGeneration, inGeneration,
                         inSync.getTaskUid(),
                         inSync.getMessageType());
             }
@@ -208,7 +209,8 @@ public class SyncEventHandler {
                 return true;
             }
 
-            if ((inSync.getMessageType() == MessageTypeEnum.NEW_EPOCH || inSync.getMessageType() == MessageTypeEnum.UPDATE_EPOCH || inSync.getMessageType() == MessageTypeEnum.REBALANCE_ANSWER) &&
+            if ((inSync.getMessageType() == MessageTypeEnum.NEW_EPOCH || inSync.getMessageType() == MessageTypeEnum.UPDATE_EPOCH
+                    || inSync.getMessageType() == MessageTypeEnum.REBALANCE_ANSWER) &&
                     inGeneration < currentGeneration) {
                 return true;
             }
