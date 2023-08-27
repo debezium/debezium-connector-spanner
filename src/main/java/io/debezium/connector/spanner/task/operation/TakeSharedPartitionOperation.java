@@ -46,7 +46,7 @@ public class TakeSharedPartitionOperation implements Operation {
                 this.isRequiredPublishSyncEvent = true;
                 newTokens.add(partitionState.getToken());
 
-                LOGGER.info("Task {} : taking shared partition {}", context.getTaskUid(), partitionState.getToken());
+                LOGGER.info("Task {} : taking shared partition {}", context.getTaskUid(), partitionState);
             }
         });
 

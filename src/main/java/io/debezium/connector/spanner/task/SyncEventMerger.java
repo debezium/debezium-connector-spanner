@@ -38,11 +38,11 @@ public class SyncEventMerger {
 
     // Apply the deltas from the new message onto the current task state.
     public static TaskSyncContext mergeIncrementalTaskSyncEvent(TaskSyncContext currentContext, TaskSyncEvent newMessage) {
-        LOGGER.info("Task {} merging {}", currentContext.getTaskUid(), newMessage);
 
         Map<String, TaskState> newTaskStatesMap = newMessage.getTaskStates();
         debug(LOGGER, "merge: state before {}, \nIncoming states: {}", currentContext, newTaskStatesMap);
 
+        long oldPartitions = currentContext.getNumPartitions() + currentContext.getNumSharedPartitions();
         // Get the current context.
         var builder = currentContext.toBuilder();
 
@@ -115,8 +115,17 @@ public class SyncEventMerger {
                             newMessage.getMessageTimestamp()));
         }
         LOGGER.debug("merge: final state is not changed");
+
         TaskSyncContext newTaskSyncContext = builder
                 .build();
+        long newPartitions = newTaskSyncContext.getNumPartitions() + newTaskSyncContext.getNumSharedPartitions();
+        if (newPartitions != oldPartitions) {
+            LOGGER.info("Task {}, processed incremental answer {}: {}, task has total partitions {}, num partitions {}, num shared partitions {}, num old partitions {}",
+                    currentContext.getTaskUid(), newTaskSyncContext,
+                    newTaskSyncContext.getNumPartitions() + newTaskSyncContext.getNumSharedPartitions(),
+                    newTaskSyncContext.getNumPartitions(), newTaskSyncContext.getNumSharedPartitions(), oldPartitions);
+
+        }
 
         return newTaskSyncContext;
     }
@@ -138,6 +147,7 @@ public class SyncEventMerger {
             return builder.build();
         }
 
+        long oldPartitions = currentContext.getNumPartitions() + currentContext.getNumSharedPartitions();
         // We only retrieve the task state belonging to the rebalance answer.
         TaskState currentTask = currentContext.getTaskStates().get(newMessage.getTaskUid());
 
@@ -154,6 +164,15 @@ public class SyncEventMerger {
                     .build();
             LOGGER.info("Processed rebalance answer {} from task {} for rebalance generation id {}", newMessage, newMessage.getTaskUid(),
                     newMessage.getRebalanceGenerationId());
+
+            long newPartitions = result.getNumPartitions() + result.getNumSharedPartitions();
+            if (newPartitions != oldPartitions) {
+                LOGGER.info(
+                        "Task {}, processed rebalance answer {}: {}, task has total partitions {}, num partitions {}, num shared partitions {}, num old partitions {}",
+                        currentContext.getTaskUid(), newMessage, result.getNumPartitions() + result.getNumSharedPartitions(),
+                        result.getNumPartitions(), result.getNumSharedPartitions(), oldPartitions);
+
+            }
             return result;
         }
         LOGGER.debug("merge: final state is not changed");
@@ -172,6 +191,7 @@ public class SyncEventMerger {
         if (newMessage.getTaskUid().equals(currentContext.getTaskUid())) {
             return builder.build();
         }
+        long oldPartitions = currentContext.getNumPartitions() + currentContext.getNumSharedPartitions();
         builder.epochOffsetHolder(currentContext.getEpochOffsetHolder().nextOffset(newMessage.getEpochOffset()));
 
         TaskState.TaskStateBuilder currentTaskBuilder = currentContext.getCurrentTaskState().toBuilder();
@@ -239,10 +259,14 @@ public class SyncEventMerger {
 
         int numSharedPartitions = result.getNumSharedPartitions();
 
-        LOGGER.info("Task {}, updating the epoch offset from the leader's UPDATE_EPOCH message {}: {}, num partitions {}, num shared partitions {}",
-                currentContext.getTaskUid(), newMessage.getTaskUid(),
-                newMessage.getEpochOffset(), numPartitions, numSharedPartitions);
+        long newPartitions = numPartitions + numSharedPartitions;
+        if (newPartitions != oldPartitions) {
+            LOGGER.info(
+                    "Task {}, updating the epoch offset from the leader's UPDATE_EPOCH message {}: {}, task has total partitions {}, num partitions {}, num shared partitions {}, num old partitions {}",
+                    currentContext.getTaskUid(), newMessage.getTaskUid(),
+                    newMessage.getEpochOffset(), numPartitions + numSharedPartitions, numPartitions, numSharedPartitions, oldPartitions);
 
+        }
         return result;
     }
 
@@ -268,6 +292,8 @@ public class SyncEventMerger {
         if (inSync.getTaskUid().equals(currentContext.getTaskUid())) {
             return builder.build();
         }
+
+        long oldPartitions = currentContext.getNumPartitions() + currentContext.getNumSharedPartitions();
 
         Map<String, TaskState> newTaskStates = new HashMap<>(inSync.getTaskStates());
         newTaskStates.remove(currentContext.getTaskUid());
@@ -299,6 +325,15 @@ public class SyncEventMerger {
                 .taskStates(newTaskStates)
                 .currentTaskState(currentTaskBuilder.build());
         TaskSyncContext result = builder.build();
+
+        long newPartitions = result.getNumPartitions() + result.getNumSharedPartitions();
+        if (newPartitions != oldPartitions) {
+            LOGGER.info("Task {}, processed new epoch message {}: {}, task has total partitions {}, num partitions {}, num shared partitions {}, num old partitions {}",
+                    currentContext.getTaskUid(), inSync.getTaskUid(),
+                    inSync.getEpochOffset(), result.getNumPartitions() + result.getNumSharedPartitions(),
+                    result.getNumPartitions(), result.getNumSharedPartitions(), oldPartitions);
+
+        }
 
         // Check that there is no partition duplication after processing the new epoch message.
         if (!foundDuplication && result.checkDuplication(true, "NEW_EPOCH")) {

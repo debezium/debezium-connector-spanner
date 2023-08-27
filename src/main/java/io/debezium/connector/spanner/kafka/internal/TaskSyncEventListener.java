@@ -21,6 +21,7 @@ import org.slf4j.Logger;
 
 import com.google.protobuf.InvalidProtocolBufferException;
 
+import io.debezium.DebeziumException;
 import io.debezium.connector.spanner.exception.SpannerConnectorException;
 import io.debezium.connector.spanner.function.BlockingBiConsumer;
 import io.debezium.connector.spanner.kafka.event.proto.SyncEventProtos;
@@ -94,13 +95,17 @@ public class TaskSyncEventListener {
             else {
                 LOGGER.info("Task {}, listen: read last message with start offset {} and end offset {}", consumerGroup, startOffset, endOffset);
                 try {
+                    LOGGER.info("Task {}, seeking back to end offset {}", consumerGroup, endOffset);
                     consumer.seek(topicPartition, startOffset);
-                    seekBackToPreviousEpoch(consumer, topicPartition, beginOffset);
+                    LOGGER.info("Task {}, seeking back to previous epoch", consumerGroup);
+                    seekBackToPreviousEpoch(consumer, topicPartition, beginOffset, startOffset);
                 }
                 catch (org.apache.kafka.common.errors.InterruptException e) {
+                    LOGGER.info("Task {}, caught interrupt exception during reading the sync topic {}", consumerGroup, e);
                     throw new InterruptedException();
                 }
                 catch (Exception e) {
+                    LOGGER.info("Task {}, Error during seek back the Sync Topic {}", consumerGroup, e);
                     errorHandler.accept(
                             new SpannerConnectorException("Error during seek back the Sync Topic", e));
                     return;
@@ -109,6 +114,7 @@ public class TaskSyncEventListener {
 
         }
         catch (Exception ex) {
+            LOGGER.info("Shutdown consumer {} for ex {}", consumerGroup, ex);
             shutdownConsumer(consumer);
             throw ex;
         }
@@ -117,6 +123,7 @@ public class TaskSyncEventListener {
                 () -> {
                     try {
                         long commitOffsetStart = System.currentTimeMillis();
+                        LOGGER.info("Task {}, beginning to poll the sync topic", consumerGroup);
                         while (!Thread.currentThread().isInterrupted()) {
                             try {
                                 poll(consumer, endOffset);
@@ -129,6 +136,7 @@ public class TaskSyncEventListener {
                             }
                             catch (org.apache.kafka.common.errors.InterruptException
                                     | InterruptedException ex) {
+                                LOGGER.info("TaskSyncEventListener, caught interrupt exception {}, {}", consumerGroup, ex);
                                 return;
                             }
                             catch (Exception e) {
@@ -182,16 +190,23 @@ public class TaskSyncEventListener {
     }
 
     private void seekBackToPreviousEpoch(
-                                         Consumer<String, byte[]> consumer, TopicPartition topicPartition, long beginOffset)
+                                         Consumer<String, byte[]> consumer, TopicPartition topicPartition, long beginOffset, long currOffset)
             throws InvalidProtocolBufferException {
         if (!seekBackToPreviousEpoch) {
+            LOGGER.info("Task {}, not seeking back to previous epoch");
             return;
         }
         ConsumerRecords<String, byte[]> records = consumer.poll(pollDuration);
 
-        if (records.isEmpty()) {
-            LOGGER.warn("listen: fail to poll last message");
-            return;
+        long currentOffset = currOffset;
+        while (records.isEmpty()) {
+            currentOffset = currentOffset - 1;
+            if (currOffset - currentOffset >= 100) {
+                throw new DebeziumException("Task " + consumerGroup + "failed to poll last message from the sync topic");
+            }
+            LOGGER.warn("Task {}, listen: fail to poll last message, trying again", consumerGroup);
+            consumer.seek(topicPartition, currentOffset);
+            records = consumer.poll(pollDuration);
         }
 
         ConsumerRecord<String, byte[]> lastRecord = records.iterator().next();
@@ -212,6 +227,7 @@ public class TaskSyncEventListener {
 
     private void shutdownConsumer(Consumer<String, byte[]> consumer) {
         try {
+            LOGGER.info("TaskSyncEventListener, Shutting down consumer {}", consumerGroup);
             consumer.unsubscribe();
             consumer.close();
         }

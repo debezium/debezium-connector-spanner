@@ -10,6 +10,7 @@ import static org.slf4j.LoggerFactory.getLogger;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Collection;
+import java.util.stream.Collectors;
 
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerGroupMetadata;
@@ -78,7 +79,8 @@ public class RebalancingEventListener {
             @Override
             public void onPartitionsAssigned(Collection<TopicPartition> partitions) {
                 ConsumerGroupMetadata meta = consumer.groupMetadata();
-                LOGGER.info("Task {} - Rebalance happened, consumer ID {}", task.getTaskUid(), meta.memberId());
+                LOGGER.info("Task {} - Rebalance happened, consumer ID {}, partitions {}", task.getTaskUid(), meta.memberId(),
+                        partitions.stream().map(partition -> partition.partition()).collect(Collectors.toList()));
 
                 lastRebalanceEventMetadata = new RebalanceEventMetadata(meta.memberId(), meta.generationId(), isLeader(partitions));
 

@@ -51,12 +51,18 @@ public class TakePartitionForStreamingOperation implements Operation {
         List<PartitionState> toStreaming = taskState.getPartitions().stream()
                 .filter(partitionState -> partitionState.getState().equals(PartitionStateEnum.READY_FOR_STREAMING))
                 .collect(Collectors.toList());
+        if (!toStreaming.isEmpty()) {
+            LOGGER.info("Task {}, ready for streaming partitions {}", taskSyncContext.getTaskUid(), toStreaming);
+        }
 
         Set<String> toSchedule = new HashSet<>();
 
         toStreaming.forEach(partitionState -> {
             if (this.submitPartition(partitionState)) {
                 toSchedule.add(partitionState.getToken());
+            }
+            else {
+                LOGGER.info("Task {}, failed to submit partition {}", taskSyncContext.getTaskUid(), partitionState);
             }
         });
 
@@ -74,7 +80,7 @@ public class TakePartitionForStreamingOperation implements Operation {
 
         isRequiredPublishSyncEvent = !toSchedule.isEmpty();
         if (isRequiredPublishSyncEvent) {
-            LOGGER.debug("Task scheduled {} partitions, taskUid: {}", toSchedule.size(), taskSyncContext.getTaskUid());
+            LOGGER.info("Task scheduled {} partitions, taskUid: {}", toSchedule, taskSyncContext.getTaskUid());
         }
 
         return taskSyncContext.toBuilder()

@@ -67,10 +67,12 @@ public class SyncEventHandler {
                         inSync.getMessageType());
             }
             if (metadata.isCanInitiateRebalancing()) {
+                LOGGER.info("task {}, finished processing all previous sync event messages with end offset {}, can initiate rebalancing with rebalance generation ID {}",
+                        taskSyncContextHolder.get().getTaskUid(), metadata.getOffset(), taskSyncContextHolder.get().getRebalanceGenerationId());
 
                 taskSyncContextHolder.update(context -> context.toBuilder()
                         .rebalanceState(RebalanceState.INITIAL_INCREMENTED_STATE_COMPLETED)
-                        .epochOffsetHolder(context.getEpochOffsetHolder().nextOffset(context.getCurrentKafkaRecordOffset()))
+                        // .epochOffsetHolder(context.getEpochOffsetHolder().nextOffset(context.getCurrentKafkaRecordOffset()))
                         .build());
             }
             return;
@@ -78,14 +80,13 @@ public class SyncEventHandler {
 
         if (inSync != null) {
             if (inSync.getMessageType() == MessageTypeEnum.NEW_EPOCH) {
-                LOGGER.info("Task {} - processPreviousStates - merge new epoch with rebalance generation ID {}", taskSyncContextHolder.get().getTaskUid(),
-                        inSync.getRebalanceGenerationId());
                 taskSyncContextHolder.update(context -> SyncEventMerger.mergeNewEpoch(context, inSync));
             }
             else if (inSync.getMessageType() == MessageTypeEnum.REBALANCE_ANSWER) {
                 taskSyncContextHolder.update(context -> SyncEventMerger.mergeRebalanceAnswer(context, inSync));
             }
             else if (inSync.getMessageType() == MessageTypeEnum.UPDATE_EPOCH) {
+
                 taskSyncContextHolder.update(context -> SyncEventMerger.mergeEpochUpdate(context, inSync));
             }
             else {
@@ -97,12 +98,15 @@ public class SyncEventHandler {
             LOGGER.info("Task {} - processPreviousStates - switch state to INITIAL_INCREMENTED_STATE_COMPLETED",
                     taskSyncContextHolder.get().getTaskUid());
 
-            LOGGER.info("task {}, finished processing all previous sync event messages with end offset {}, can initiate rebalancing",
-                    taskSyncContextHolder.get().getTaskUid(), metadata.getOffset());
+            long newPartitions = taskSyncContextHolder.get().getNumPartitions() + taskSyncContextHolder.get().getNumSharedPartitions();
+
+            LOGGER.info(
+                    "task {}, finished processing all previous sync event messages with end offset {}, can initiate rebalancing with rebalance generation ID {}, task has total partitions {}",
+                    taskSyncContextHolder.get().getTaskUid(), metadata.getOffset(), taskSyncContextHolder.get().getRebalanceGenerationId(), newPartitions);
 
             taskSyncContextHolder.update(context -> context.toBuilder()
                     .rebalanceState(RebalanceState.INITIAL_INCREMENTED_STATE_COMPLETED)
-                    .epochOffsetHolder(context.getEpochOffsetHolder().nextOffset(context.getCurrentKafkaRecordOffset()))
+                    // .epochOffsetHolder(context.getEpochOffsetHolder().nextOffset(context.getCurrentKafkaRecordOffset()))
                     .build());
             LOGGER.info("Task {} - now initialized with epoch offset {} and context {}", taskSyncContextHolder.get().getTaskUid(),
                     taskSyncContextHolder.get().getEpochOffsetHolder().getEpochOffset(), taskSyncContextHolder.get());
@@ -184,8 +188,7 @@ public class SyncEventHandler {
 
         try {
 
-            if (!taskSyncContextHolder.get().isLeader() ||
-                    !taskSyncContextHolder.get().getRebalanceState().equals(RebalanceState.INITIAL_INCREMENTED_STATE_COMPLETED)) {
+            if (!taskSyncContextHolder.get().getRebalanceState().equals(RebalanceState.INITIAL_INCREMENTED_STATE_COMPLETED)) {
                 return;
             }
 
@@ -209,8 +212,8 @@ public class SyncEventHandler {
                 return true;
             }
 
-            if ((inSync.getMessageType() == MessageTypeEnum.NEW_EPOCH || inSync.getMessageType() == MessageTypeEnum.UPDATE_EPOCH
-                    || inSync.getMessageType() == MessageTypeEnum.REBALANCE_ANSWER) &&
+            if ((inSync.getMessageType() == MessageTypeEnum.REBALANCE_ANSWER || inSync.getMessageType() == MessageTypeEnum.NEW_EPOCH
+                    || inSync.getMessageType() == MessageTypeEnum.UPDATE_EPOCH) &&
                     inGeneration < currentGeneration) {
                 return true;
             }
@@ -230,15 +233,19 @@ public class SyncEventHandler {
         try {
             if (inSync.getMessageType() == MessageTypeEnum.REGULAR) {
                 processRegularMessage(inSync, metadata);
+
             }
             else if (inSync.getMessageType() == MessageTypeEnum.REBALANCE_ANSWER) {
                 processRebalanceAnswer(inSync, metadata);
+
             }
             else if (inSync.getMessageType() == MessageTypeEnum.UPDATE_EPOCH) {
                 processUpdateEpoch(inSync, metadata);
+
             }
             else if (inSync.getMessageType() == MessageTypeEnum.NEW_EPOCH) {
                 processNewEpoch(inSync, metadata);
+
             }
         }
         catch (Exception e) {

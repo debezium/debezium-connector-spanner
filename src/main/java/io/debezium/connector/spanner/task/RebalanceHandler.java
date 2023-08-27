@@ -40,12 +40,29 @@ public class RebalanceHandler {
     }
 
     public void process(boolean isLeader, String consumerId, long rebalanceGenerationId) throws InterruptedException {
-        LOGGER.info("processRebalancingEvent: start, consumerId: {}, taskId{}, rebalanceGenerationId: {}", consumerId, taskSyncContextHolder.get().getTaskUid(),
-                rebalanceGenerationId);
+        LOGGER.info("processRebalancingEvent: start, consumerId: {}, taskId{}, rebalanceGenerationId: {}, isLeader {}", consumerId,
+                taskSyncContextHolder.get().getTaskUid(),
+                rebalanceGenerationId, isLeader);
 
         this.leaderAction.stop();
 
+        LOGGER.info("processRebalancingEvent: stopped leader thread, consumerId: {}, taskId{}, rebalanceGenerationId: {}, isLeader {}", consumerId,
+                taskSyncContextHolder.get().getTaskUid(),
+                rebalanceGenerationId, isLeader);
+
+        LOGGER.info("processRebalancingEvent: updating task sync context, consumerId: {}, taskId{}, rebalanceGenerationId: {}, isLeader {}",
+                rebalanceGenerationId, consumerId,
+                taskSyncContextHolder.get().getTaskUid(),
+                rebalanceGenerationId, isLeader);
         TaskSyncContext context = taskSyncContextHolder.updateAndGet(oldContext -> {
+            if (rebalanceGenerationId < taskSyncContextHolder.get().getRebalanceGenerationId()) {
+                LOGGER.info("processRebalancingEvent: skipping due to stale rebalance generation ID {}, consumerId: {}, taskId{}, rebalanceGenerationId: {}, isLeader {}",
+                        rebalanceGenerationId, consumerId,
+                        taskSyncContextHolder.get().getTaskUid(),
+                        rebalanceGenerationId, isLeader);
+                return oldContext;
+
+            }
             TaskState updatedState = oldContext.getCurrentTaskState()
                     .toBuilder()
                     .consumerId(consumerId)
@@ -66,15 +83,26 @@ public class RebalanceHandler {
                     .rebalanceState(RebalanceState.INITIAL_INCREMENTED_STATE_COMPLETED)
                     .build();
         });
+        if (context.getRebalanceGenerationId() != rebalanceGenerationId) {
+            LOGGER.info(
+                    "processRebalancingEvent: failed to update task sync context, consumerId: {}, taskId{}, rebalanceGenerationId: {}, isLeader {}, task rebalance generation ID {}",
+                    consumerId,
+                    taskSyncContextHolder.get().getTaskUid(),
+                    rebalanceGenerationId, isLeader, taskSyncContextHolder.get().getRebalanceGenerationId());
+            return;
+        }
         TaskSyncEvent taskSyncEvent = context.buildRebalanceAnswerTaskSyncEvent();
 
         LoggerUtils.debug(LOGGER, "processRebalancingEvent: send: {}", taskSyncEvent);
-        LOGGER.info("Task {} - RebalanceHandler sent sync event for consumer ID {}", taskSyncEvent.getTaskUid(), consumerId);
+        LOGGER.info("Task {} - RebalanceHandler sent sync event for consumer ID {} and rebalance generation ID {}", taskSyncEvent.getTaskUid(), consumerId,
+                rebalanceGenerationId);
 
         taskSyncPublisher.send(taskSyncEvent);
 
-        LOGGER.info("processRebalancingEvent: Task {} rebalance answer has been sent for consumer ID {}",
-                taskSyncContextHolder.get().getTaskUid(), consumerId);
+        LOGGER.info(
+                "processRebalancingEvent: Task {} rebalance answer has been sent for consumer ID {} and rebalance generation ID {}, num partitions {} num shared partitions {}",
+                taskSyncContextHolder.get().getTaskUid(), consumerId, rebalanceGenerationId, taskSyncContextHolder.get().getNumPartitions(),
+                taskSyncContextHolder.get().getNumSharedPartitions());
         if (isLeader) {
             LOGGER.info("Task {} is leader", context.getTaskUid());
             this.leaderAction.start();
@@ -89,15 +117,18 @@ public class RebalanceHandler {
         this.lowWatermarkStampPublisher.init();
     }
 
-    public void destroy() {
+    public synchronized void destroy() {
         this.leaderAction.stop();
+        LOGGER.info("Task {}, destroyed leader action ", taskSyncContextHolder.get().getTaskUid());
 
         try {
             this.lowWatermarkStampPublisher.destroy();
         }
+
         catch (InterruptedException e) {
             // ignore to continue task destroying
         }
+        LOGGER.info("Task {}, destroyed low watermark stamp publisher ", taskSyncContextHolder.get().getTaskUid());
 
     }
 }

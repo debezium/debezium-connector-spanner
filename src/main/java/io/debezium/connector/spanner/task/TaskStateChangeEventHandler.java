@@ -164,6 +164,8 @@ public class TaskStateChangeEventHandler {
         List<String> removedOwnedPartitions = new ArrayList<String>();
         List<String> removedSharedPartitions = new ArrayList<String>();
 
+        long totalPartitions = taskSyncContextHolder.get().getNumPartitions() + taskSyncContextHolder.get().getNumSharedPartitions();
+
         try {
             taskSyncContext = taskSyncContextHolder.updateAndGet(context -> {
                 TaskSyncContext newContext = context;
@@ -216,6 +218,18 @@ public class TaskStateChangeEventHandler {
         if (publishTaskSyncEvent.get()) {
             TaskSyncEvent incrementalEvent = taskSyncContext.buildIncrementalTaskSyncEvent(
                     ownedPartitions, sharedPartitions, removedOwnedPartitions, removedSharedPartitions);
+
+            long newTotalPartitions = taskSyncContext.getNumPartitions() + taskSyncContext.getNumSharedPartitions();
+
+            if (newTotalPartitions != totalPartitions) {
+                LOGGER.info(
+                        "generated incremental event: Task {}  rebalance generation ID {}, task has total partitions {}, num partitions {} num shared partitions {}, incremental event {}, previous partitions {}, new partitions {}",
+                        taskSyncContextHolder.get().getTaskUid(), taskSyncContextHolder.get().getRebalanceGenerationId(),
+                        taskSyncContextHolder.get().getNumPartitions() + taskSyncContextHolder.get().getNumSharedPartitions(),
+                        taskSyncContextHolder.get().getNumPartitions(),
+                        taskSyncContextHolder.get().getNumSharedPartitions(), incrementalEvent, totalPartitions, newTotalPartitions);
+            }
+
             taskSyncPublisher.send(incrementalEvent);
         }
 

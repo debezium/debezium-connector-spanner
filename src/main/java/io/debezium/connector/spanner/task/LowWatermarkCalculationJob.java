@@ -29,7 +29,7 @@ public class LowWatermarkCalculationJob {
 
     private volatile Thread calculationThread;
 
-    private final Duration pollInterval = Duration.ofMillis(600000);
+    private final Duration pollInterval = Duration.ofMillis(60000);
 
     private final Consumer<Throwable> errorHandler;
     private final boolean enabled;
