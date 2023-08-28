@@ -145,15 +145,19 @@ public class TaskSyncEventListener {
                                 return;
                             }
                         }
-
                     }
                     finally {
                         shutdownConsumer(consumer);
                     }
                 },
                 "SpannerConnector-TaskSyncEventListener");
+        thread.setUncaughtExceptionHandler((t, ex) -> {
+            LOGGER.error("Error in SpannerConnector-TaskSyncEventListener, task {}, ex {}", consumerGroup, ex.getStackTrace());
+            errorHandler.accept(new RuntimeException(ex));
+        });
 
         thread.start();
+
     }
 
     private int poll(Consumer<String, byte[]> consumer, long endOffset)

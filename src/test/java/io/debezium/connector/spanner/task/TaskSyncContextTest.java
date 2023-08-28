@@ -7,8 +7,6 @@ package io.debezium.connector.spanner.task;
 
 import static io.debezium.connector.spanner.task.TaskTestHelper.generateTaskStateWithPartitions;
 
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -36,8 +34,7 @@ class TaskSyncContextTest {
         Assertions.assertEquals(MessageTypeEnum.REBALANCE_ANSWER, syncEvent.getMessageType());
 
         // Build incremental message.
-        syncEvent = taskSyncContext.buildIncrementalTaskSyncEvent(
-                Collections.emptyList(), Collections.emptyList(), Collections.emptyList(), Collections.emptyList());
+        syncEvent = taskSyncContext.buildCurrentTaskSyncEvent();
         Assertions.assertEquals("task0", syncEvent.getTaskUid());
         Assertions.assertEquals(1, syncEvent.getTaskStates().size());
         Assertions.assertEquals(MessageTypeEnum.REGULAR, syncEvent.getMessageType());
@@ -72,22 +69,13 @@ class TaskSyncContextTest {
         Assertions.assertEquals(taskState1.getSharedPartitions().size(), 2);
 
         // Build incremental message.
-        List<String> updatedOwnedPartitions = new ArrayList<>();
-        List<String> updatedSharedPartitions = new ArrayList<>();
-        List<String> removedOwnedPartitions = new ArrayList<>();
-        List<String> removedSharedPartitions = new ArrayList<>();
-        updatedOwnedPartitions.add("token0");
-        updatedOwnedPartitions.add("token2");
-        updatedSharedPartitions.add("token4");
-        syncEvent = taskSyncContext.buildIncrementalTaskSyncEvent(
-                updatedOwnedPartitions, updatedSharedPartitions, removedOwnedPartitions,
-                removedSharedPartitions);
-        taskState1 = syncEvent.getTaskStates().get(syncEvent.getTaskUid());
+        syncEvent = taskSyncContext.buildCurrentTaskSyncEvent();
         Assertions.assertEquals("task0", syncEvent.getTaskUid());
         Assertions.assertEquals(1, syncEvent.getTaskStates().size());
         Assertions.assertEquals(MessageTypeEnum.REGULAR, syncEvent.getMessageType());
-        Assertions.assertEquals(taskState1.getPartitionsMap().size(), 2);
-        Assertions.assertEquals(taskState1.getSharedPartitions().size(), 1);
+        taskState1 = syncEvent.getTaskStates().get(syncEvent.getTaskUid());
+        Assertions.assertEquals(taskState1.getPartitionsMap().size(), 4);
+        Assertions.assertEquals(taskState1.getSharedPartitions().size(), 2);
 
         // Build epoch update message.
         syncEvent = taskSyncContext.buildUpdateEpochTaskSyncEvent();
@@ -122,146 +110,6 @@ class TaskSyncContextTest {
         taskState3 = syncEvent.getTaskStates().get("task2");
         Assertions.assertEquals(taskState3.getPartitionsMap().size(), 2);
         Assertions.assertEquals(taskState3.getSharedPartitions().size(), 1);
-    }
-
-    @Test
-    void testIncrementalAnswer() {
-        TaskSyncContext taskSyncContext = buildTaskSyncContextWithPartitions();
-
-        List<String> updatedOwnedPartitions = new ArrayList<>();
-        List<String> updatedSharedPartitions = new ArrayList<>();
-        List<String> removedOwnedPartitions = new ArrayList<>();
-        List<String> removedSharedPartitions = new ArrayList<>();
-        // Test basic newly owned partitions, newly modified, and newly shared partitions.
-        updatedOwnedPartitions.add("token0");
-        updatedOwnedPartitions.add("token2");
-        updatedSharedPartitions.add("token4");
-        // Build incremental message.
-
-        TaskSyncEvent syncEvent = taskSyncContext.buildIncrementalTaskSyncEvent(
-                updatedOwnedPartitions, updatedSharedPartitions, removedOwnedPartitions, removedSharedPartitions);
-        Assertions.assertEquals("task0", syncEvent.getTaskUid());
-        Assertions.assertEquals(1, syncEvent.getTaskStates().size());
-        Assertions.assertEquals(MessageTypeEnum.REGULAR, syncEvent.getMessageType());
-
-        TaskState taskState1 = syncEvent.getTaskStates().get(syncEvent.getTaskUid());
-        Assertions.assertEquals(taskState1.getPartitionsMap().size(), 2);
-        PartitionState partition1 = taskState1.getPartitionsMap().get("token0");
-        Assertions.assertEquals(partition1.getState(), PartitionStateEnum.CREATED);
-        PartitionState partition2 = taskState1.getPartitionsMap().get("token2");
-        Assertions.assertEquals(partition2.getState(), PartitionStateEnum.RUNNING);
-
-        Assertions.assertEquals(taskState1.getSharedPartitions().size(), 1);
-        PartitionState partition3 = taskState1.getSharedPartitionsMap().get("token4");
-        Assertions.assertEquals(partition3.getState(), PartitionStateEnum.CREATED);
-        updatedOwnedPartitions.clear();
-        updatedSharedPartitions.clear();
-
-        // Let's say a partition was owned and then updated.
-        updatedOwnedPartitions.add("token2");
-        updatedOwnedPartitions.add("token2");
-        updatedOwnedPartitions.add("token3");
-        updatedSharedPartitions.add("token4");
-
-        syncEvent = taskSyncContext.buildIncrementalTaskSyncEvent(
-                updatedOwnedPartitions, updatedSharedPartitions, removedOwnedPartitions,
-                removedSharedPartitions);
-        Assertions.assertEquals("task0", syncEvent.getTaskUid());
-        Assertions.assertEquals(1, syncEvent.getTaskStates().size());
-        Assertions.assertEquals(MessageTypeEnum.REGULAR, syncEvent.getMessageType());
-
-        taskState1 = syncEvent.getTaskStates().get(syncEvent.getTaskUid());
-        Assertions.assertEquals(taskState1.getPartitionsMap().size(), 2);
-
-        partition1 = taskState1.getPartitionsMap().get("token3");
-        Assertions.assertEquals(partition1.getState(), PartitionStateEnum.FINISHED);
-        partition2 = taskState1.getPartitionsMap().get("token2");
-        Assertions.assertEquals(partition2.getState(), PartitionStateEnum.RUNNING);
-
-        Assertions.assertEquals(taskState1.getSharedPartitions().size(), 1);
-        partition3 = taskState1.getSharedPartitionsMap().get("token4");
-        Assertions.assertEquals(partition3.getState(), PartitionStateEnum.CREATED);
-        updatedOwnedPartitions.clear();
-        updatedSharedPartitions.clear();
-
-        // Let's say a partition was owned and then removed.
-        updatedOwnedPartitions.add("token1");
-        updatedOwnedPartitions.add("token3");
-        removedOwnedPartitions.add("token1");
-        updatedSharedPartitions.add("token4");
-
-        syncEvent = taskSyncContext.buildIncrementalTaskSyncEvent(
-                updatedOwnedPartitions, updatedSharedPartitions, removedOwnedPartitions,
-                removedSharedPartitions);
-
-        Assertions.assertEquals("task0", syncEvent.getTaskUid());
-        Assertions.assertEquals(1, syncEvent.getTaskStates().size());
-        Assertions.assertEquals(MessageTypeEnum.REGULAR, syncEvent.getMessageType());
-
-        taskState1 = syncEvent.getTaskStates().get(syncEvent.getTaskUid());
-        Assertions.assertEquals(taskState1.getPartitionsMap().size(), 2);
-        partition1 = taskState1.getPartitionsMap().get("token3");
-        Assertions.assertEquals(partition1.getState(), PartitionStateEnum.FINISHED);
-        partition2 = taskState1.getPartitionsMap().get("token1");
-        Assertions.assertEquals(partition2.getState(), PartitionStateEnum.REMOVED);
-
-        Assertions.assertEquals(taskState1.getSharedPartitions().size(), 1);
-        partition3 = taskState1.getSharedPartitionsMap().get("token4");
-        Assertions.assertEquals(partition3.getState(), PartitionStateEnum.CREATED);
-
-        updatedOwnedPartitions.clear();
-        removedOwnedPartitions.clear();
-        updatedSharedPartitions.clear();
-
-        // Let's say a partition was updated and then removed.
-        updatedOwnedPartitions.add("token0");
-        updatedOwnedPartitions.add("token1");
-        updatedOwnedPartitions.add("token3");
-        removedOwnedPartitions.add("token1");
-        updatedSharedPartitions.add("token4");
-
-        syncEvent = taskSyncContext.buildIncrementalTaskSyncEvent(
-                updatedOwnedPartitions, updatedSharedPartitions, removedOwnedPartitions,
-                removedSharedPartitions);
-
-        Assertions.assertEquals("task0", syncEvent.getTaskUid());
-        Assertions.assertEquals(1, syncEvent.getTaskStates().size());
-        Assertions.assertEquals(MessageTypeEnum.REGULAR, syncEvent.getMessageType());
-
-        taskState1 = syncEvent.getTaskStates().get(syncEvent.getTaskUid());
-        Assertions.assertEquals(taskState1.getPartitionsMap().size(), 3);
-        partition1 = taskState1.getPartitionsMap().get("token3");
-        Assertions.assertEquals(partition1.getState(), PartitionStateEnum.FINISHED);
-        partition2 = taskState1.getPartitionsMap().get("token1");
-        Assertions.assertEquals(partition2.getState(), PartitionStateEnum.REMOVED);
-        partition3 = taskState1.getPartitionsMap().get("token0");
-        Assertions.assertEquals(partition3.getState(), PartitionStateEnum.CREATED);
-
-        Assertions.assertEquals(taskState1.getSharedPartitions().size(), 1);
-        PartitionState partition4 = taskState1.getSharedPartitionsMap().get("token4");
-        Assertions.assertEquals(partition4.getState(), PartitionStateEnum.CREATED);
-
-        updatedOwnedPartitions.clear();
-        removedOwnedPartitions.clear();
-        updatedSharedPartitions.clear();
-
-        // Let's say a partition was shared and then removed.
-        updatedSharedPartitions.add("token5");
-        removedSharedPartitions.add("token5");
-        syncEvent = taskSyncContext.buildIncrementalTaskSyncEvent(
-                updatedOwnedPartitions, updatedSharedPartitions, removedOwnedPartitions,
-                removedSharedPartitions);
-
-        Assertions.assertEquals("task0", syncEvent.getTaskUid());
-        Assertions.assertEquals(1, syncEvent.getTaskStates().size());
-        Assertions.assertEquals(MessageTypeEnum.REGULAR, syncEvent.getMessageType());
-
-        taskState1 = syncEvent.getTaskStates().get(syncEvent.getTaskUid());
-        Assertions.assertEquals(taskState1.getPartitionsMap().size(), 0);
-
-        Assertions.assertEquals(taskState1.getSharedPartitions().size(), 1);
-        partition1 = taskState1.getSharedPartitionsMap().get("token5");
-        Assertions.assertEquals(partition1.getState(), PartitionStateEnum.REMOVED);
     }
 
     private TaskSyncContext buildEmptyTaskSyncContext() {

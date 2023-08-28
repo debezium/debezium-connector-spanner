@@ -6,7 +6,6 @@
 package io.debezium.connector.spanner.task.operation;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -26,8 +25,6 @@ public class FindPartitionForStreamingOperation implements Operation {
     private static final Logger LOGGER = LoggerFactory.getLogger(FindPartitionForStreamingOperation.class);
 
     private boolean isRequiredPublishSyncEvent = false;
-
-    List<String> partitionsToBeStreamed = new ArrayList<String>();
 
     public FindPartitionForStreamingOperation() {
     }
@@ -58,7 +55,6 @@ public class FindPartitionForStreamingOperation implements Operation {
                             this.isRequiredPublishSyncEvent = true;
                             LOGGER.info("Task took partition for streaming, taskUid: {}, partition {}",
                                     taskSyncContext.getTaskUid(), partitionState.getToken());
-                            partitionsToBeStreamed.add(partitionState.getToken());
 
                             return partitionState.toBuilder()
                                     .state(PartitionStateEnum.READY_FOR_STREAMING)
@@ -118,25 +114,5 @@ public class FindPartitionForStreamingOperation implements Operation {
     @Override
     public TaskSyncContext doOperation(TaskSyncContext taskSyncContext) {
         return takePartitionForStreaming(taskSyncContext);
-    }
-
-    @Override
-    public List<String> updatedOwnedPartitions() {
-        return partitionsToBeStreamed;
-    }
-
-    @Override
-    public List<String> updatedSharedPartitions() {
-        return Collections.emptyList();
-    }
-
-    @Override
-    public List<String> removedOwnedPartitions() {
-        return Collections.emptyList();
-    }
-
-    @Override
-    public List<String> removedSharedPartitions() {
-        return Collections.emptyList();
     }
 }

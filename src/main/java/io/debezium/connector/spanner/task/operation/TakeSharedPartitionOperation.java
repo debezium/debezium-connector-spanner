@@ -6,7 +6,6 @@
 package io.debezium.connector.spanner.task.operation;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -27,13 +26,12 @@ public class TakeSharedPartitionOperation implements Operation {
     private static final Logger LOGGER = LoggerFactory.getLogger(TakeSharedPartitionOperation.class);
 
     private boolean isRequiredPublishSyncEvent = false;
-    private List<String> newTokens = new ArrayList<String>();
 
     private TaskSyncContext takePartition(TaskSyncContext context) {
 
         TaskState taskState = context.getCurrentTaskState();
 
-        List<PartitionState> sharedPartitions = findSharedPartition(context);
+        List<PartitionState> sharedPartitions = filterDuplications(findSharedPartition(context));
         Set<String> tokens = taskState.getPartitions().stream()
                 .map(PartitionState::getToken)
                 .collect(Collectors.toSet());
@@ -44,7 +42,6 @@ public class TakeSharedPartitionOperation implements Operation {
             if (!tokens.contains(partitionState.getToken())) {
                 partitions.add(partitionState);
                 this.isRequiredPublishSyncEvent = true;
-                newTokens.add(partitionState.getToken());
 
                 LOGGER.info("Task {} : taking shared partition {}", context.getTaskUid(), partitionState);
             }
@@ -74,23 +71,13 @@ public class TakeSharedPartitionOperation implements Operation {
         return takePartition(taskSyncContext);
     }
 
-    @Override
-    public List<String> updatedOwnedPartitions() {
-        return newTokens;
+    private List<PartitionState> filterDuplications(List<PartitionState> partitionStates) {
+        return partitionStates.stream()
+                .collect(Collectors.groupingBy(PartitionState::getToken))
+                .values()
+                .stream()
+                .flatMap(list -> list.stream().sorted().limit(1))
+                .collect(Collectors.toList());
     }
 
-    @Override
-    public List<String> updatedSharedPartitions() {
-        return Collections.emptyList();
-    }
-
-    @Override
-    public List<String> removedOwnedPartitions() {
-        return Collections.emptyList();
-    }
-
-    @Override
-    public List<String> removedSharedPartitions() {
-        return Collections.emptyList();
-    }
 }

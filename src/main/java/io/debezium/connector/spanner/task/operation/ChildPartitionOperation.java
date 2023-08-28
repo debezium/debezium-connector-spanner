@@ -8,7 +8,6 @@ package io.debezium.connector.spanner.task.operation;
 import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -38,14 +37,8 @@ public class ChildPartitionOperation implements Operation {
 
     private final List<Partition> newPartitions;
 
-    private final List<String> returnOwnedPartitions;
-
-    private final List<String> returnSharedPartitions;
-
     public ChildPartitionOperation(List<Partition> newPartitions) {
         this.newPartitions = newPartitions;
-        this.returnOwnedPartitions = new ArrayList<String>();
-        this.returnSharedPartitions = new ArrayList<String>();
     }
 
     private TaskSyncContext share(TaskSyncContext taskSyncContext) {
@@ -90,12 +83,10 @@ public class ChildPartitionOperation implements Operation {
 
             if (taskSyncContext.getTaskUid().equals(taskUid)) {
                 partitions.add(partitionState);
-                returnOwnedPartitions.add(partitionState.getToken());
                 LOGGER.debug("ChildPartitionOperation: added new partition: {}", newPartition.getToken());
             }
             else {
                 sharedPartitions.add(partitionState);
-                returnSharedPartitions.add(partitionState.getToken());
                 LOGGER.debug("ChildPartitionOperation: shared new partition: {}", newPartition.getToken());
             }
 
@@ -182,26 +173,6 @@ public class ChildPartitionOperation implements Operation {
     @Override
     public TaskSyncContext doOperation(TaskSyncContext taskSyncContext) {
         return share(taskSyncContext);
-    }
-
-    @Override
-    public List<String> updatedOwnedPartitions() {
-        return this.returnOwnedPartitions;
-    }
-
-    @Override
-    public List<String> updatedSharedPartitions() {
-        return this.returnSharedPartitions;
-    };
-
-    @Override
-    public List<String> removedOwnedPartitions() {
-        return Collections.emptyList();
-    }
-
-    @Override
-    public List<String> removedSharedPartitions() {
-        return Collections.emptyList();
     }
 
 }

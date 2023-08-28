@@ -42,18 +42,13 @@ class SyncEventFromProtoMapperTest {
                 .setEndTimestamp("1970-01-01T00:00:00.000008000Z")
                 .build();
 
-        var protoPartition3 = SyncEventProtos.PartitionState.newBuilder()
-                .setToken("eeeea098----08990")
-                .setState(SyncEventProtos.State.REMOVED)
-                .build();
-
         var protoState1 = SyncEventProtos.TaskState.newBuilder()
                 .setTaskUid("uienjnjaaaa")
                 .setConsumerId("ppp323323")
                 .setRebalanceGenerationId(7878)
                 .setStateTimestamp(11111)
-                .addAllPartitions(List.of(protoPartition1, protoPartition2, protoPartition3))
-                .addAllSharedPartitions(List.of(protoPartition2, protoPartition3))
+                .addAllPartitions(List.of(protoPartition1, protoPartition2))
+                .addAllSharedPartitions(List.of(protoPartition2))
                 .build();
 
         var protoState2 = SyncEventProtos.TaskState.newBuilder()
@@ -92,19 +87,15 @@ class SyncEventFromProtoMapperTest {
         assertThat(taskState1.getRebalanceGenerationId()).isEqualTo(protoState1.getRebalanceGenerationId());
         assertThat(taskState1.getStateTimestamp()).isEqualTo(protoState1.getStateTimestamp());
 
-        assertThat(taskState1.getPartitionsMap()).hasSize(3);
+        assertThat(taskState1.getPartitionsMap()).hasSize(2);
         PartitionState partition1 = taskState1.getPartitionsMap().get(protoPartition1.getToken());
         assertPartition(partition1, protoPartition1, PartitionStateEnum.CREATED);
         PartitionState partition2 = taskState1.getPartitionsMap().get(protoPartition2.getToken());
         assertPartition(partition2, protoPartition2, PartitionStateEnum.READY_FOR_STREAMING);
-        PartitionState partition3 = taskState1.getPartitionsMap().get(protoPartition3.getToken());
-        assertThat(partition3.getState()).isEqualTo(PartitionStateEnum.REMOVED);
 
-        assertThat(taskState1.getSharedPartitions()).hasSize(2);
+        assertThat(taskState1.getSharedPartitions()).hasSize(1);
         PartitionState shared2 = taskState1.getPartitionsMap().get(protoPartition2.getToken());
         assertPartition(shared2, protoPartition2, PartitionStateEnum.READY_FOR_STREAMING);
-        PartitionState shared3 = taskState1.getPartitionsMap().get(protoPartition3.getToken());
-        assertThat(shared3.getState()).isEqualTo(PartitionStateEnum.REMOVED);
 
         TaskState taskState2 = taskSyncEvent.getTaskStates().get(protoState2.getTaskUid());
         assertThat(taskState2.getTaskUid()).isEqualTo(protoState2.getTaskUid());

@@ -32,7 +32,7 @@ public class TaskSyncPublisher {
     private final String topic;
     private final KafkaProducer<String, byte[]> producer;
     private volatile Instant lastTime;
-    private final BufferedPublisher bufferedPublisher;
+    private final BufferedPublisher<TaskSyncEvent> bufferedPublisher;
     private final Consumer<RuntimeException> errorHandler;
 
     private final String taskUid;
@@ -45,7 +45,7 @@ public class TaskSyncPublisher {
         this.taskUid = taskUid;
 
         if (syncEventPublisherWaitingTimeout > 0) {
-            this.bufferedPublisher = new BufferedPublisher(
+            this.bufferedPublisher = new BufferedPublisher<>(
                     this.taskUid,
                     "Buffer-Pub",
                     syncEventPublisherWaitingTimeout,

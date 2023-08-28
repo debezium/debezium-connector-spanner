@@ -7,8 +7,6 @@ package io.debezium.connector.spanner.task;
 
 import static org.slf4j.LoggerFactory.getLogger;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
@@ -159,11 +157,6 @@ public class TaskStateChangeEventHandler {
 
         TaskSyncContext taskSyncContext;
 
-        List<String> ownedPartitions = new ArrayList<String>();
-        List<String> sharedPartitions = new ArrayList<String>();
-        List<String> removedOwnedPartitions = new ArrayList<String>();
-        List<String> removedSharedPartitions = new ArrayList<String>();
-
         long totalPartitions = taskSyncContextHolder.get().getNumPartitions() + taskSyncContextHolder.get().getNumSharedPartitions();
 
         try {
@@ -176,37 +169,6 @@ public class TaskStateChangeEventHandler {
                                 taskSyncContextHolder.get().getTaskUid(), operation.getClass().getSimpleName());
                         publishTaskSyncEvent.set(true);
                     }
-                    if (!operation.updatedOwnedPartitions().isEmpty()) {
-                        for (String updatedOwnedPartition : operation.updatedOwnedPartitions()) {
-                            if (!ownedPartitions.contains(updatedOwnedPartition)) {
-                                ownedPartitions.add(updatedOwnedPartition);
-                            }
-                        }
-                    }
-
-                    if (!operation.removedOwnedPartitions().isEmpty()) {
-                        for (String removedOwnedPartition : operation.removedOwnedPartitions()) {
-                            if (!removedOwnedPartitions.contains(removedOwnedPartition)) {
-                                removedOwnedPartitions.add(removedOwnedPartition);
-                            }
-                        }
-                    }
-
-                    if (!operation.updatedSharedPartitions().isEmpty()) {
-                        for (String updatedSharedPartition : operation.updatedSharedPartitions()) {
-                            if (!sharedPartitions.contains(updatedSharedPartition)) {
-                                sharedPartitions.add(updatedSharedPartition);
-                            }
-                        }
-                    }
-
-                    if (!operation.removedSharedPartitions().isEmpty()) {
-                        for (String removedSharedPartition : operation.removedSharedPartitions()) {
-                            if (!removedSharedPartitions.contains(removedSharedPartition)) {
-                                removedSharedPartitions.add(removedSharedPartition);
-                            }
-                        }
-                    }
                 }
                 return newContext;
             });
@@ -216,8 +178,7 @@ public class TaskStateChangeEventHandler {
         }
 
         if (publishTaskSyncEvent.get()) {
-            TaskSyncEvent incrementalEvent = taskSyncContext.buildIncrementalTaskSyncEvent(
-                    ownedPartitions, sharedPartitions, removedOwnedPartitions, removedSharedPartitions);
+            TaskSyncEvent incrementalEvent = taskSyncContext.buildCurrentTaskSyncEvent();
 
             long newTotalPartitions = taskSyncContext.getNumPartitions() + taskSyncContext.getNumSharedPartitions();
 

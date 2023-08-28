@@ -188,7 +188,7 @@ public class SyncEventHandler {
 
         try {
 
-            if (!taskSyncContextHolder.get().getRebalanceState().equals(RebalanceState.INITIAL_INCREMENTED_STATE_COMPLETED)) {
+            if (!taskSyncContextHolder.get().isLeader() || !taskSyncContextHolder.get().getRebalanceState().equals(RebalanceState.INITIAL_INCREMENTED_STATE_COMPLETED)) {
                 return;
             }
 

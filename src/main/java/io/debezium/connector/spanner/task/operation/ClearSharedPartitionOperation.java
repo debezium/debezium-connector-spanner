@@ -6,7 +6,6 @@
 package io.debezium.connector.spanner.task.operation;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Random;
 import java.util.Set;
@@ -27,8 +26,6 @@ public class ClearSharedPartitionOperation implements Operation {
     private static final Logger LOGGER = LoggerFactory.getLogger(ClearSharedPartitionOperation.class);
 
     private boolean isRequiredPublishSyncEvent = false;
-    List<String> removedSharedTokens = new ArrayList<String>();
-    List<String> updatedSharedTokens = new ArrayList<String>();
 
     private TaskSyncContext clear(TaskSyncContext taskSyncContext) {
 
@@ -85,7 +82,6 @@ public class ClearSharedPartitionOperation implements Operation {
                             sharedToken, assigneeTaskUid);
                     PartitionState reassignedToken = PartitionState.builder().token(sharedToken.getToken()).assigneeTaskUid(assigneeTaskUid).build();
                     finalSharedList.add(reassignedToken);
-                    updatedSharedTokens.add(reassignedToken.getToken());
                 }
             }
             else {
@@ -96,15 +92,6 @@ public class ClearSharedPartitionOperation implements Operation {
 
         if (finalSharedList.size() != currentSharedList.size() || reassignedPartition) {
             this.isRequiredPublishSyncEvent = true;
-        }
-
-        for (PartitionState partition : currentTaskState.getSharedPartitions()) {
-            if (!finalSharedList.contains(partition)) {
-                removedSharedTokens.add(partition.getToken());
-            }
-        }
-        if (!removedSharedTokens.isEmpty()) {
-            LOGGER.info("Task {} removed shared partitions {}", taskSyncContext.getTaskUid(), removedSharedTokens);
         }
 
         return taskSyncContext.toBuilder().currentTaskState(currentTaskState.toBuilder()
@@ -120,25 +107,5 @@ public class ClearSharedPartitionOperation implements Operation {
     @Override
     public TaskSyncContext doOperation(TaskSyncContext taskSyncContext) {
         return clear(taskSyncContext);
-    }
-
-    @Override
-    public List<String> updatedOwnedPartitions() {
-        return Collections.emptyList();
-    }
-
-    @Override
-    public List<String> updatedSharedPartitions() {
-        return updatedSharedTokens;
-    };
-
-    @Override
-    public List<String> removedOwnedPartitions() {
-        return Collections.emptyList();
-    }
-
-    @Override
-    public List<String> removedSharedPartitions() {
-        return removedSharedTokens;
     }
 }

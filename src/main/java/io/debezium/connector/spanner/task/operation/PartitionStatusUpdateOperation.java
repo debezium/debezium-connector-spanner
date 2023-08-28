@@ -5,7 +5,6 @@
  */
 package io.debezium.connector.spanner.task.operation;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -65,25 +64,5 @@ public class PartitionStatusUpdateOperation implements Operation {
         return taskSyncContext.toBuilder()
                 .currentTaskState(currentTaskState.toBuilder().partitions(partitionsList).build())
                 .build();
-    }
-
-    @Override
-    public List<String> updatedOwnedPartitions() {
-        return Collections.singletonList(token);
-    }
-
-    @Override
-    public List<String> updatedSharedPartitions() {
-        return Collections.emptyList();
-    }
-
-    @Override
-    public List<String> removedOwnedPartitions() {
-        return Collections.emptyList();
-    }
-
-    @Override
-    public List<String> removedSharedPartitions() {
-        return Collections.emptyList();
     }
 }

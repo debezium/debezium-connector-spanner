@@ -108,8 +108,9 @@ public class LeaderService {
 
         while (consumerToTaskMap.size() < consumers.size()) {
 
-            LOGGER.info("awaitAllNewTaskStateUpdates: " +
-                    "expected: {}, actual: {}. Expected consumers: {}", consumers.size(), consumerToTaskMap.size(), consumers);
+            LOGGER.info("Task {}, rebalance generation ID {}, awaitAllNewTaskStateUpdates: " +
+                    "expected: {}, actual: {}. Expected consumers: {}", taskSyncContextHolder.get().getTaskUid(), taskSyncContextHolder.get().getRebalanceGenerationId(),
+                    consumers.size(), consumerToTaskMap.size(), consumers);
 
             if (timeoutMeter.isExpired()) {
                 LOGGER.error("Task {} : Not received all answers from tasks", taskSyncContextHolder.get().getTaskUid());

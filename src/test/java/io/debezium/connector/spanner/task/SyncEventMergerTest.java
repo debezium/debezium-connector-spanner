@@ -11,7 +11,6 @@ import static io.debezium.connector.spanner.task.SyncEventMerger.mergeNewEpoch;
 import static io.debezium.connector.spanner.task.SyncEventMerger.mergeRebalanceAnswer;
 import static io.debezium.connector.spanner.task.TaskTestHelper.generateTaskStateWithPartitions;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -66,39 +65,45 @@ class SyncEventMergerTest {
         Assertions.assertEquals(taskState3.getSharedPartitionsMap().size(), 1);
     }
 
-    @Test
-    void testMergeIncrementalSyncAnswer() {
+    void testMergeIncrementalAnswer() {
         TaskSyncContext taskSyncContext1 = buildTaskSyncContext1();
         TaskSyncContext taskSyncContext2 = buildTaskSyncContext2();
 
-        List<String> updatedOwnedPartitions = new ArrayList<>();
-        List<String> updatedSharedPartitions = new ArrayList<>();
-        List<String> removedOwnedPartitions = new ArrayList<>();
-        List<String> removedSharedPartitions = new ArrayList<>();
-        updatedOwnedPartitions.add("token2");
-        removedSharedPartitions.add("token5");
+        TaskSyncEvent incrementalAnswer1 = taskSyncContext1.buildCurrentTaskSyncEvent();
+        TaskSyncContext mergeIncrementalAnswer = mergeIncrementalTaskSyncEvent(
+                taskSyncContext2, incrementalAnswer1);
 
-        TaskSyncEvent syncEvent = taskSyncContext1.buildIncrementalTaskSyncEvent(
-                updatedOwnedPartitions, updatedSharedPartitions, removedOwnedPartitions,
-                removedSharedPartitions);
-        TaskSyncContext mergedIncrementalTaskSyncEvent = mergeIncrementalTaskSyncEvent(
-                taskSyncContext2, syncEvent);
+        Assertions.assertEquals("task2", mergeIncrementalAnswer.getTaskUid());
+        Assertions.assertEquals(2, mergeIncrementalAnswer.getTaskStates().size());
 
-        Assertions.assertEquals("task2", mergedIncrementalTaskSyncEvent.getTaskUid());
-        Assertions.assertEquals(2, mergedIncrementalTaskSyncEvent.getTaskStates().size());
-
-        TaskState taskState1 = mergedIncrementalTaskSyncEvent.getTaskStates().get("task0");
+        TaskState taskState1 = mergeIncrementalAnswer.getTaskStates().get("task0");
         Assertions.assertEquals(taskState1.getTaskUid(), "task0");
 
-        Assertions.assertEquals(taskState1.getPartitionsMap().size(), 2);
+        Assertions.assertEquals(taskState1.getPartitionsMap().size(), 4);
         PartitionState partition1 = taskState1.getPartitionsMap().get("token0");
         Assertions.assertEquals(partition1.getState(), PartitionStateEnum.CREATED);
-        PartitionState partition2 = taskState1.getPartitionsMap().get("token2");
-        Assertions.assertEquals(partition2.getState(), PartitionStateEnum.RUNNING);
+        PartitionState partition2 = taskState1.getPartitionsMap().get("token1");
+        Assertions.assertEquals(partition2.getState(), PartitionStateEnum.REMOVED);
+        PartitionState partition3 = taskState1.getPartitionsMap().get("token2");
+        Assertions.assertEquals(partition3.getState(), PartitionStateEnum.RUNNING);
+        PartitionState partition4 = taskState1.getPartitionsMap().get("token3");
+        Assertions.assertEquals(partition4.getState(), PartitionStateEnum.FINISHED);
 
-        Assertions.assertEquals(taskState1.getSharedPartitionsMap().size(), 1);
-        PartitionState partition3 = taskState1.getSharedPartitionsMap().get("token4");
-        Assertions.assertEquals(partition3.getState(), PartitionStateEnum.CREATED);
+        Assertions.assertEquals(taskState1.getSharedPartitions().size(), 2);
+        PartitionState partition5 = taskState1.getSharedPartitionsMap().get("token4");
+        Assertions.assertEquals(partition5.getState(), PartitionStateEnum.CREATED);
+        PartitionState partition6 = taskState1.getSharedPartitionsMap().get("token5");
+        Assertions.assertEquals(partition6.getState(), PartitionStateEnum.REMOVED);
+
+        TaskState taskState2 = mergeIncrementalAnswer.getCurrentTaskState();
+        Assertions.assertEquals(taskState2.getTaskUid(), "task2");
+        Assertions.assertEquals(taskState2.getPartitionsMap().size(), 4);
+        Assertions.assertEquals(taskState2.getSharedPartitionsMap().size(), 1);
+
+        TaskState taskState3 = mergeIncrementalAnswer.getTaskStates().get("task1");
+        Assertions.assertEquals(taskState3.getTaskUid(), "task1");
+        Assertions.assertEquals(taskState3.getPartitionsMap().size(), 2);
+        Assertions.assertEquals(taskState3.getSharedPartitionsMap().size(), 1);
     }
 
     @Test

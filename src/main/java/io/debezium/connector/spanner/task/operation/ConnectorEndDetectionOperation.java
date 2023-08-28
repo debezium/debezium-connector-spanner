@@ -5,9 +5,6 @@
  */
 package io.debezium.connector.spanner.task.operation;
 
-import java.util.Collections;
-import java.util.List;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -54,25 +51,5 @@ public class ConnectorEndDetectionOperation implements Operation {
             }
         }
         return taskSyncContext;
-    }
-
-    @Override
-    public List<String> updatedOwnedPartitions() {
-        return Collections.emptyList();
-    }
-
-    @Override
-    public List<String> updatedSharedPartitions() {
-        return Collections.emptyList();
-    }
-
-    @Override
-    public List<String> removedOwnedPartitions() {
-        return Collections.emptyList();
-    }
-
-    @Override
-    public List<String> removedSharedPartitions() {
-        return Collections.emptyList();
     }
 }

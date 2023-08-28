@@ -7,8 +7,6 @@ package io.debezium.connector.spanner.task.operation;
 
 import static org.slf4j.LoggerFactory.getLogger;
 
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -38,7 +36,6 @@ public class RemoveFinishedPartitionOperation implements Operation {
     private final SpannerEventDispatcher spannerEventDispatcher;
     private final SpannerConnectorConfig connectorConfig;
     private boolean isRequiredPublishSyncEvent = false;
-    private final List<String> removedFinishedPartitions = new ArrayList<>();
 
     public RemoveFinishedPartitionOperation(SpannerEventDispatcher spannerEventDispatcher, SpannerConnectorConfig spannerConnectorConfig) {
         this.spannerEventDispatcher = spannerEventDispatcher;
@@ -85,7 +82,6 @@ public class RemoveFinishedPartitionOperation implements Operation {
                                     catch (InterruptedException e) {
                                         LOGGER.error("Task {}, Failed to send null offset for partition {}", taskSyncContext.getTaskUid(), partitionState.getToken());
                                     }
-                                    removedFinishedPartitions.add(partitionState.getToken());
                                     return null;
                                 }
                                 return partitionState;
@@ -141,25 +137,5 @@ public class RemoveFinishedPartitionOperation implements Operation {
     @Override
     public TaskSyncContext doOperation(TaskSyncContext taskSyncContext) {
         return removeFinishedPartitions(taskSyncContext);
-    }
-
-    @Override
-    public List<String> updatedOwnedPartitions() {
-        return Collections.emptyList();
-    }
-
-    @Override
-    public List<String> updatedSharedPartitions() {
-        return Collections.emptyList();
-    }
-
-    @Override
-    public List<String> removedOwnedPartitions() {
-        return removedFinishedPartitions;
-    }
-
-    @Override
-    public List<String> removedSharedPartitions() {
-        return Collections.emptyList();
     }
 }
