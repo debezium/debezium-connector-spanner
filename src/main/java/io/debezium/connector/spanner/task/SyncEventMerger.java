@@ -65,12 +65,9 @@ public class SyncEventMerger {
                             newMessage.getMessageTimestamp()));
             TaskSyncContext result = builder
                     .build();
-            LOGGER.info("Processed incremental answer {} from task {} for rebalance generation id {}", newMessage, newMessage.getTaskUid(),
-                    newMessage.getRebalanceGenerationId());
-
             long newPartitions = result.getNumPartitions() + result.getNumSharedPartitions();
             if (newPartitions != oldPartitions) {
-                LOGGER.info(
+                LOGGER.debug(
                         "Task {}, processed incremental answer {}: {}, task has total partitions {}, num partitions {}, num shared partitions {}, num old partitions {}",
                         currentContext.getTaskUid(), newMessage, result.getNumPartitions() + result.getNumSharedPartitions(),
                         result.getNumPartitions(), result.getNumSharedPartitions(), oldPartitions);

@@ -72,7 +72,6 @@ public class SyncEventHandler {
 
                 taskSyncContextHolder.update(context -> context.toBuilder()
                         .rebalanceState(RebalanceState.INITIAL_INCREMENTED_STATE_COMPLETED)
-                        // .epochOffsetHolder(context.getEpochOffsetHolder().nextOffset(context.getCurrentKafkaRecordOffset()))
                         .build());
             }
             return;
@@ -106,7 +105,6 @@ public class SyncEventHandler {
 
             taskSyncContextHolder.update(context -> context.toBuilder()
                     .rebalanceState(RebalanceState.INITIAL_INCREMENTED_STATE_COMPLETED)
-                    // .epochOffsetHolder(context.getEpochOffsetHolder().nextOffset(context.getCurrentKafkaRecordOffset()))
                     .build());
             LOGGER.info("Task {} - now initialized with epoch offset {} and context {}", taskSyncContextHolder.get().getTaskUid(),
                     taskSyncContextHolder.get().getEpochOffsetHolder().getEpochOffset(), taskSyncContextHolder.get());
@@ -207,12 +205,12 @@ public class SyncEventHandler {
             long inGeneration = inSync.getRebalanceGenerationId();
             long currentGeneration = taskSyncContextHolder.get().getRebalanceGenerationId();
 
-            if ((inSync.getMessageType() == MessageTypeEnum.REGULAR) &&
+            if ((inSync.getMessageType() == MessageTypeEnum.REGULAR || inSync.getMessageType() == MessageTypeEnum.REBALANCE_ANSWER) &&
                     inGeneration != currentGeneration) {
                 return true;
             }
 
-            if ((inSync.getMessageType() == MessageTypeEnum.REBALANCE_ANSWER || inSync.getMessageType() == MessageTypeEnum.NEW_EPOCH
+            if ((inSync.getMessageType() == MessageTypeEnum.NEW_EPOCH
                     || inSync.getMessageType() == MessageTypeEnum.UPDATE_EPOCH) &&
                     inGeneration < currentGeneration) {
                 return true;
