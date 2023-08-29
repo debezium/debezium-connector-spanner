@@ -13,6 +13,7 @@ import java.time.Duration;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,13 +21,14 @@ import org.slf4j.LoggerFactory;
 import io.debezium.DebeziumException;
 import io.debezium.connector.spanner.kafka.internal.KafkaConsumerAdminService;
 import io.debezium.connector.spanner.kafka.internal.TaskSyncPublisher;
-import io.debezium.connector.spanner.kafka.internal.model.MessageTypeEnum;
 import io.debezium.connector.spanner.kafka.internal.model.RebalanceState;
 import io.debezium.connector.spanner.kafka.internal.model.TaskState;
 import io.debezium.connector.spanner.kafka.internal.model.TaskSyncEvent;
 import io.debezium.connector.spanner.task.TaskSyncContext;
 import io.debezium.connector.spanner.task.TaskSyncContextHolder;
 import io.debezium.connector.spanner.task.leader.rebalancer.TaskPartitionRebalancer;
+import io.debezium.util.Clock;
+import io.debezium.util.Metronome;
 
 /**
  * This class contains all the logic for the leader task functionality.
@@ -58,6 +60,10 @@ public class LeaderAction {
 
     private Consumer<Throwable> errorHandler;
 
+    private final Duration sleepInterval = Duration.ofMillis(100);
+
+    private final Clock clock;
+
     public LeaderAction(TaskSyncContextHolder taskSyncContextHolder, KafkaConsumerAdminService kafkaAdminService,
                         LeaderService leaderService, TaskPartitionRebalancer taskPartitonRebalancer,
                         TaskSyncPublisher taskSyncPublisher,
@@ -68,11 +74,14 @@ public class LeaderAction {
         this.taskPartitonRebalancer = taskPartitonRebalancer;
         this.taskSyncPublisher = taskSyncPublisher;
         this.errorHandler = errorHandler;
+        this.clock = Clock.system();
+
     }
 
     private Thread createLeaderThread() {
         Thread thread = new Thread(() -> {
-            LOGGER.info("performLeaderAction: Task {} start leader thread", taskSyncContextHolder.get().getTaskUid());
+            LOGGER.info("performLeaderAction: Task {} start leader thread with rebalance generation ID {}", taskSyncContextHolder.get().getTaskUid(),
+                    taskSyncContextHolder.get().getRebalanceGenerationId());
             try {
                 this.newEpoch();
             }
@@ -84,7 +93,7 @@ public class LeaderAction {
                 return;
             }
 
-            while (!Thread.interrupted()) {
+            while (!Thread.currentThread().isInterrupted()) {
                 try {
                     Thread.sleep(EPOCH_OFFSET_UPDATE_DURATION.toMillis());
                     if (taskSyncContextHolder.get().getRebalanceState() == RebalanceState.NEW_EPOCH_STARTED) {
@@ -99,10 +108,11 @@ public class LeaderAction {
                     return;
                 }
             }
+            LOGGER.info("performLeaderAction: Task {} stopped leader thread", taskSyncContextHolder.get().getTaskUid());
         }, "SpannerConnector-LeaderAction");
 
         thread.setUncaughtExceptionHandler((t, ex) -> {
-            LOGGER.error("Leader action execution error", ex);
+            LOGGER.error("Leader action execution error, task {}, ex {}", taskSyncContextHolder.get().getTaskUid(), ex.getStackTrace());
             errorHandler.accept(ex);
         });
 
@@ -115,10 +125,17 @@ public class LeaderAction {
                 .epochOffsetHolder(oldContext.getEpochOffsetHolder().nextOffset(oldContext.getCurrentKafkaRecordOffset()))
                 .build());
 
-        taskSyncPublisher.send(taskSyncContext.buildTaskSyncEvent(MessageTypeEnum.UPDATE_EPOCH));
+        TaskSyncEvent taskSyncEvent = taskSyncContext.buildUpdateEpochTaskSyncEvent();
+        taskSyncPublisher.send(taskSyncEvent);
 
-        LOGGER.info("Task {} - Epoch offset has been incremented and published {}:{}",
-                taskSyncContextHolder.get().getTaskUid(), taskSyncContext.getRebalanceGenerationId(), taskSyncContext.getEpochOffsetHolder().getEpochOffset());
+        int numPartitions = taskSyncEvent.getNumPartitions();
+
+        int numSharedPartitions = taskSyncEvent.getNumSharedPartitions();
+
+        LOGGER.info(
+                "Task {} - Leader task has updated the epoch offset with rebalance generation ID: {} and epoch offset: {}, num partitions {}, num shared partitions {}",
+                taskSyncContextHolder.get().getTaskUid(), taskSyncContext.getRebalanceGenerationId(), taskSyncContext.getEpochOffsetHolder().getEpochOffset(),
+                numPartitions, numSharedPartitions);
 
         return taskSyncContext;
     }
@@ -131,15 +148,33 @@ public class LeaderAction {
         this.leaderThread.start();
     }
 
-    public void stop() {
+    public synchronized void stop() {
         if (this.leaderThread == null) {
             return;
         }
+        LOGGER.info("Task {}, trying to stop leader thread with rebalance generation ID {}", taskSyncContextHolder.get().getTaskUid(),
+                taskSyncContextHolder.get().getRebalanceGenerationId());
 
         this.leaderThread.interrupt();
+        LOGGER.info("Task {}, interrupted leader thread with rebalance generation ID {}", taskSyncContextHolder.get().getTaskUid(),
+                taskSyncContextHolder.get().getRebalanceGenerationId());
 
+        final Metronome metronome = Metronome.sleeper(sleepInterval, clock);
         while (!this.leaderThread.getState().equals(Thread.State.TERMINATED)) {
+            try {
+                // Sleep for sleepInterval.
+                metronome.pause();
+
+                LOGGER.info("Task {}, interrupting leader thread again with rebalance generation ID {}", taskSyncContextHolder.get().getTaskUid(),
+                        taskSyncContextHolder.get().getRebalanceGenerationId());
+                this.leaderThread.interrupt();
+            }
+            catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
         }
+        LOGGER.info("Task {}, stopped leader thread with rebalance generation ID {}", taskSyncContextHolder.get().getTaskUid(),
+                taskSyncContextHolder.get().getRebalanceGenerationId());
 
         this.leaderThread = null;
     }
@@ -170,12 +205,15 @@ public class LeaderAction {
         boolean foundDuplication = false;
         if (staleContext.checkDuplication(false, "NEW EPOCH rebalance event, initial context")) {
             foundDuplication = true;
+
         }
 
         TaskSyncContext taskSyncContext = taskSyncContextHolder.updateAndGet(oldContext -> {
             TaskState leaderState = oldContext.getCurrentTaskState();
 
             Map<String, TaskState> currentTaskStates = oldContext.getAllTaskStates();
+            Set<String> taskUids = currentTaskStates.keySet().stream().collect(Collectors.toSet());
+            LOGGER.info("Task {}, Current task states in old context: {}", oldContext.getTaskUid(), taskUids);
 
             Map<Boolean, Map<String, TaskState>> isSurvivedPartitionedTaskStates = splitSurvivedAndObsoleteTaskStates(currentTaskStates, consumerToTaskMap.values());
 
@@ -196,10 +234,21 @@ public class LeaderAction {
             taskSyncContext.checkDuplication(true, "NEW EPOCH rebalance event, resulting context");
         }
 
-        TaskSyncEvent taskSyncEvent = taskSyncContext.buildTaskSyncEvent(MessageTypeEnum.NEW_EPOCH);
-        LOGGER.debug("Task {} - sent new epoch {}", taskSyncContext.getTaskUid(), taskSyncEvent);
-        LOGGER.info("Task {} - LeaderAction sent sync event with rebalance generation ID {}: and epoch offset {}", taskSyncContext.getTaskUid(),
-                taskSyncContext.getRebalanceGenerationId(), taskSyncContext.getEpochOffsetHolder().getEpochOffset());
+        TaskSyncEvent taskSyncEvent = taskSyncContext.buildNewEpochTaskSyncEvent();
+
+        int numPartitions = taskSyncEvent.getNumPartitions();
+
+        int numSharedPartitions = taskSyncEvent.getNumSharedPartitions();
+
+        Set<String> taskUids = taskSyncEvent.getTaskStates().keySet().stream().collect(Collectors.toSet());
+
+        LOGGER.info(
+                "Task {} - sent new epoch with rebalance generation ID {}, num tasks {}, total partitions {}, num owned partitions {}, num shared partitions {}, task Uids {}",
+                taskSyncContext.getTaskUid(),
+                taskSyncContext.getRebalanceGenerationId(),
+                taskSyncEvent.getTaskStates().size(),
+                numPartitions + numSharedPartitions,
+                numPartitions, numSharedPartitions, taskUids, numPartitions + numSharedPartitions);
 
         taskSyncPublisher.send(taskSyncEvent);
 

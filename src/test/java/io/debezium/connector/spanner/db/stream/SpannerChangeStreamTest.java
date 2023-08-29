@@ -25,6 +25,7 @@ import com.google.cloud.Timestamp;
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.SpannerException;
 
+import io.debezium.connector.spanner.db.DatabaseClientFactory;
 import io.debezium.connector.spanner.db.model.Partition;
 import io.debezium.connector.spanner.db.model.StreamEventMetadata;
 import io.debezium.connector.spanner.db.model.event.ChangeStreamEvent;
@@ -39,8 +40,10 @@ class SpannerChangeStreamTest {
     void testRun() throws ChangeStreamException, InterruptedException {
         SpannerChangeStreamService streamService = mock(SpannerChangeStreamService.class);
         MetricsEventPublisher metricsEventPublisher = mock(MetricsEventPublisher.class);
+        DatabaseClientFactory databaseClientFactory = mock(DatabaseClientFactory.class);
 
-        SpannerChangeStream spannerChangeStream = new SpannerChangeStream(streamService, metricsEventPublisher, Duration.ofSeconds(60), 3);
+        SpannerChangeStream spannerChangeStream = new SpannerChangeStream(streamService, metricsEventPublisher, Duration.ofSeconds(60), 3, "taskUid",
+                databaseClientFactory);
         spannerChangeStream.run(() -> false, null, null);
         verify(metricsEventPublisher, times(0)).publishMetricEvent(any());
     }
@@ -52,10 +55,12 @@ class SpannerChangeStreamTest {
         ChangeStreamEventConsumer changeStreamEventConsumer = mock(ChangeStreamEventConsumer.class);
         ChangeStreamEvent changeStreamEvent = mock(ChangeStreamEvent.class);
         StreamEventMetadata streamEventMetadata = mock(StreamEventMetadata.class);
+        DatabaseClientFactory databaseClientFactory = mock(DatabaseClientFactory.class);
         when(changeStreamEvent.getMetadata()).thenReturn(streamEventMetadata);
         when(streamEventMetadata.getPartitionToken()).thenReturn("");
 
-        SpannerChangeStream spannerChangeStream = new SpannerChangeStream(streamService, metricsEventPublisher, Duration.ofSeconds(60), 3);
+        SpannerChangeStream spannerChangeStream = new SpannerChangeStream(streamService, metricsEventPublisher, Duration.ofSeconds(60), 3, "taskUid",
+                databaseClientFactory);
         spannerChangeStream.run(() -> false, changeStreamEventConsumer, null);
         spannerChangeStream.onStreamEvent(changeStreamEvent);
 
@@ -70,8 +75,10 @@ class SpannerChangeStreamTest {
         MetricsEventPublisher metricsEventPublisher = mock(MetricsEventPublisher.class);
         PartitionEventListener partitionEventListener = mock(PartitionEventListener.class);
         when(partitionEventListener.onStuckPartition(anyString())).thenReturn(true);
+        DatabaseClientFactory databaseClientFactory = mock(DatabaseClientFactory.class);
 
-        SpannerChangeStream spannerChangeStream = new SpannerChangeStream(streamService, metricsEventPublisher, Duration.ofSeconds(60), 3);
+        SpannerChangeStream spannerChangeStream = new SpannerChangeStream(streamService, metricsEventPublisher, Duration.ofSeconds(60), 3, "taskUid",
+                databaseClientFactory);
         spannerChangeStream.run(() -> false, null, partitionEventListener);
         spannerChangeStream.onStuckPartition("");
 
@@ -83,8 +90,10 @@ class SpannerChangeStreamTest {
         SpannerChangeStreamService streamService = mock(SpannerChangeStreamService.class);
         MetricsEventPublisher metricsEventPublisher = mock(MetricsEventPublisher.class);
         FailureChangeStreamException exception = mock(FailureChangeStreamException.class);
+        DatabaseClientFactory databaseClientFactory = mock(DatabaseClientFactory.class);
 
-        SpannerChangeStream spannerChangeStream = new SpannerChangeStream(streamService, metricsEventPublisher, Duration.ofSeconds(60), 3);
+        SpannerChangeStream spannerChangeStream = new SpannerChangeStream(streamService, metricsEventPublisher, Duration.ofSeconds(60), 3, "taskUid",
+                databaseClientFactory);
         assertTrue(spannerChangeStream.onError(null, null));
         assertTrue(spannerChangeStream.onError(exception));
     }
@@ -93,8 +102,10 @@ class SpannerChangeStreamTest {
     void testStop() {
         SpannerChangeStreamService streamService = mock(SpannerChangeStreamService.class);
         MetricsEventPublisher metricsEventPublisher = mock(MetricsEventPublisher.class);
+        DatabaseClientFactory databaseClientFactory = mock(DatabaseClientFactory.class);
 
-        SpannerChangeStream spannerChangeStream = new SpannerChangeStream(streamService, metricsEventPublisher, Duration.ofSeconds(60), 3);
+        SpannerChangeStream spannerChangeStream = new SpannerChangeStream(streamService, metricsEventPublisher, Duration.ofSeconds(60), 3, "taskUid",
+                databaseClientFactory);
         spannerChangeStream.stop();
         spannerChangeStream.stop("test");
         verify(metricsEventPublisher).publishMetricEvent(any());
@@ -106,8 +117,10 @@ class SpannerChangeStreamTest {
         MetricsEventPublisher metricsEventPublisher = mock(MetricsEventPublisher.class);
         SpannerException exception = mock(SpannerException.class);
         when(exception.getErrorCode()).thenReturn(ErrorCode.CANCELLED);
+        DatabaseClientFactory databaseClientFactory = mock(DatabaseClientFactory.class);
 
-        SpannerChangeStream spannerChangeStream = new SpannerChangeStream(streamService, metricsEventPublisher, Duration.ofSeconds(60), 3);
+        SpannerChangeStream spannerChangeStream = new SpannerChangeStream(streamService, metricsEventPublisher, Duration.ofSeconds(60), 3, "taskUid",
+                databaseClientFactory);
         assertTrue(spannerChangeStream.isCanceled(exception));
         assertFalse(spannerChangeStream.isCanceled(null));
     }
@@ -119,8 +132,10 @@ class SpannerChangeStreamTest {
         SpannerException exception = mock(SpannerException.class);
         Partition partition = mock(Partition.class);
         when(partition.toString()).thenReturn("");
+        DatabaseClientFactory databaseClientFactory = mock(DatabaseClientFactory.class);
 
-        SpannerChangeStream spannerChangeStream = new SpannerChangeStream(streamService, metricsEventPublisher, Duration.ofSeconds(60), 3);
+        SpannerChangeStream spannerChangeStream = new SpannerChangeStream(streamService, metricsEventPublisher, Duration.ofSeconds(60), 3, "taskUid",
+                databaseClientFactory);
         when(exception.getErrorCode()).thenReturn(ErrorCode.OUT_OF_RANGE);
         assertTrue(spannerChangeStream.getStreamException(partition, exception) instanceof OutOfRangeChangeStreamException);
 
@@ -135,12 +150,14 @@ class SpannerChangeStreamTest {
     void testSubmitPartition() {
         SpannerChangeStreamService streamService = mock(SpannerChangeStreamService.class);
         MetricsEventPublisher metricsEventPublisher = mock(MetricsEventPublisher.class);
+        DatabaseClientFactory databaseClientFactory = mock(DatabaseClientFactory.class);
 
         HashSet<String> parentTokens = new HashSet<>();
         Timestamp startTimestamp = Timestamp.ofTimeMicroseconds(1L);
         Partition partition = new Partition("partitionToken", parentTokens, startTimestamp, Timestamp.ofTimeMicroseconds(1L), "originParent");
 
-        SpannerChangeStream spannerChangeStream = new SpannerChangeStream(streamService, metricsEventPublisher, Duration.ofSeconds(60), 3);
+        SpannerChangeStream spannerChangeStream = new SpannerChangeStream(streamService, metricsEventPublisher, Duration.ofSeconds(60), 3, "taskuid",
+                databaseClientFactory);
 
         new Thread(() -> {
             try {

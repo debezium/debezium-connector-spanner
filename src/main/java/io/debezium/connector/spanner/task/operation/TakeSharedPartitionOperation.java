@@ -31,7 +31,7 @@ public class TakeSharedPartitionOperation implements Operation {
 
         TaskState taskState = context.getCurrentTaskState();
 
-        List<PartitionState> sharedPartitions = findSharedPartition(context);
+        List<PartitionState> sharedPartitions = filterDuplications(findSharedPartition(context));
         Set<String> tokens = taskState.getPartitions().stream()
                 .map(PartitionState::getToken)
                 .collect(Collectors.toSet());
@@ -43,7 +43,7 @@ public class TakeSharedPartitionOperation implements Operation {
                 partitions.add(partitionState);
                 this.isRequiredPublishSyncEvent = true;
 
-                LOGGER.info("Task {} : taking shared partition {}", context.getTaskUid(), partitionState.getToken());
+                LOGGER.info("Task {} : taking shared partition {}", context.getTaskUid(), partitionState);
             }
         });
 
@@ -70,4 +70,14 @@ public class TakeSharedPartitionOperation implements Operation {
     public TaskSyncContext doOperation(TaskSyncContext taskSyncContext) {
         return takePartition(taskSyncContext);
     }
+
+    private List<PartitionState> filterDuplications(List<PartitionState> partitionStates) {
+        return partitionStates.stream()
+                .collect(Collectors.groupingBy(PartitionState::getToken))
+                .values()
+                .stream()
+                .flatMap(list -> list.stream().sorted().limit(1))
+                .collect(Collectors.toList());
+    }
+
 }

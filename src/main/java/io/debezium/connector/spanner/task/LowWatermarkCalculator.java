@@ -61,6 +61,7 @@ public class LowWatermarkCalculator {
                 .collect(Collectors.groupingBy(PartitionState::getToken));
 
         Set<String> duplicatesInPartitions = checkDuplication(partitionsMap);
+
         if (!duplicatesInPartitions.isEmpty()) {
             if (printOffsets) {
                 LOGGER.warn(
@@ -109,7 +110,8 @@ public class LowWatermarkCalculator {
             long acceptedLag = spannerConnectorConfig.getHeartbeatInterval().toMillis() + OFFSET_MONITORING_LAG_MAX_MS;
             if (lag > acceptedLag) {
                 LOGGER.warn(
-                        "Partition has a very old start timestamp, lag: {}, token: {}",
+                        "task: {}, Partition has a very old start timestamp, lag: {}, token: {}",
+                        taskSyncContextHolder.get().getTaskUid(),
                         lag,
                         InitialPartition.PARTITION_TOKEN);
             }
@@ -124,21 +126,22 @@ public class LowWatermarkCalculator {
         catch (ConnectException e) {
             if (e.getCause() != null && e.getCause() instanceof InterruptedException) {
                 LOGGER.info(
-                        "Kafka connect offsetStorageReader is interrupting... Thread interrupted: {}",
-                        Thread.currentThread().isInterrupted());
+                        "Task {}, Kafka connect offsetStorageReader is interrupting... Thread interrupted: {}",
+                        taskSyncContextHolder.get().getTaskUid(), Thread.currentThread().isInterrupted());
             }
             else {
                 LOGGER.warn(
-                        "Kafka connect offsetStorageReader cannot return offsets. Thread interrupted: {}. {}",
-                        Thread.currentThread().isInterrupted(),
+                        "Task {}, Kafka connect offsetStorageReader cannot return offsets. Thread interrupted: {}. {}, throwing error",
+                        taskSyncContextHolder.get().getTaskUid(), Thread.currentThread().isInterrupted(),
                         SpannerErrorHandler.getStackTrace(e));
+                throw e;
             }
             return null;
         }
         catch (RuntimeException e) {
             LOGGER.warn(
-                    "Kafka connect offsetStorageReader cannot return offsets {}",
-                    SpannerErrorHandler.getStackTrace(e));
+                    "Task {}, Kafka connect offsetStorageReader cannot return offsets {}",
+                    taskSyncContextHolder.get().getTaskUid(), SpannerErrorHandler.getStackTrace(e));
             return null;
         }
 
@@ -183,14 +186,15 @@ public class LowWatermarkCalculator {
                         String token = partitionState.getToken();
                         long lag = now - timestamp.toDate().getTime();
                         if (lag > acceptedLag) {
-                            LOGGER.warn("Task {}, Partition has a very old offset, lag: {}, token: {}", taskSyncContextHolder.get().getTaskUid(), lag, token);
+                            LOGGER.warn("Task {}, Partition has a very old offset, lag: {}, token: {}", taskSyncContextHolder.get().getTaskUid(), lag, partitionState);
                         }
                     }
                     else if (partitionState.getStartTimestamp() != null) {
                         String token = partitionState.getToken();
                         long lag = now - partitionState.getStartTimestamp().toDate().getTime();
                         if (lag > acceptedLag) {
-                            LOGGER.warn("Task {}, Partition has a very old start time, lag: {}, token: {}", taskSyncContextHolder.get().getTaskUid(), lag, token);
+                            LOGGER.warn("Task {}, Partition has a very old start time, lag: {}, token: {}", taskSyncContextHolder.get().getTaskUid(), lag,
+                                    partitionState);
                         }
                     }
                 });
