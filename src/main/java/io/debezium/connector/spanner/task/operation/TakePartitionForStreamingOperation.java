@@ -75,7 +75,7 @@ public class TakePartitionForStreamingOperation implements Operation {
 
         isRequiredPublishSyncEvent = !toSchedule.isEmpty();
         if (isRequiredPublishSyncEvent) {
-            LOGGER.info("Task scheduled {} partitions, taskUid: {}", toSchedule, taskSyncContext.getTaskUid());
+            LOGGER.debug("Task scheduled {} partitions, taskUid: {}", toSchedule, taskSyncContext.getTaskUid());
         }
 
         return taskSyncContext.toBuilder()

@@ -80,7 +80,6 @@ public class FinishPartitionWatchDog {
                     metronome.pause();
                 }
                 catch (InterruptedException e) {
-                    LOGGER.info("Interrupting SpannerConnector-FinishingPartitionWatchDog");
                     Thread.currentThread().interrupt();
                     return;
                 }

@@ -50,10 +50,6 @@ public class RebalanceHandler {
                 taskSyncContextHolder.get().getTaskUid(),
                 rebalanceGenerationId, isLeader);
 
-        LOGGER.info("processRebalancingEvent: updating task sync context, consumerId: {}, taskId{}, rebalanceGenerationId: {}, isLeader {}",
-                rebalanceGenerationId, consumerId,
-                taskSyncContextHolder.get().getTaskUid(),
-                rebalanceGenerationId, isLeader);
         TaskSyncContext context = taskSyncContextHolder.updateAndGet(oldContext -> {
             if (rebalanceGenerationId < taskSyncContextHolder.get().getRebalanceGenerationId()) {
                 LOGGER.info("processRebalancingEvent: skipping due to stale rebalance generation ID {}, consumerId: {}, taskId{}, rebalanceGenerationId: {}, isLeader {}",

@@ -84,7 +84,7 @@ public class TaskSyncContextHolder {
     }
 
     public void awaitInitialization(Duration awaitTimeout) {
-        LOGGER.debug("awaitInitialization: start");
+        LOGGER.info("awaitInitialization: start");
         TimeoutMeter timeout = TimeoutMeter.setTimeout(awaitTimeout);
         while (RebalanceState.START_INITIAL_SYNC.equals(this.get().getRebalanceState())) {
             if (timeout.isExpired()) {
@@ -98,7 +98,6 @@ public class TaskSyncContextHolder {
     public void awaitNewEpoch() {
         while (!RebalanceState.NEW_EPOCH_STARTED.equals(this.get().getRebalanceState())) {
             if (Thread.interrupted()) {
-                LOGGER.info("Interrupting awaitNewEpoch task {}", taskSyncContextRef.get().getTaskUid());
                 Thread.currentThread().interrupt();
                 return;
             }
@@ -109,7 +108,6 @@ public class TaskSyncContextHolder {
                 metronome.pause();
             }
             catch (InterruptedException e) {
-                LOGGER.info("Interrupting awaitNewEpoch task {}", taskSyncContextRef.get().getTaskUid());
                 Thread.currentThread().interrupt();
             }
         }

@@ -38,7 +38,7 @@ public class FindPartitionForStreamingOperation implements Operation {
                 .map(partitionState -> {
                     if (partitionState.getState().equals(PartitionStateEnum.CREATED)) {
                         boolean takePartitionForStreaming = false;
-                        LOGGER.info("Task sees partition with CREATED state, task Uid {}, partition {}", taskSyncContext.getTaskUid(), partitionState);
+                        LOGGER.debug("Task sees partition with CREATED state, task Uid {}, partition {}", taskSyncContext.getTaskUid(), partitionState);
                         if (finishedPartitions.containsAll(partitionState.getParents())) {
                             takePartitionForStreaming = true;
                             LOGGER.info("Task takes partition for streaming, taskUid: {}, partition {}",
@@ -53,16 +53,12 @@ public class FindPartitionForStreamingOperation implements Operation {
 
                         if (takePartitionForStreaming) {
                             this.isRequiredPublishSyncEvent = true;
-                            LOGGER.info("Task took partition for streaming, taskUid: {}, partition {}",
-                                    taskSyncContext.getTaskUid(), partitionState.getToken());
 
                             return partitionState.toBuilder()
                                     .state(PartitionStateEnum.READY_FOR_STREAMING)
                                     .build();
                         }
                         else {
-                            LOGGER.info("Task does not take partition for streaming, taskUid: {}, partition {}, parents {}",
-                                    taskSyncContext.getTaskUid(), partitionState.getToken(), partitionState.getParents());
                             return partitionState;
                         }
                     }
