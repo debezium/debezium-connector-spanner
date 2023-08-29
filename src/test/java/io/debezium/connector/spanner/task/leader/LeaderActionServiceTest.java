@@ -8,6 +8,8 @@ package io.debezium.connector.spanner.task.leader;
 import static io.debezium.connector.spanner.task.TaskTestHelper.generatePartitions;
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.time.Duration;
+import java.time.temporal.ChronoUnit;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -58,6 +60,7 @@ class LeaderActionServiceTest {
         SpannerConnectorConfig spannerConnectorConfig = Mockito.mock(SpannerConnectorConfig.class);
 
         Mockito.when(spannerConnectorConfig.startTime()).thenReturn(Timestamp.now());
+        Mockito.when(spannerConnectorConfig.getAwaitTaskAnswerTimeout()).thenReturn(Duration.of(120000, ChronoUnit.MILLIS));
 
         leaderService = new LeaderService(taskSyncContextHolder,
                 spannerConnectorConfig,

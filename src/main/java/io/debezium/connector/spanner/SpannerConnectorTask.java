@@ -76,6 +76,8 @@ public class SpannerConnectorTask extends SpannerBaseSourceTask {
 
     private volatile KafkaSpannerSchema schema;
 
+    private volatile boolean beganPolling = false;
+
     @Override
     protected SpannerChangeEventSourceCoordinator start(Configuration configuration) {
 
@@ -143,7 +145,8 @@ public class SpannerConnectorTask extends SpannerBaseSourceTask {
                 daoFactory,
                 spannerMeter.getMetricsEventPublisher(),
                 connectorConfig.getConnectorName(),
-                dialect);
+                dialect,
+                databaseClientFactory);
 
         this.changeStream = spannerChangeStreamFactory.getStream(
                 connectorConfig.changeStreamName(),
@@ -226,6 +229,10 @@ public class SpannerConnectorTask extends SpannerBaseSourceTask {
 
     @Override
     protected List<SourceRecord> doPoll() throws InterruptedException {
+        if (!beganPolling) {
+            beganPolling = true;
+            LOGGER.info("Task {}, began polling", taskUid);
+        }
         final List<DataChangeEvent> records = queue.poll();
 
         long pollAtTimestamp = Instant.now().toEpochMilli();

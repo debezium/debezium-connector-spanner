@@ -59,6 +59,8 @@ public class LeaderService {
 
     private final PartitionFactory partitionFactory;
 
+    private final Duration awaitTaskAnswerDuration;
+
     public LeaderService(TaskSyncContextHolder taskSyncContextHolder,
                          SpannerConnectorConfig spannerConnectorConfig,
                          BlockingConsumer<TaskStateChangeEvent> eventConsumer,
@@ -69,6 +71,7 @@ public class LeaderService {
 
         this.startTime = spannerConnectorConfig.startTime();
         this.endTime = spannerConnectorConfig.endTime() != null ? spannerConnectorConfig.endTime() : null;
+        this.awaitTaskAnswerDuration = spannerConnectorConfig.getAwaitTaskAnswerTimeout();
 
         this.eventConsumer = eventConsumer;
         this.errorHandler = errorHandler;
@@ -101,12 +104,13 @@ public class LeaderService {
         Map<String, String> consumerToTaskMap = new HashMap<>();
         LOGGER.info("awaitAllNewTaskStateUpdates: wait taskSyncContextHolder for all new task updates");
 
-        TimeoutMeter timeoutMeter = TimeoutMeter.setTimeout(AWAIT_TASK_ANSWER_DURATION);
+        TimeoutMeter timeoutMeter = TimeoutMeter.setTimeout(awaitTaskAnswerDuration);
 
         while (consumerToTaskMap.size() < consumers.size()) {
 
-            LOGGER.info("awaitAllNewTaskStateUpdates: " +
-                    "expected: {}, actual: {}. Expected consumers: {}", consumers.size(), consumerToTaskMap.size(), consumers);
+            LOGGER.info("Task {}, rebalance generation ID {}, awaitAllNewTaskStateUpdates: " +
+                    "expected: {}, actual: {}. Expected consumers: {}", taskSyncContextHolder.get().getTaskUid(), taskSyncContextHolder.get().getRebalanceGenerationId(),
+                    consumers.size(), consumerToTaskMap.size(), consumers);
 
             if (timeoutMeter.isExpired()) {
                 LOGGER.error("Task {} : Not received all answers from tasks", taskSyncContextHolder.get().getTaskUid());

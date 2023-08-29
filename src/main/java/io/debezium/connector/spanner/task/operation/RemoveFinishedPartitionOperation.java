@@ -94,7 +94,6 @@ public class RemoveFinishedPartitionOperation implements Operation {
         if (taskState.getPartitions().size() != partitions.size()) {
             this.isRequiredPublishSyncEvent = true;
         }
-
         return taskSyncContext.toBuilder()
                 .currentTaskState(taskState.toBuilder().partitions(partitions).build())
                 .build();

@@ -19,7 +19,6 @@ import java.util.stream.Stream;
 import org.slf4j.Logger;
 
 import io.debezium.DebeziumException;
-import io.debezium.connector.spanner.kafka.internal.model.MessageTypeEnum;
 import io.debezium.connector.spanner.kafka.internal.model.RebalanceState;
 import io.debezium.connector.spanner.kafka.internal.model.TaskState;
 import io.debezium.connector.spanner.kafka.internal.model.TaskSyncEvent;
@@ -34,23 +33,143 @@ public class SyncEventMerger {
     private SyncEventMerger() {
     }
 
-    public static TaskSyncContext merge(TaskSyncContext context, TaskSyncEvent inSync) {
+    // Apply the deltas from the new message onto the current task state.
+    public static TaskSyncContext mergeIncrementalTaskSyncEvent(TaskSyncContext currentContext, TaskSyncEvent newMessage) {
+        Map<String, TaskState> newTaskStatesMap = newMessage.getTaskStates();
+        debug(LOGGER, "merge: state before {}, \nIncoming states: {}", currentContext, newTaskStatesMap);
 
-        boolean foundDuplication = false;
+        var builder = currentContext.toBuilder();
 
-        // Only check for duplicate partition errors for messages that are NEW_EPOCH, UPDATE_EPOCH,
-        // or REBALANCE_ANSWER.
-        if (inSync.getMessageType() != MessageTypeEnum.REGULAR && context.checkDuplication(false, inSync.getMessageType().toString())) {
-            foundDuplication = true;
-        }
-        Map<String, TaskState> newTaskStatesMap = inSync.getTaskStates();
-        debug(LOGGER, "merge: state before {}, \nIncoming states: {}", context, newTaskStatesMap);
-
-        var builder = context.toBuilder();
-
-        // Skip processing messages that this task has already produced.
-        if (inSync.getTaskUid().equals(context.getTaskUid())) {
+        TaskState newTask = newMessage.getTaskStates().get(newMessage.getTaskUid());
+        if (newTask == null) {
+            LOGGER.warn("The rebalance answer {} did not contain the task's UID: {}", newMessage, newMessage.getTaskUid());
             return builder.build();
+        }
+
+        if (newTask.getTaskUid().equals(currentContext.getTaskUid())) {
+            return builder.build();
+        }
+
+        long oldPartitions = currentContext.getNumPartitions() + currentContext.getNumSharedPartitions();
+        // We only retrieve the task state belonging to the rebalance answer.
+        TaskState currentTask = currentContext.getTaskStates().get(newMessage.getTaskUid());
+
+        if (currentTask == null || newTask.getStateTimestamp() > currentTask.getStateTimestamp()) {
+            Map<String, TaskState> taskStates = new HashMap<>(currentContext.getTaskStates());
+            // Remove the task state from the map.
+            taskStates.remove(newMessage.getTaskUid());
+            // Insert the new task state in.
+            taskStates.put(newMessage.getTaskUid(), newTask);
+            builder.taskStates(taskStates)
+                    .createdTimestamp(Long.max(currentContext.getCreatedTimestamp(),
+                            newMessage.getMessageTimestamp()));
+            TaskSyncContext result = builder
+                    .build();
+            LOGGER.info("Processed incremental answer {} from task {} for rebalance generation id {}", newMessage, newMessage.getTaskUid(),
+                    newMessage.getRebalanceGenerationId());
+
+            long newPartitions = result.getNumPartitions() + result.getNumSharedPartitions();
+            if (newPartitions != oldPartitions) {
+                LOGGER.info(
+                        "Task {}, processed incremental answer {}: {}, task has total partitions {}, num partitions {}, num shared partitions {}, num old partitions {}",
+                        currentContext.getTaskUid(), newMessage, result.getNumPartitions() + result.getNumSharedPartitions(),
+                        result.getNumPartitions(), result.getNumSharedPartitions(), oldPartitions);
+
+            }
+            return result;
+        }
+        LOGGER.debug("merge: final state is not changed");
+
+        return builder.build();
+    }
+
+    // Take in the new task's snapshot.
+    public static TaskSyncContext mergeRebalanceAnswer(TaskSyncContext currentContext, TaskSyncEvent newMessage) {
+        Map<String, TaskState> newTaskStatesMap = newMessage.getTaskStates();
+        debug(LOGGER, "merge: state before {}, \nIncoming states: {}", currentContext, newTaskStatesMap);
+
+        var builder = currentContext.toBuilder();
+
+        TaskState newTask = newMessage.getTaskStates().get(newMessage.getTaskUid());
+        if (newTask == null) {
+            LOGGER.warn("The rebalance answer {} did not contain the task's UID: {}", newMessage, newMessage.getTaskUid());
+            return builder.build();
+        }
+
+        if (newTask.getTaskUid().equals(currentContext.getTaskUid())) {
+            return builder.build();
+        }
+
+        long oldPartitions = currentContext.getNumPartitions() + currentContext.getNumSharedPartitions();
+        // We only retrieve the task state belonging to the rebalance answer.
+        TaskState currentTask = currentContext.getTaskStates().get(newMessage.getTaskUid());
+
+        if (currentTask == null || newTask.getStateTimestamp() > currentTask.getStateTimestamp()) {
+            Map<String, TaskState> taskStates = new HashMap<>(currentContext.getTaskStates());
+            // Remove the task state from the map.
+            taskStates.remove(newMessage.getTaskUid());
+            // Insert the new task state in.
+            taskStates.put(newMessage.getTaskUid(), newTask);
+            builder.taskStates(taskStates)
+                    .createdTimestamp(Long.max(currentContext.getCreatedTimestamp(),
+                            newMessage.getMessageTimestamp()));
+            TaskSyncContext result = builder
+                    .build();
+            LOGGER.info("Processed rebalance answer {} from task {} for rebalance generation id {}", newMessage, newMessage.getTaskUid(),
+                    newMessage.getRebalanceGenerationId());
+
+            long newPartitions = result.getNumPartitions() + result.getNumSharedPartitions();
+            if (newPartitions != oldPartitions) {
+                LOGGER.info(
+                        "Task {}, processed rebalance answer {}: {}, task has total partitions {}, num partitions {}, num shared partitions {}, num old partitions {}",
+                        currentContext.getTaskUid(), newMessage, result.getNumPartitions() + result.getNumSharedPartitions(),
+                        result.getNumPartitions(), result.getNumSharedPartitions(), oldPartitions);
+
+            }
+            return result;
+        }
+        LOGGER.debug("merge: final state is not changed");
+
+        return builder.build();
+    }
+
+    // For UPDATE_EPOCH messages, we only update a task's state if the new message contains
+    // the same message for the task which had a higher state timestamp.
+    public static TaskSyncContext mergeEpochUpdate(TaskSyncContext currentContext, TaskSyncEvent newMessage) {
+        Map<String, TaskState> newTaskStatesMap = newMessage.getTaskStates();
+        debug(LOGGER, "merge: state before {}, \nIncoming states: {}", currentContext, newTaskStatesMap);
+
+        var builder = currentContext.toBuilder();
+        // If the current task is the leader, there is no need to merge the epoch update.
+        if (newMessage.getTaskUid().equals(currentContext.getTaskUid())) {
+            return builder.build();
+        }
+        long oldPartitions = currentContext.getNumPartitions() + currentContext.getNumSharedPartitions();
+        builder.epochOffsetHolder(currentContext.getEpochOffsetHolder().nextOffset(newMessage.getEpochOffset()));
+
+        TaskState.TaskStateBuilder currentTaskBuilder = currentContext.getCurrentTaskState().toBuilder();
+        if (RebalanceState.START_INITIAL_SYNC.equals(currentContext.getRebalanceState())) {
+            // Update the rebalance generation ID for both the task and the overall context
+            // in case we are still processing from previous states and haven't connected to
+            // the rebalance topic yet.
+            LOGGER.info("Task {}, updating the rebalance generation ID from the leader epoch update {}: {}", currentContext.getTaskUid(), newMessage.getTaskUid(),
+                    newMessage.getRebalanceGenerationId());
+            builder.rebalanceGenerationId(newMessage.getRebalanceGenerationId());
+            currentTaskBuilder.rebalanceGenerationId(newMessage.getRebalanceGenerationId());
+        }
+
+        // Only retrieve the current task states where the task UID is included inside the UPDATE_EPOCH message.
+        Set<String> updateEpochTaskUids = newTaskStatesMap.keySet().stream().collect(Collectors.toSet());
+        Map<String, TaskState> currentTaskStates = currentContext.getTaskStates();
+
+        Map<String, TaskState> filteredTaskStates = new HashMap<String, TaskState>();
+        for (Map.Entry<String, TaskState> currentTaskState : currentTaskStates.entrySet()) {
+            if (!updateEpochTaskUids.contains(currentTaskState.getKey())) {
+                LOGGER.info("Task {}, removing task state {} since it is not included in the UPDATE_EPOCH message {}", currentContext.getTaskUid(),
+                        currentTaskState.getKey(), updateEpochTaskUids);
+                continue;
+            }
+            filteredTaskStates.put(currentTaskState.getKey(), currentTaskState.getValue());
         }
 
         Set<String> updatedStatesUids = new HashSet<>();
@@ -58,57 +177,50 @@ public class SyncEventMerger {
         // We only update our internal copies of other task states from received sync event messages.
         // We do not update our own internal task state from received sync event messages, since
         // we have the most up-to-date version of our own task state.
-        for (TaskState inTaskState : newTaskStatesMap.values()) {
-
-            if (inTaskState.getTaskUid().equals(context.getTaskUid())) {
+        for (TaskState newTaskState : newTaskStatesMap.values()) {
+            // We don't update our own task state.
+            if (newTaskState.getTaskUid().equals(currentContext.getTaskUid())) {
                 continue;
             }
 
-            TaskState currentTaskState = context.getTaskStates().get(inTaskState.getTaskUid());
+            TaskState currentTaskState = filteredTaskStates.get(newTaskState.getTaskUid());
             // We only update our internal copy of another task's state, if the state timestamp
             // in the sync event message is greater than the state timestamp of our internal
             // copy of the other task's state.
-            if (currentTaskState == null || inTaskState.getStateTimestamp() > currentTaskState.getStateTimestamp()) {
-                updatedStatesUids.add(inTaskState.getTaskUid());
+            if (currentTaskState == null || newTaskState.getStateTimestamp() > currentTaskState.getStateTimestamp()) {
+                updatedStatesUids.add(newTaskState.getTaskUid());
             }
         }
 
-        if (inSync.getMessageType() == MessageTypeEnum.UPDATE_EPOCH && !inSync.getTaskUid().equals(context.getTaskUid())) {
-            LOGGER.info("Task {}, updating the epoch offset from the leader's UPDATE_EPOCH message {}: {}", context.getTaskUid(), inSync.getTaskUid(),
-                    inSync.getEpochOffset());
-            builder.epochOffsetHolder(context.getEpochOffsetHolder().nextOffset(inSync.getEpochOffset()));
+        var oldStatesStream = filteredTaskStates.entrySet().stream()
+                .filter(e -> !updatedStatesUids.contains(e.getKey()));
+
+        var updatedStatesStream = newTaskStatesMap.entrySet().stream()
+                .filter(e -> updatedStatesUids.contains(e.getKey()));
+
+        Map<String, TaskState> mergedTaskStates = Stream.concat(oldStatesStream, updatedStatesStream)
+                .collect(toUnmodifiableMap(Map.Entry::getKey, Map.Entry::getValue));
+
+        TaskSyncContext result = builder
+                .taskStates(mergedTaskStates)
+                .createdTimestamp(Long.max(currentContext.getCreatedTimestamp(), newMessage.getMessageTimestamp()))
+                .currentTaskState(currentTaskBuilder.build())
+                .epochOffsetHolder(currentContext.getEpochOffsetHolder().nextOffset(newMessage.getEpochOffset()))
+                .build();
+
+        int numPartitions = result.getNumPartitions();
+
+        int numSharedPartitions = result.getNumSharedPartitions();
+
+        long newPartitions = numPartitions + numSharedPartitions;
+        if (newPartitions != oldPartitions) {
+            LOGGER.info(
+                    "Task {}, updating the epoch offset from the leader's UPDATE_EPOCH message {}: {}, task has total partitions {}, num partitions {}, num shared partitions {}, num old partitions {}",
+                    currentContext.getTaskUid(), newMessage.getTaskUid(),
+                    newMessage.getEpochOffset(), numPartitions + numSharedPartitions, numPartitions, numSharedPartitions, oldPartitions);
+
         }
-
-        if (!updatedStatesUids.isEmpty()) {
-            var oldStatesStream = context.getTaskStates().entrySet().stream()
-                    .filter(e -> !updatedStatesUids.contains(e.getKey()));
-
-            var updatedStatesStream = newTaskStatesMap.entrySet().stream()
-                    .filter(e -> updatedStatesUids.contains(e.getKey()));
-
-            Map<String, TaskState> mergedTaskStates = Stream.concat(oldStatesStream, updatedStatesStream)
-                    .collect(toUnmodifiableMap(Map.Entry::getKey, Map.Entry::getValue));
-
-            builder.taskStates(mergedTaskStates)
-                    .createdTimestamp(Long.max(context.getCreatedTimestamp(), inSync.getMessageTimestamp()));
-
-            TaskSyncContext result = builder
-                    .build();
-
-            debug(LOGGER, "merge: final state {}, \nUpdated uids: {}, epoch: {}",
-                    result, updatedStatesUids, result.getRebalanceGenerationId());
-
-            if (inSync.getMessageType() != MessageTypeEnum.REGULAR && !foundDuplication) {
-                if (result.checkDuplication(true, inSync.getMessageType().toString())) {
-                    LOGGER.info("Task {} found duplication after processing {}", context.getTaskUid(), inSync);
-                }
-            }
-
-            return result;
-        }
-        LOGGER.debug("merge: final state is not changed");
-
-        return builder.build();
+        return result;
     }
 
     public static TaskSyncContext mergeNewEpoch(TaskSyncContext currentContext, TaskSyncEvent inSync) {
@@ -133,6 +245,8 @@ public class SyncEventMerger {
         if (inSync.getTaskUid().equals(currentContext.getTaskUid())) {
             return builder.build();
         }
+
+        long oldPartitions = currentContext.getNumPartitions() + currentContext.getNumSharedPartitions();
 
         Map<String, TaskState> newTaskStates = new HashMap<>(inSync.getTaskStates());
         newTaskStates.remove(currentContext.getTaskUid());
@@ -165,6 +279,15 @@ public class SyncEventMerger {
                 .currentTaskState(currentTaskBuilder.build());
         TaskSyncContext result = builder.build();
 
+        long newPartitions = result.getNumPartitions() + result.getNumSharedPartitions();
+        if (newPartitions != oldPartitions) {
+            LOGGER.info("Task {}, processed new epoch message {}: {}, task has total partitions {}, num partitions {}, num shared partitions {}, num old partitions {}",
+                    currentContext.getTaskUid(), inSync.getTaskUid(),
+                    inSync.getEpochOffset(), result.getNumPartitions() + result.getNumSharedPartitions(),
+                    result.getNumPartitions(), result.getNumSharedPartitions(), oldPartitions);
+
+        }
+
         // Check that there is no partition duplication after processing the new epoch message.
         if (!foundDuplication && result.checkDuplication(true, "NEW_EPOCH")) {
             LOGGER.debug("Task {}, duplication exists after processing new epoch, old context {}", result.getTaskUid(), currentContext);
@@ -174,5 +297,4 @@ public class SyncEventMerger {
 
         return result;
     }
-
 }

@@ -9,6 +9,9 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.google.cloud.Timestamp;
 
 import io.debezium.connector.spanner.SpannerConnectorConfig;
@@ -38,6 +41,7 @@ import io.debezium.spi.schema.DataCollectionId;
  * Collects metrics of the Spanner connector
  */
 public class SpannerMeter {
+    private static final Logger LOGGER = LoggerFactory.getLogger(SpannerMeter.class);
 
     private final Set<DataCollectionId> capturedTables = ConcurrentHashMap.newKeySet();
     private final AtomicInteger detectedPartitionCount = new AtomicInteger(0);
@@ -245,23 +249,34 @@ public class SpannerMeter {
     }
 
     public void shutdown() {
-        totalLatency.shutdown();
         connectorLatency.shutdown();
+        LOGGER.info("Task UID {}, Spanner meter, shutdown connector latency", getTaskUid());
+        totalLatency.shutdown();
+        LOGGER.info("Task UID {}, Spanner meter, shutdown total latency", getTaskUid());
         spannerLatency.shutdown();
+        LOGGER.info("Task UID {}, Spanner meter, shutdown spanner latency", getTaskUid());
         commitToEmitLatency.shutdown();
+        LOGGER.info("Task UID {}, Spanner meter, shutdown committoemit latency", getTaskUid());
 
         commitToPublishLatency.shutdown();
+        LOGGER.info("Task UID {}, Spanner meter, shutdown committopublish latency", getTaskUid());
         emitToPublishLatency.shutdown();
+        LOGGER.info("Task UID {}, Spanner meter, shutdown emittopublish latency", getTaskUid());
 
         ownConnectorLatency.shutdown();
+        LOGGER.info("Task UID {}, Spanner meter, shutdown ownConnectorLatency latency", getTaskUid());
 
         partitionOffsetLagStatistics.shutdown();
+        LOGGER.info("Task UID {}, Spanner meter, shutdown partitionOffsetLagStatistics latency", getTaskUid());
 
         lowWatermarkLagLatency.shutdown();
+        LOGGER.info("Task UID {}, Spanner meter, shutdown lowWatermarkLagLatency latency", getTaskUid());
 
         receivingTimeOffsetStatistics.shutdown();
+        LOGGER.info("Task UID {}, Spanner meter, shutdown receivingTimeOffsetStatistics", getTaskUid());
 
         delayChangeStreamEvents.shutdown();
+        LOGGER.info("Task UID {}, Spanner meter, shutdown delayChangeStreamEvents", getTaskUid());
     }
 
     public void finishTask() {

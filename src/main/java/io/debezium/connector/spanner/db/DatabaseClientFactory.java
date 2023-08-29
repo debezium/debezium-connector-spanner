@@ -16,6 +16,7 @@ import com.google.api.gax.rpc.FixedHeaderProvider;
 import com.google.auth.oauth2.GoogleCredentials;
 import com.google.cloud.spanner.DatabaseClient;
 import com.google.cloud.spanner.DatabaseId;
+import com.google.cloud.spanner.Spanner;
 import com.google.cloud.spanner.SpannerOptions;
 import com.google.common.annotations.VisibleForTesting;
 
@@ -36,6 +37,7 @@ public class DatabaseClientFactory {
     private final String databaseId;
 
     private final SpannerOptions options;
+    private volatile Spanner spanner;
 
     private DatabaseClient databaseClient;
 
@@ -63,6 +65,8 @@ public class DatabaseClientFactory {
         String userAgentString = USER_AGENT_PREFIX + Module.version();
         builder.setHeaderProvider(FixedHeaderProvider.create("user-agent", userAgentString));
         this.options = builder.build();
+        this.spanner = options.getService();
+
     }
 
     public DatabaseClientFactory(SpannerConnectorConfig config) {
@@ -95,11 +99,19 @@ public class DatabaseClientFactory {
         return credential;
     }
 
+    public synchronized void closeSpanner() {
+        if (spanner == null) {
+            return;
+        }
+        spanner.close();
+        spanner = null;
+    }
+
     public DatabaseClient getDatabaseClient() {
         if (databaseClient != null) {
             return databaseClient;
         }
-        databaseClient = options.getService().getDatabaseClient(
+        databaseClient = spanner.getDatabaseClient(
                 DatabaseId.of(this.projectId, this.instanceId, this.databaseId));
         return databaseClient;
     }

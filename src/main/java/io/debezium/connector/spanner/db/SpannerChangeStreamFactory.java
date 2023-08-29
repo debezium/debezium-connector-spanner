@@ -23,6 +23,7 @@ public class SpannerChangeStreamFactory {
     private static final String JOB_NAME = "SpannerChangeStream_Kafka";
 
     private final DaoFactory daoFactory;
+    private final DatabaseClientFactory databaseClientFactory;
     private final MetricsEventPublisher metricsEventPublisher;
     private final String connectorName;
     private final Dialect dialect;
@@ -30,9 +31,10 @@ public class SpannerChangeStreamFactory {
 
     public SpannerChangeStreamFactory(String taskUid,
                                       DaoFactory daoFactory, MetricsEventPublisher metricsEventPublisher, String connectorName,
-                                      Dialect dialect) {
+                                      Dialect dialect, DatabaseClientFactory databaseClientFactory) {
         this.taskUid = taskUid;
         this.daoFactory = daoFactory;
+        this.databaseClientFactory = databaseClientFactory;
         this.metricsEventPublisher = metricsEventPublisher;
         this.connectorName = connectorName;
         this.dialect = dialect;
@@ -52,6 +54,6 @@ public class SpannerChangeStreamFactory {
                 taskUid, changeStreamDao, changeStreamRecordMapper, heartbeatMillis, metricsEventPublisher);
 
         return new SpannerChangeStream(
-                streamService, metricsEventPublisher, heartbeatMillis, maxMissedHeartbeats);
+                streamService, metricsEventPublisher, heartbeatMillis, maxMissedHeartbeats, taskUid, databaseClientFactory);
     }
 }

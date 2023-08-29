@@ -79,6 +79,7 @@ public class BufferedPublisher<V> {
         V item = this.value.getAndSet(null);
 
         if (item != null) {
+            LOGGER.info("Task {}, publishing buffered {}", taskUid, item);
             this.onPublish.accept(item);
         }
     }

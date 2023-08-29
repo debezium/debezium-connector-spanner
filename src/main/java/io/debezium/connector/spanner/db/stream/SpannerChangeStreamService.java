@@ -86,9 +86,13 @@ public class SpannerChangeStreamService {
                 start = now();
             }
         }
-        finally {
-            LOGGER.info("Task {}, Stopped streaming from partition {}", taskUid, token);
+        catch (InterruptedException ex) {
+            LOGGER.info("task {}, Interrupting streaming partition task with token {}", this.taskUid, partition.getToken());
+            Thread.currentThread().interrupt();
         }
+        // finally {
+        // LOGGER.info("Task {}, Stopped streaming from partition {}", taskUid, token);
+        // }
 
         partitionEventListener.onFinish(partition);
         LOGGER.info("Task {}, Finished consuming partition {}", taskUid, partition);

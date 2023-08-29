@@ -20,6 +20,7 @@ import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.SpannerException;
 import com.google.common.annotations.VisibleForTesting;
 
+import io.debezium.connector.spanner.db.DatabaseClientFactory;
 import io.debezium.connector.spanner.db.model.Partition;
 import io.debezium.connector.spanner.db.model.event.ChangeStreamEvent;
 import io.debezium.connector.spanner.db.stream.exception.ChangeStreamException;
@@ -59,8 +60,13 @@ public class SpannerChangeStream implements ChangeStream {
 
     private final PartitionQueryingMonitor partitionQueryingMonitor;
 
+    private final String taskUid;
+
+    private final DatabaseClientFactory databaseClientFactory;
+
     public SpannerChangeStream(SpannerChangeStreamService streamService,
-                               MetricsEventPublisher metricsEventPublisher, Duration heartBeatInterval, int maxMissedHeartbeats) {
+                               MetricsEventPublisher metricsEventPublisher, Duration heartBeatInterval, int maxMissedHeartbeats, String taskUid,
+                               DatabaseClientFactory databaseClientFactory) {
         this.streamService = streamService;
         this.partitionThreadPool = new PartitionThreadPool();
         this.metricsEventPublisher = metricsEventPublisher;
@@ -69,6 +75,8 @@ public class SpannerChangeStream implements ChangeStream {
                 this::onStuckPartition,
                 this::onError,
                 metricsEventPublisher, maxMissedHeartbeats);
+        this.taskUid = taskUid;
+        this.databaseClientFactory = databaseClientFactory;
     }
 
     @Override
@@ -89,6 +97,7 @@ public class SpannerChangeStream implements ChangeStream {
         try {
             while (runningFlagSupplier.getAsBoolean()) {
                 if (signal.await(WAIT_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS) && exception.get() != null) {
+                    LOGGER.warn("Task {}, is throwing exception during streaming {}", this.taskUid, exception.get());
                     throw exception.get();
                 }
 
@@ -101,8 +110,12 @@ public class SpannerChangeStream implements ChangeStream {
 
             this.lock.unlock();
 
-            LOGGER.info("Shutdown all partition streaming...");
-            this.partitionThreadPool.shutdown();
+            LOGGER.info("Task {}, closing Spanner", this.taskUid);
+            databaseClientFactory.closeSpanner();
+
+            LOGGER.info("Task {}, Shutting down all partition streaming...", this.taskUid);
+            this.partitionThreadPool.shutdown(this.taskUid);
+            LOGGER.info("Task {}, Shutdown all partition streaming...", this.taskUid);
 
             this.isRunning.set(false);
         }
@@ -111,19 +124,21 @@ public class SpannerChangeStream implements ChangeStream {
     @Override
     public boolean submitPartition(Partition partition) {
         if (!isRunning.get()) {
+            LOGGER.info("Task {}, Failed to submit partition: {}", this.taskUid, partition.getToken());
             return false;
         }
 
         boolean submitted = partitionThreadPool.submit(partition.getToken(), () -> {
-            LOGGER.info("Started streaming from partition with token {}", partition.getToken());
+            LOGGER.info("task {}, Started streaming from partition with token {}", this.taskUid, partition.getToken());
             try {
                 streamService.getEvents(partition, this::onStreamEvent, this.partitionEventListener);
             }
             catch (InterruptedException ex) {
-                LOGGER.info("Interrupting streaming partition task with token {}", partition.getToken());
+                LOGGER.info("task {}, Interrupting streaming partition task with token {}", this.taskUid, partition.getToken());
                 Thread.currentThread().interrupt();
             }
             catch (Exception ex) {
+
                 LOGGER.info("Exception during streaming {} from partition with token {}", ex.getMessage(), partition.getToken());
 
                 if (this.onError(partition, ex)) {
@@ -136,6 +151,8 @@ public class SpannerChangeStream implements ChangeStream {
                 }
                 catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
+                    LOGGER.info("Interrupting streaming partition task with token {} and exception {}, SHOULD NEVER REACH THIS POINT, CHECK IF TASK FAILED",
+                            partition.getToken(), e);
                 }
             }
             finally {
@@ -177,7 +194,13 @@ public class SpannerChangeStream implements ChangeStream {
 
     @Override
     public void stop() {
-        partitionThreadPool.shutdown();
+        LOGGER.info("Task {}, closing Spanner", this.taskUid);
+        databaseClientFactory.closeSpanner();
+
+        LOGGER.info("Task {}, Shutting down partition thread pool {}", this.taskUid, partitionThreadPool.getActiveThreads());
+
+        partitionThreadPool.shutdown(this.taskUid);
+        LOGGER.info("Task {}, Shutdown partition thread pool", this.taskUid);
     }
 
     @VisibleForTesting

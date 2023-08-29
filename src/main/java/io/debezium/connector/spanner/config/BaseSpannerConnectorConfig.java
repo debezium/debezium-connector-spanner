@@ -81,6 +81,7 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
     private static final String CONNECTOR_SPANNER_REBALANCING_TASK_WAITING_TIMEOUT_PROPERTY_NAME = "connector.spanner.rebalancing.task.wait.timeout";
     private static final String CONNECTOR_SPANNER_SYNC_EVENT_PUBLISH_WAITING_TIMEOUT_PROPERTY_NAME = "connector.spanner.sync.publisher.wait.timeout";
     private static final String CONNECTOR_SPANNER_TASK_AWAIT_INITIALIZATION_TIMEOUT_PROPERTY_NAME = "connector.spanner.task.await.initialization.timeout";
+    private static final String CONNECTOR_SPANNER_TASK_AWAIT_TASK_ANSWER_TIMEOUT_PROPERTY_NAME = "connector.spanner.task.await.task.answer.timeout";
 
     private static final String MAX_MISSED_HEARTBEATS_PROPERTY_NAME = "connector.spanner.max.missed.heartbeats";
 
@@ -544,6 +545,15 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
             .withDefault(120000)
             .withDescription("Connector task await initialization timeout, default 120000 ms");
 
+    protected static final Field TASK_AWAIT_ANSWER_TIMEOUT = Field.create(CONNECTOR_SPANNER_TASK_AWAIT_TASK_ANSWER_TIMEOUT_PROPERTY_NAME)
+            .withDisplayName("Task await answer timeout")
+            .withType(Type.INT)
+            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR, 16))
+            .withWidth(Width.MEDIUM)
+            .withImportance(Importance.LOW)
+            .withDefault(120000)
+            .withDescription("Connector leader task await answer timeout, default 120000 ms");
+
     protected static final Field PERCENTAGE_METRICS_CLEAR_INTERVAL = Field.create(PERCENTAGE_METRICS_CLEAR_INTERVAL_PROPERTY_NAME)
             .withDisplayName("Percentage metrics clear interval")
             .withType(Type.INT)
@@ -597,6 +607,7 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
                     REBALANCING_TASK_WAITING_TIMEOUT,
                     SYNC_EVENT_PUBLISH_WAITING_TIMEOUT,
                     TASK_AWAIT_INITIALIZATION_TMEOUT,
+                    TASK_AWAIT_ANSWER_TIMEOUT,
                     CONNECTOR_SPANNER_PARTITION_FINISHING_AFTER_COMMIT_FIELD,
                     CONNECTOR_SPANNER_FINISHED_PARTITION_DELETION_DELAY_FIELD,
                     PERCENTAGE_METRICS_CLEAR_INTERVAL,

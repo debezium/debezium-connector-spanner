@@ -62,7 +62,7 @@ class BufferedPublisherTest {
         BufferedPublisher<Integer> pub = new BufferedPublisher<>("test-task-1", "pub-1", 5,
                 publishImmediately,
                 onPublish
-                        // .andThen(System.out::println)
+                        .andThen(System.out::println)
                         .andThen(result::add));
 
         pub.start();

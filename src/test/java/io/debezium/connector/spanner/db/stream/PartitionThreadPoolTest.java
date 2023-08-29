@@ -33,7 +33,7 @@ class PartitionThreadPoolTest {
         partitionThreadPool.stop("Test token1");
         assertEquals(1, partitionThreadPool.getActiveThreads().size());
 
-        partitionThreadPool.shutdown();
+        partitionThreadPool.shutdown("taskuid");
         assertEquals(0, partitionThreadPool.getActiveThreads().size());
     }
 }

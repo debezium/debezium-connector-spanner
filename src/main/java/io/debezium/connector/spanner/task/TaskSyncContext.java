@@ -62,18 +62,62 @@ public class TaskSyncContext {
         return Map.copyOf(taskStateMap);
     }
 
-    public TaskSyncEvent buildTaskSyncEvent() {
-        return buildTaskSyncEvent(MessageTypeEnum.REGULAR);
+    public Map<String, TaskState> getCurrentTaskStateMap() {
+        Map<String, TaskState> currentTaskStateMap = new HashMap<>();
+        currentTaskStateMap.put(currentTaskState.getTaskUid(), currentTaskState.toBuilder()
+                .consumerId(consumerId)
+                .rebalanceGenerationId(rebalanceGenerationId)
+                .stateTimestamp(Instant.now().toEpochMilli()).build());
+        return Map.copyOf(currentTaskStateMap);
     }
 
-    public TaskSyncEvent buildTaskSyncEvent(MessageTypeEnum messageType) {
+    // Builds a new epoch message, which will contain all task states.
+    public TaskSyncEvent buildNewEpochTaskSyncEvent() {
         return TaskSyncEvent.builder().epochOffset(this.epochOffsetHolder.getEpochOffset()).taskStates(
                 this.getAllTaskStates())
                 .taskUid(this.getTaskUid())
                 .consumerId(this.getConsumerId())
                 .rebalanceGenerationId(this.getRebalanceGenerationId())
                 .messageTimestamp(this.getCreatedTimestamp())
-                .messageType(messageType)
+                .messageType(MessageTypeEnum.NEW_EPOCH)
+                .databaseSchemaTimestamp(databaseSchemaTimestamp)
+                .build();
+    }
+
+    // Builds an epoch update message, which will contain all task states.
+    public TaskSyncEvent buildUpdateEpochTaskSyncEvent() {
+        return TaskSyncEvent.builder().epochOffset(this.epochOffsetHolder.getEpochOffset()).taskStates(
+                this.getAllTaskStates())
+                .taskUid(this.getTaskUid())
+                .consumerId(this.getConsumerId())
+                .rebalanceGenerationId(this.getRebalanceGenerationId())
+                .messageTimestamp(this.getCreatedTimestamp())
+                .messageType(MessageTypeEnum.UPDATE_EPOCH)
+                .databaseSchemaTimestamp(databaseSchemaTimestamp)
+                .build();
+    }
+
+    // Builds a rebalance answer task sync event, which will contain only the current task state.
+    public TaskSyncEvent buildRebalanceAnswerTaskSyncEvent() {
+        return TaskSyncEvent.builder().epochOffset(this.epochOffsetHolder.getEpochOffset()).taskStates(
+                this.getCurrentTaskStateMap())
+                .taskUid(this.getTaskUid())
+                .consumerId(this.getConsumerId())
+                .rebalanceGenerationId(this.getRebalanceGenerationId())
+                .messageTimestamp(this.getCreatedTimestamp())
+                .messageType(MessageTypeEnum.REBALANCE_ANSWER)
+                .databaseSchemaTimestamp(databaseSchemaTimestamp)
+                .build();
+    }
+
+    public TaskSyncEvent buildCurrentTaskSyncEvent() {
+        return TaskSyncEvent.builder().epochOffset(this.epochOffsetHolder.getEpochOffset()).taskStates(
+                this.getCurrentTaskStateMap())
+                .taskUid(this.getTaskUid())
+                .consumerId(this.getConsumerId())
+                .rebalanceGenerationId(this.getRebalanceGenerationId())
+                .messageTimestamp(this.getCreatedTimestamp())
+                .messageType(MessageTypeEnum.REGULAR)
                 .databaseSchemaTimestamp(databaseSchemaTimestamp)
                 .build();
     }
@@ -351,11 +395,40 @@ public class TaskSyncContext {
         return this.initialized;
     }
 
+    public int getNumPartitions() {
+        Map<String, List<PartitionState>> partitionsMap = getAllTaskStates().values().stream()
+                .flatMap(taskState -> taskState.getPartitions().stream())
+                .filter(
+                        partitionState -> !partitionState.getState().equals(PartitionStateEnum.FINISHED)
+                                && !partitionState.getState().equals(PartitionStateEnum.REMOVED))
+                .collect(Collectors.groupingBy(PartitionState::getToken));
+
+        return partitionsMap.size();
+    }
+
+    public int getNumSharedPartitions() {
+        Map<String, List<PartitionState>> partitionsMap = getAllTaskStates().values().stream()
+                .flatMap(taskState -> taskState.getPartitions().stream())
+                .filter(
+                        partitionState -> !partitionState.getState().equals(PartitionStateEnum.FINISHED)
+                                && !partitionState.getState().equals(PartitionStateEnum.REMOVED))
+                .collect(Collectors.groupingBy(PartitionState::getToken));
+
+        Map<String, PartitionState> partitions = partitionsMap.entrySet().stream()
+                .map(entry -> new AbstractMap.SimpleEntry<>(entry.getKey(), entry.getValue().get(0)))
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+
+        Map<String, List<PartitionState>> sharedPartitionsMap = getAllTaskStates().values().stream()
+                .flatMap(taskState -> taskState.getSharedPartitions().stream())
+                .filter(partitionState -> !partitions.containsKey(partitionState.getToken()))
+                .collect(Collectors.groupingBy(PartitionState::getToken));
+
+        return sharedPartitionsMap.size();
+    }
+
     // Debug function used to check if there is any partiton or shared partition duplication
     // inside the TaskSyncContext.
     public boolean checkDuplication(boolean printOffsets, String loggingString) {
-
-        // Filter out all of the FINISHED or REMOVED partitions.
         Map<String, List<PartitionState>> partitionsMap = getAllTaskStates().values().stream()
                 .flatMap(taskState -> taskState.getPartitions().stream())
                 .filter(
@@ -379,6 +452,7 @@ public class TaskSyncContext {
         Map<String, PartitionState> partitions = partitionsMap.entrySet().stream()
                 .map(entry -> new AbstractMap.SimpleEntry<>(entry.getKey(), entry.getValue().get(0)))
                 .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+
         Map<String, List<PartitionState>> sharedPartitionsMap = getAllTaskStates().values().stream()
                 .flatMap(taskState -> taskState.getSharedPartitions().stream())
                 .filter(partitionState -> !partitions.containsKey(partitionState.getToken()))

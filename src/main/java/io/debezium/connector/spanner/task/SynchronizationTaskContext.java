@@ -173,10 +173,6 @@ public class SynchronizationTaskContext {
 
             this.taskSyncEventListener.subscribe(syncEventHandler::process);
 
-            this.taskSyncEventListener.subscribe(syncEventHandler::processNewEpoch);
-
-            this.taskSyncEventListener.subscribe(syncEventHandler::processRebalanceAnswer);
-
             this.taskSyncEventListener.subscribe(syncEventHandler::processPreviousStates);
 
             this.taskSyncEventListener.start();

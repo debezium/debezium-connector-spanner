@@ -61,6 +61,7 @@ public class LowWatermarkStampPublisher {
         }
 
         if (publisherThread.getState().equals(Thread.State.NEW)) {
+            LOGGER.info("task {}, started publisher thread ", taskSyncContextHolder.get().getTaskUid());
             this.publisherThread.start();
         }
 
@@ -72,6 +73,7 @@ public class LowWatermarkStampPublisher {
     }
 
     public void destroy() throws InterruptedException {
+        LOGGER.info("Task {}, Attempting to destroy LowWatermarkStampPublisher", taskSyncContextHolder.get().getTaskUid());
         if (this.publisherThread == null || publisherThread.getState().equals(Thread.State.NEW)) {
             return;
         }
@@ -79,9 +81,11 @@ public class LowWatermarkStampPublisher {
 
         this.publisherThread.interrupt();
 
+        LOGGER.info("Task {}, Attempting to destroy LowWatermarkStampPublisher with state {}", taskSyncContextHolder.get().getTaskUid(), publisherThread.getState());
         while (this.publisherThread != null) {
         }
 
+        LOGGER.info("Task {}, Successfully destroyed LowWatermarkStampPublisher", taskSyncContextHolder.get().getTaskUid());
         spannerEventDispatcher.publishLowWatermarkStampEvent();
     }
 
@@ -100,6 +104,7 @@ public class LowWatermarkStampPublisher {
                         Thread.sleep(publishInterval.toMillis());
                     }
                     catch (InterruptedException e) {
+                        LOGGER.info("Task {}, LowWatermarkStampPublisher caught exception {}", taskSyncContextHolder.get().getTaskUid(), e);
                         Thread.currentThread().interrupt();
                     }
                 }
