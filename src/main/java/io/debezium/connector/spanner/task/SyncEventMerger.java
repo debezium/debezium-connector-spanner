@@ -285,7 +285,6 @@ public class SyncEventMerger {
                 inSync.getEpochOffset(), result.getNumPartitions() + result.getNumSharedPartitions(),
                 result.getNumPartitions(), result.getNumSharedPartitions(), oldPartitions);
 
-
         // Check that there is no partition duplication after processing the new epoch message.
         if (!foundDuplication && result.checkDuplication(true, "NEW_EPOCH")) {
             LOGGER.debug("Task {}, duplication exists after processing new epoch, old context {}", result.getTaskUid(), currentContext);
