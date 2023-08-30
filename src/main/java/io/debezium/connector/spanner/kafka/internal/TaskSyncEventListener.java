@@ -135,6 +135,9 @@ public class TaskSyncEventListener {
                                     LOGGER.info("Task {}, still polling the sync topic", consumerGroup);
                                     sw = Stopwatch.accumulating().start();
                                 }
+                                else {
+                                    sw.start();
+                                }
                                 poll(consumer, endOffset);
                                 if (!consumerFactory.isAutoCommitEnabled()
                                         && commitOffsetStart + commitOffsetsInterval < System.currentTimeMillis()) {
