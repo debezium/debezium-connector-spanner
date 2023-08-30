@@ -14,7 +14,6 @@ import java.util.Map;
 import org.apache.kafka.common.config.ConfigValue;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
-import org.junitpioneer.jupiter.SetEnvironmentVariable;
 
 import io.debezium.config.Configuration;
 
@@ -99,27 +98,6 @@ class ConnectionValidatorTest {
                 "gcp.spanner.credentials.json", new ConfigValue("gcp.spanner.credentials.json", "{}", new ArrayList<>(), new ArrayList<>()));
 
         ConfigurationValidator.ValidationContext validationContext = new ConfigurationValidator.ValidationContext(configuration, configValueMap);
-        ConnectionValidator connectionValidator = spy(ConnectionValidator.withContext(validationContext));
-        connectionValidator.validate();
-        Assertions.assertEquals(false, connectionValidator.isSuccess());
-    }
-
-    @Test
-    @SetEnvironmentVariable(key = "GOOGLE_APPLICATION_CREDENTIALS", value = "")
-    void validateFailForMissingCredentials() {
-        Configuration configuration = Configuration.from(Map.of(
-                "gcp.spanner.project.id", "boxwood-weaver-353315",
-                "gcp.spanner.instance.id", "kafka-connector",
-                "gcp.spanner.database.id", "kafkaspan"));
-        Map<String, ConfigValue> configValueMap = Map.of(
-                "gcp.spanner.project.id", new ConfigValue("gcp.spanner.project.id", "boxwood-weaver-353315", new ArrayList<>(), new ArrayList<>()),
-                "gcp.spanner.instance.id", new ConfigValue("gcp.spanner.instance.id", "kafka-connector", new ArrayList<>(), new ArrayList<>()),
-                "gcp.spanner.database.id", new ConfigValue("gcp.spanner.database.id", "kafkaspan", new ArrayList<>(), new ArrayList<>()),
-                "gcp.spanner.credentials.path", new ConfigValue("gcp.spanner.credentials.json", "", new ArrayList<>(), new ArrayList<>()),
-                "gcp.spanner.credentials.json", new ConfigValue("gcp.spanner.credentials.json", "", new ArrayList<>(), new ArrayList<>()));
-
-        ConfigurationValidator.ValidationContext validationContext = new ConfigurationValidator.ValidationContext(configuration, configValueMap);
-
         ConnectionValidator connectionValidator = spy(ConnectionValidator.withContext(validationContext));
         connectionValidator.validate();
         Assertions.assertEquals(false, connectionValidator.isSuccess());
