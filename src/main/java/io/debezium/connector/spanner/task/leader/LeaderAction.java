@@ -207,7 +207,11 @@ public class LeaderAction {
             foundDuplication = true;
 
         }
+        int numOldPartitions = taskSyncContextHolder.get().getNumPartitions();
+        int numSharedOldPartitions = taskSyncContextHolder.get().getNumSharedPartitions();
 
+        LOGGER.info("Task {} - before sending new epoch, total partitions {}, num partitions {}, num shared partitions {}", numOldPartitions + numSharedOldPartitions,
+                numOldPartitions, numSharedOldPartitions);
         TaskSyncContext taskSyncContext = taskSyncContextHolder.updateAndGet(oldContext -> {
             TaskState leaderState = oldContext.getCurrentTaskState();
 

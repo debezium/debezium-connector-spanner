@@ -102,7 +102,7 @@ public class LeaderService {
     public Map<String, String> awaitAllNewTaskStateUpdates(Set<String> consumers, long rebalanceGenerationId)
             throws InterruptedException {
         Map<String, String> consumerToTaskMap = new HashMap<>();
-        LOGGER.info("awaitAllNewTaskStateUpdates: wait taskSyncContextHolder for all new task updates");
+        LOGGER.info("awaitAllNewTaskStateUpdates: wait taskSyncContextHolder for all new task updates, minus leader task");
 
         TimeoutMeter timeoutMeter = TimeoutMeter.setTimeout(awaitTaskAnswerDuration);
 
