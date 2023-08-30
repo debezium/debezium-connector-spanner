@@ -61,7 +61,7 @@ public class SyncEventHandler {
             if (inSync != null) {
                 long inGeneration = inSync.getRebalanceGenerationId();
                 long currentGeneration = taskSyncContextHolder.get().getRebalanceGenerationId();
-                LOGGER.info("Task {}, skipFromMismatchingGeneration: currentGen: {}, inGen: {}, inTaskUid: {}, message type {}", taskSyncContextHolder.get().getTaskUid(),
+                LOGGER.debug("Task {}, skipFromMismatchingGeneration: currentGen: {}, inGen: {}, inTaskUid: {}, message type {}", taskSyncContextHolder.get().getTaskUid(),
                         currentGeneration, inGeneration,
                         inSync.getTaskUid(),
                         inSync.getMessageType());
@@ -216,7 +216,7 @@ public class SyncEventHandler {
         }
 
         if (skipFromMismatchingGeneration(inSync)) {
-            LOGGER.info("Task {}, skipping message from task {}, from prior generation {} and message type {} with current generation {}",
+            LOGGER.debug("Task {}, skipping message from task {}, from prior generation {} and message type {} with current generation {}",
                     taskSyncContextHolder.get().getTaskUid(), inSync.getTaskUid(), inSync.getRebalanceGenerationId(), inSync.getMessageType(),
                     taskSyncContextHolder.get().getRebalanceGenerationId());
             return;

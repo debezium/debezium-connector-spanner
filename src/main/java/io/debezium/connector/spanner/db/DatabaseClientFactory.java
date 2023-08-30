@@ -108,6 +108,9 @@ public class DatabaseClientFactory {
     }
 
     public DatabaseClient getDatabaseClient() {
+        if (spanner == null) {
+          return null;
+        }
         if (databaseClient != null) {
             return databaseClient;
         }
