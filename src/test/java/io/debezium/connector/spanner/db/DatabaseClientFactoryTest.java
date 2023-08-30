@@ -38,13 +38,13 @@ class DatabaseClientFactoryTest {
     @Test
     void testGetGoogleCredentials() {
         assertNull(new DatabaseClientFactory("myproject", "42", "42", "Credentials Json",
-                "Credentials Path", null, "test-role")
+                "Credentials Path", null, null, "test-role")
                 .getGoogleCredentials("Credentials Json", "Credentials Path"));
         assertNull(new DatabaseClientFactory("myproject", "42", "42", "Credentials Json",
-                "Credentials Path", null, "test-role")
+                "Credentials Path", null, null, "test-role")
                 .getGoogleCredentials(null, null));
         assertNull(new DatabaseClientFactory("myproject", "42", "42", "Credentials Json",
-                "Credentials Path", null, "test-role")
+                "Credentials Path", null, null, "test-role")
                 .getGoogleCredentials(null, "Credentials Path"));
 
     }
@@ -52,7 +52,7 @@ class DatabaseClientFactoryTest {
     @Test
     void testGetDatabaseClient() {
         DatabaseClientFactory databaseClientFactory = new DatabaseClientFactory("myproject", "42",
-                "42", "Credentials Json", "Credentials Path", null, "test-role");
+                "42", "Credentials Json", "Credentials Path", null, null, "test-role");
 
         DatabaseClient actualDatabaseClient = databaseClientFactory.getDatabaseClient();
         assertNotNull(actualDatabaseClient);

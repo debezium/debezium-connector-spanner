@@ -22,6 +22,7 @@
         <version.joda>2.10.14</version.joda>
         <version.commons-lang3>3.12.0</version.commons-lang3>
         <version.junit>5.8.2</version.junit>
+        <version.junitPioneer>1.6.1</version.junitPioneer>
         <version.mockito>4.6.1</version.mockito>
         <version.testcontainers>1.17.3</version.testcontainers>
         <version.assertj>3.23.1</version.assertj>
@@ -184,6 +185,11 @@
                 <version>${version.junit}</version>
             </dependency>
             <dependency>
+                <groupId>org.junit-pioneer</groupId>
+                <artifactId>junit-pioneer</artifactId>
+                <version>${version.junitPioneer}</version>
+            </dependency>
+            <dependency>
                 <groupId>org.junit.jupiter</groupId>
                 <artifactId>junit-jupiter-engine</artifactId>
                 <version>${version.junit}</version>
@@ -297,6 +303,12 @@
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter-engine</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.junit-pioneer</groupId>
+            <artifactId>junit-pioneer</artifactId>
+            <version>${version.junitPioneer}</version>
             <scope>test</scope>
         </dependency>
         <dependency>

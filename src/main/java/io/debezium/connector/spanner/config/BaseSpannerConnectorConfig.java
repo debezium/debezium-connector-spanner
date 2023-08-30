@@ -41,6 +41,7 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
     protected static final String GCP_SPANNER_INSTANCE_ID_PROPERTY_NAME = "gcp.spanner.instance.id";
     protected static final String GCP_SPANNER_DATABASE_ID_PROPERTY_NAME = "gcp.spanner.database.id";
     protected static final String GCP_SPANNER_HOST_PROPERTY_NAME = "gcp.spanner.host";
+    protected static final String GCP_SPANNER_EMULATOR_HOST_PROPERTY_NAME = "gcp.spanner.emulator.host";
     protected static final String GCP_SPANNER_CHANGE_STREAM_PROPERTY_NAME = "gcp.spanner.change.stream";
     protected static final String START_TIME_PROPERTY_NAME = "gcp.spanner.start.time";
     protected static final String END_TIME_PROPERTY_NAME = "gcp.spanner.end.time";
@@ -175,6 +176,14 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
             .withWidth(Width.SHORT)
             .withImportance(Importance.LOW)
             .withDescription("Spanner host");
+
+    public static final Field SPANNER_EMULATOR_HOST = Field.create(GCP_SPANNER_EMULATOR_HOST_PROPERTY_NAME)
+            .withDisplayName("SpannerEmulatorHost")
+            .withType(Type.STRING)
+            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR, 7))
+            .withWidth(Width.MEDIUM)
+            .withImportance(Importance.LOW)
+            .withDescription("Spanner emulator host");
 
     public static final Field SPANNER_CREDENTIALS_PATH = Field.create(GCP_SPANNER_CREDENTIALS_PATH_PROPERTY_NAME)
             .withDisplayName(GCP_SPANNER_CREDENTIALS_PATH_PROPERTY_NAME)
@@ -587,6 +596,7 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
                     SPANNER_CREDENTIALS_PATH,
                     SPANNER_CREDENTIALS_JSON,
                     SPANNER_HOST,
+                    SPANNER_EMULATOR_HOST,
                     STREAM_EVENT_QUEUE_CAPACITY,
                     TASK_STATE_CHANGE_EVENT_QUEUE_CAPACITY,
                     VALUE_CAPTURE_MODE,
