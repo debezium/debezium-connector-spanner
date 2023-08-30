@@ -134,7 +134,8 @@ public class TaskSyncEventListener {
                                     // Restart the stopwatch.
                                     LOGGER.info("Task {}, still polling the sync topic", consumerGroup);
                                     sw = Stopwatch.accumulating().start();
-                                } else {
+                                }
+                                else {
                                     // Resume the existing stop watch, we haven't met the criteria yet.
                                     sw.start();
                                 }
