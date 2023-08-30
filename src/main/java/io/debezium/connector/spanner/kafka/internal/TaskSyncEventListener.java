@@ -28,6 +28,7 @@ import io.debezium.connector.spanner.kafka.event.proto.SyncEventProtos;
 import io.debezium.connector.spanner.kafka.internal.model.SyncEventMetadata;
 import io.debezium.connector.spanner.kafka.internal.model.TaskSyncEvent;
 import io.debezium.connector.spanner.kafka.internal.proto.SyncEventFromProtoMapper;
+import io.debezium.util.Stopwatch;
 
 /** Consumes messages from the Sync Topic */
 public class TaskSyncEventListener {
@@ -41,6 +42,7 @@ public class TaskSyncEventListener {
     private final SyncEventConsumerFactory<String, byte[]> consumerFactory;
     private final List<BlockingBiConsumer<TaskSyncEvent, SyncEventMetadata>> eventConsumers = new ArrayList<>();
     private final java.util.function.Consumer<RuntimeException> errorHandler;
+    private final Duration pollInterval = Duration.ofMillis(300000);
 
     private volatile Thread thread;
 
@@ -124,8 +126,15 @@ public class TaskSyncEventListener {
                     try {
                         long commitOffsetStart = System.currentTimeMillis();
                         LOGGER.info("Task {}, beginning to poll the sync topic", consumerGroup);
+                        Stopwatch sw = Stopwatch.accumulating().start();
                         while (!Thread.currentThread().isInterrupted()) {
                             try {
+                                final Duration totalDuration = sw.stop().durations().statistics().getTotal();
+                                if (totalDuration.toMillis() >= pollInterval.toMillis()) {
+                                    // Restart the stopwatch.
+                                    LOGGER.info("Task {}, still polling the sync topic", consumerGroup);
+                                    sw = Stopwatch.accumulating().start();
+                                }
                                 poll(consumer, endOffset);
                                 if (!consumerFactory.isAutoCommitEnabled()
                                         && commitOffsetStart + commitOffsetsInterval < System.currentTimeMillis()) {

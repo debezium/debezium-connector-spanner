@@ -162,13 +162,6 @@ public class SyncEventHandler {
         taskSyncContextHolder.lock();
 
         try {
-
-            boolean start_initial_sync = taskSyncContextHolder.get().getRebalanceState() == RebalanceState.START_INITIAL_SYNC;
-
-            if (!start_initial_sync && !taskSyncContextHolder.get().getRebalanceState().equals(RebalanceState.NEW_EPOCH_STARTED)) {
-                return;
-            }
-
             LOGGER.debug("Task {} - process sync event", taskSyncContextHolder.get().getTaskUid());
 
             taskSyncContextHolder.update(context -> SyncEventMerger.mergeIncrementalTaskSyncEvent(context, inSync));
@@ -205,15 +198,13 @@ public class SyncEventHandler {
             long inGeneration = inSync.getRebalanceGenerationId();
             long currentGeneration = taskSyncContextHolder.get().getRebalanceGenerationId();
 
-            if ((inSync.getMessageType() == MessageTypeEnum.REGULAR || inSync.getMessageType() == MessageTypeEnum.REBALANCE_ANSWER) &&
-                    inGeneration != currentGeneration) {
-                return true;
-            }
+            // For REGULAR type messages, we filter them out in SyncEventMerger if the preexisting
+            // task states map does not contain them, and if the state timestamp is not greater.
 
-            if ((inSync.getMessageType() == MessageTypeEnum.NEW_EPOCH
-                    || inSync.getMessageType() == MessageTypeEnum.UPDATE_EPOCH) &&
-                    inGeneration < currentGeneration) {
-                return true;
+            if (inSync.getMessageType() == MessageTypeEnum.REBALANCE_ANSWER ||
+                    inSync.getMessageType() == MessageTypeEnum.NEW_EPOCH
+                    || inSync.getMessageType() == MessageTypeEnum.UPDATE_EPOCH) {
+                return inGeneration < currentGeneration;
             }
         }
         return false;
@@ -225,6 +216,9 @@ public class SyncEventHandler {
         }
 
         if (skipFromMismatchingGeneration(inSync)) {
+            LOGGER.info("Task {}, skipping message from task {}, from prior generation {} and message type {} with current generation {}",
+                    taskSyncContextHolder.get().getTaskUid(), inSync.getTaskUid(), inSync.getRebalanceGenerationId(), inSync.getMessageType(),
+                    taskSyncContextHolder.get().getRebalanceGenerationId());
             return;
         }
 

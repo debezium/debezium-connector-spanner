@@ -91,13 +91,14 @@ public class RebalanceHandler {
 
         LoggerUtils.debug(LOGGER, "processRebalancingEvent: send: {}", taskSyncEvent);
         LOGGER.info("Task {} - RebalanceHandler sent sync event for consumer ID {} and rebalance generation ID {}", taskSyncEvent.getTaskUid(), consumerId,
-                rebalanceGenerationId);
+                taskSyncContextHolder.get().getRebalanceGenerationId());
 
         taskSyncPublisher.send(taskSyncEvent);
 
         LOGGER.info(
                 "processRebalancingEvent: Task {} rebalance answer has been sent for consumer ID {} and rebalance generation ID {}, num partitions {} num shared partitions {}",
-                taskSyncContextHolder.get().getTaskUid(), consumerId, rebalanceGenerationId, taskSyncContextHolder.get().getNumPartitions(),
+                taskSyncContextHolder.get().getTaskUid(), consumerId, taskSyncContextHolder.get().getRebalanceGenerationId(),
+                taskSyncContextHolder.get().getNumPartitions(),
                 taskSyncContextHolder.get().getNumSharedPartitions());
         if (isLeader) {
             LOGGER.info("Task {} is leader", context.getTaskUid());

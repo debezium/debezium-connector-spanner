@@ -54,7 +54,12 @@ public class SyncEventMerger {
         // We only retrieve the task state belonging to the rebalance answer.
         TaskState currentTask = currentContext.getTaskStates().get(newMessage.getTaskUid());
 
-        if (currentTask == null || newTask.getStateTimestamp() > currentTask.getStateTimestamp()) {
+        if (currentTask == null) {
+            LOGGER.warn("Task {}, The task's UID: {} not contained in current task states map", currentContext.getTaskUid(), newMessage.getTaskUid());
+            return builder.build();
+        }
+
+        if (newTask.getStateTimestamp() > currentTask.getStateTimestamp()) {
             Map<String, TaskState> taskStates = new HashMap<>(currentContext.getTaskStates());
             // Remove the task state from the map.
             taskStates.remove(newMessage.getTaskUid());
