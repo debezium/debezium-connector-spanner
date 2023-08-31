@@ -31,7 +31,8 @@ public class ClearSharedPartitionOperation implements Operation {
         TaskState currentTaskState = taskSyncContext.getCurrentTaskState();
 
         // Retrieve the tokens that are owned by other tasks.
-        Set<String> otherTokens = taskSyncContext.getTaskStates().values().stream().flatMap(taskState -> taskState.getPartitions().stream()).map(PartitionState::getToken)
+        Set<String> otherTokens = taskSyncContext.getAllTaskStates().values().stream().flatMap(taskState -> taskState.getPartitions().stream())
+                .map(PartitionState::getToken)
                 .collect(Collectors.toSet());
 
         // Retrieve the tokens that are shared by other tasks.
