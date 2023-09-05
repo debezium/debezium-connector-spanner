@@ -155,7 +155,7 @@ public class SynchronizationTaskContext {
         final LowWatermarkCalculator lowWatermarkCalculator = new LowWatermarkCalculator(connectorConfig, taskSyncContextHolder, partitionOffsetProvider);
 
         this.lowWatermarkCalculationJob = new LowWatermarkCalculationJob(connectorConfig, this::onError, lowWatermarkCalculator,
-                lowWatermarkHolder);
+                lowWatermarkHolder, task.getTaskUid());
 
         this.taskStateChangeEventProcessor = new TaskStateChangeEventProcessor(connectorConfig.taskStateChangeEventQueueCapacity(),
                 taskSyncContextHolder, taskStateChangeEventHandler, this::onError, metricsEventPublisher);

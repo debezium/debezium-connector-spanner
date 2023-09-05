@@ -230,6 +230,7 @@ public class TaskSyncEventListener {
 
         long previousEpochOffset = taskSyncEvent.getEpochOffset();
         long startOffset = Math.max(previousEpochOffset, beginOffset);
+        LOGGER.info("Task {}, listen: found previous epoch offset {} and begin offset {}", consumerGroup, previousEpochOffset, beginOffset);
 
         LOGGER.info("Task {}, listen: seek back to previous epoch offset: {}", consumerGroup, startOffset);
         consumer.seek(topicPartition, startOffset);

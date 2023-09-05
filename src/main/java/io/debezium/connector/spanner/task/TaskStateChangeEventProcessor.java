@@ -76,8 +76,8 @@ public class TaskStateChangeEventProcessor {
 
                 taskSyncContextHolder.awaitNewEpoch();
 
-                this.taskSyncContextHolder.lock();
                 try {
+                    this.taskSyncContextHolder.lock();
                     this.taskStateChangeEventHandler.processEvent(event);
                 }
                 catch (InterruptedException e) {

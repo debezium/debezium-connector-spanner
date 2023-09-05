@@ -42,11 +42,13 @@ public class LowWatermarkCalculationJob {
     private final Lock lock = new ReentrantLock();
 
     private final Condition signal = lock.newCondition();
+    private final String taskUid;
 
     public LowWatermarkCalculationJob(SpannerConnectorConfig connectorConfig,
                                       Consumer<Throwable> errorHandler,
                                       LowWatermarkCalculator lowWatermarkCalculator,
-                                      LowWatermarkHolder lowWatermarkHolder) {
+                                      LowWatermarkHolder lowWatermarkHolder,
+                                      String taskUid) {
         this.errorHandler = errorHandler;
 
         this.lowWatermarkCalculator = lowWatermarkCalculator;
@@ -55,6 +57,7 @@ public class LowWatermarkCalculationJob {
 
         this.enabled = connectorConfig.isLowWatermarkEnabled();
         this.period = connectorConfig.getLowWatermarkUpdatePeriodMs();
+        this.taskUid = taskUid;
     }
 
     private Thread createMainThread() {
@@ -75,13 +78,17 @@ public class LowWatermarkCalculationJob {
 
                 }
                 catch (InterruptedException e) {
+                    LOGGER.info("Task {}, Interrupted low watermark calculation main thread", taskUid);
                     Thread.currentThread().interrupt();
                     return;
                 }
             }
         }, "SpannerConnector-WatermarkCalculationJob");
 
-        thread.setUncaughtExceptionHandler((t, e) -> errorHandler.accept(e));
+        thread.setUncaughtExceptionHandler((t, e) -> {
+            LOGGER.error("Task {}, caught exception during low watermark calculation {}", taskUid, e);
+            errorHandler.accept(e);
+        });
 
         return thread;
     }
@@ -101,6 +108,7 @@ public class LowWatermarkCalculationJob {
                             // Restart the stopwatch.
                             printOffsets = true;
                             sw = Stopwatch.accumulating().start();
+                            LOGGER.info("Task {}, still calculating low watermark", taskUid);
                         }
                         else {
                             // Resume the existing stop watch, we haven't met the criteria yet.
@@ -115,12 +123,16 @@ public class LowWatermarkCalculationJob {
                 }
                 catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
+                    LOGGER.info("Task {}, interrupted low watermark calculation", taskUid);
                     return;
                 }
             }
         }, "SpannerConnector-WatermarkCalculationJob-Calculation");
 
-        thread.setUncaughtExceptionHandler((t, e) -> errorHandler.accept(e));
+        thread.setUncaughtExceptionHandler((t, e) -> {
+            LOGGER.error("Task {}, caught exception during low watermark calculation {}", taskUid, e);
+            errorHandler.accept(e);
+        });
 
         return thread;
     }
@@ -150,6 +162,7 @@ public class LowWatermarkCalculationJob {
         if (!enabled) {
             return;
         }
+        LOGGER.info("Task {}, Started low watermark calculation", taskUid);
 
         calculationThread = createCalculationThread();
         calculationThread.start();
