@@ -87,9 +87,9 @@ public class ConnectionValidator implements ConfigurationValidator.Validator {
         // Skip checks for credentials against Emulator.
         return context.getErrors(PROJECT_ID).isEmpty() &&
                 context.getErrors(INSTANCE_ID).isEmpty() &&
-                context.getErrors(DATABASE_ID).isEmpty() && (!isAgainstEmulator &&
-                        context.getErrors(SPANNER_CREDENTIALS_JSON).isEmpty() &&
-                        context.getErrors(SPANNER_CREDENTIALS_PATH).isEmpty());
+                context.getErrors(DATABASE_ID).isEmpty() && (isAgainstEmulator ||
+                        (context.getErrors(SPANNER_CREDENTIALS_JSON).isEmpty() &&
+                                context.getErrors(SPANNER_CREDENTIALS_PATH).isEmpty()));
     }
 
 }

@@ -29,7 +29,7 @@ class ConnectionValidatorTest {
                 "gcp.spanner.project.id", new ConfigValue("gcp.spanner.project.id", "boxwood-weaver-353315", new ArrayList<>(), new ArrayList<>()),
                 "gcp.spanner.instance.id", new ConfigValue("gcp.spanner.instance.id", "kafka-connector", new ArrayList<>(), new ArrayList<>()),
                 "gcp.spanner.database.id", new ConfigValue("gcp.spanner.database.id", "kafkaspan", new ArrayList<>(), new ArrayList<>()),
-                "gcp.spanner.credentials.path", new ConfigValue("gcp.spanner.credentials.json", "{}", new ArrayList<>(), new ArrayList<>()),
+                "gcp.spanner.credentials.path", new ConfigValue("gcp.spanner.credentials.path", "no_path", new ArrayList<>(), new ArrayList<>()),
                 "gcp.spanner.credentials.json", new ConfigValue("gcp.spanner.credentials.json", "{}", new ArrayList<>(), new ArrayList<>()));
 
         ConfigurationValidator.ValidationContext validationContext = new ConfigurationValidator.ValidationContext(configuration, configValueMap);
@@ -56,7 +56,7 @@ class ConnectionValidatorTest {
 
         ConnectionValidator connectionValidator = spy(ConnectionValidator.withContext(validationContext));
         connectionValidator.validate();
-        Assertions.assertEquals(false, connectionValidator.isSuccess());
+        Assertions.assertEquals(true, connectionValidator.isSuccess());
     }
 
     @Test
@@ -87,15 +87,14 @@ class ConnectionValidatorTest {
     @Test
     void validateFailForMissingProperties() {
         Configuration configuration = Configuration.from(Map.of(
-                "gcp.spanner.credentials.path", "no_path",
                 "gcp.spanner.database.id", "kafkaspan"));
         List<String> errMessages = List.of("missing required property");
         Map<String, ConfigValue> configValueMap = Map.of(
-                "gcp.spanner.project.id", new ConfigValue("gcp.spanner.project.id", "boxwood-weaver-353315", new ArrayList<>(), errMessages),
-                "gcp.spanner.instance.id", new ConfigValue("gcp.spanner.instance.id", "kafka-connector", new ArrayList<>(), errMessages),
-                "gcp.spanner.database.id", new ConfigValue("gcp.spanner.database.id", "kafkaspan", new ArrayList<>(), new ArrayList<>()),
-                "gcp.spanner.credentials.path", new ConfigValue("gcp.spanner.credentials.path", "no_path", new ArrayList<>(), new ArrayList<>()),
-                "gcp.spanner.credentials.json", new ConfigValue("gcp.spanner.credentials.json", "{}", new ArrayList<>(), new ArrayList<>()));
+                "gcp.spanner.project.id", new ConfigValue("gcp.spanner.project.id", "", new ArrayList<>(), errMessages),
+                "gcp.spanner.instance.id", new ConfigValue("gcp.spanner.instance.id", "", new ArrayList<>(), errMessages),
+                "gcp.spanner.database.id", new ConfigValue("gcp.spanner.database.id", "", new ArrayList<>(), new ArrayList<>()),
+                "gcp.spanner.credentials.path", new ConfigValue("gcp.spanner.credentials.path", "", new ArrayList<>(), new ArrayList<>()),
+                "gcp.spanner.credentials.json", new ConfigValue("gcp.spanner.credentials.json", "", new ArrayList<>(), new ArrayList<>()));
 
         ConfigurationValidator.ValidationContext validationContext = new ConfigurationValidator.ValidationContext(configuration, configValueMap);
         ConnectionValidator connectionValidator = spy(ConnectionValidator.withContext(validationContext));
