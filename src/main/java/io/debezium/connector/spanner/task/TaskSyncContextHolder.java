@@ -51,6 +51,26 @@ public class TaskSyncContextHolder {
         return taskSyncContextRef.get();
     }
 
+    public boolean isLocked() {
+        return lock.isLocked();
+    }
+
+    public boolean isLockedByCurrentThread() {
+        return lock.isHeldByCurrentThread();
+    }
+
+    public String lockDebugString() {
+        return lock.toString();
+    }
+
+    public int getQueueLength() {
+        return lock.getQueueLength();
+    }
+
+    public int getHoldCount() {
+        return lock.getHoldCount();
+    }
+
     public void update(UnaryOperator<TaskSyncContext> updateFunction) {
         this.updateAndGet(updateFunction);
     }

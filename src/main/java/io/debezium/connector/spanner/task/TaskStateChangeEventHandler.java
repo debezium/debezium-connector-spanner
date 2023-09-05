@@ -153,10 +153,6 @@ public class TaskStateChangeEventHandler {
     private TaskSyncContext performOperation(Operation... operations) throws InterruptedException {
         AtomicBoolean publishTaskSyncEvent = new AtomicBoolean(false);
 
-        taskSyncContextHolder.lock();
-
-        TaskSyncContext taskSyncContext;
-
         long totalPartitions = taskSyncContextHolder.get().getNumPartitions() + taskSyncContextHolder.get().getNumSharedPartitions();
 
         String operationClassNames = "";
@@ -164,24 +160,18 @@ public class TaskStateChangeEventHandler {
             operationClassNames += operation.getClass().getSimpleName() + ",";
 
         }
-
-        try {
-            taskSyncContext = taskSyncContextHolder.updateAndGet(context -> {
-                TaskSyncContext newContext = context;
-                for (Operation operation : operations) {
-                    newContext = operation.doOperation(newContext);
-                    if (operation.isRequiredPublishSyncEvent()) {
-                        LOGGER.debug("Task {} - need to publish sync event for operation {}",
-                                taskSyncContextHolder.get().getTaskUid(), operation.getClass().getSimpleName());
-                        publishTaskSyncEvent.set(true);
-                    }
+        TaskSyncContext taskSyncContext = taskSyncContextHolder.updateAndGet(context -> {
+            TaskSyncContext newContext = context;
+            for (Operation operation : operations) {
+                newContext = operation.doOperation(newContext);
+                if (operation.isRequiredPublishSyncEvent()) {
+                    LOGGER.debug("Task {} - need to publish sync event for operation {}",
+                            taskSyncContextHolder.get().getTaskUid(), operation.getClass().getSimpleName());
+                    publishTaskSyncEvent.set(true);
                 }
-                return newContext;
-            });
-        }
-        finally {
-            taskSyncContextHolder.unlock();
-        }
+            }
+            return newContext;
+        });
 
         if (publishTaskSyncEvent.get()) {
             TaskSyncEvent incrementalEvent = taskSyncContext.buildCurrentTaskSyncEvent();
