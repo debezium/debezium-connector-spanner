@@ -51,24 +51,9 @@ public class TaskSyncContextHolder {
         return taskSyncContextRef.get();
     }
 
-    public boolean isLocked() {
-        return lock.isLocked();
-    }
-
-    public boolean isLockedByCurrentThread() {
-        return lock.isHeldByCurrentThread();
-    }
-
     public String lockDebugString() {
-        return lock.toString();
-    }
-
-    public int getQueueLength() {
-        return lock.getQueueLength();
-    }
-
-    public int getHoldCount() {
-        return lock.getHoldCount();
+        return "Lock Debug String {is locked: " + lock.isLocked() + ", isLockedByCurrentThread: " + lock.isHeldByCurrentThread() + ", lock debug string: "
+                + lock.toString();
     }
 
     public void update(UnaryOperator<TaskSyncContext> updateFunction) {
@@ -76,16 +61,13 @@ public class TaskSyncContextHolder {
     }
 
     public TaskSyncContext updateAndGet(UnaryOperator<TaskSyncContext> updateFunction) {
-        boolean needToLock = !lock.isHeldByCurrentThread();
-        if (needToLock) {
-            lock.lock();
-        }
         TaskSyncContext taskSyncContext;
         try {
+            lock.lock();
             taskSyncContext = taskSyncContextRef.updateAndGet(updateFunction);
         }
         finally {
-            if (needToLock) {
+            if (lock.isHeldByCurrentThread()) {
                 lock.unlock();
             }
         }
@@ -100,7 +82,9 @@ public class TaskSyncContextHolder {
     }
 
     public void unlock() {
-        lock.unlock();
+        if (lock.isHeldByCurrentThread()) {
+            lock.unlock();
+        }
     }
 
     public void awaitInitialization(Duration awaitTimeout) {
