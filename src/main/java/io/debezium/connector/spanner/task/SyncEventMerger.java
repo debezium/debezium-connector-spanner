@@ -92,6 +92,10 @@ public class SyncEventMerger {
 
         var builder = currentContext.toBuilder();
 
+        if (!currentContext.isLeader() || !currentContext.getRebalanceState().equals(RebalanceState.INITIAL_INCREMENTED_STATE_COMPLETED)) {
+            return builder.build();
+        }
+
         TaskState newTask = newMessage.getTaskStates().get(newMessage.getTaskUid());
         if (newTask == null) {
             LOGGER.warn("The rebalance answer {} did not contain the task's UID: {}", newMessage, newMessage.getTaskUid());
@@ -142,6 +146,13 @@ public class SyncEventMerger {
         debug(LOGGER, "merge: state before {}, \nIncoming states: {}", currentContext, newTaskStatesMap);
 
         var builder = currentContext.toBuilder();
+        // do not merge if not starting initial sync / not new epoch started.
+        boolean start_initial_sync = currentContext.getRebalanceState() == RebalanceState.START_INITIAL_SYNC;
+
+        if (!start_initial_sync && !currentContext.getRebalanceState().equals(RebalanceState.NEW_EPOCH_STARTED)) {
+            return builder.build();
+        }
+
         // If the current task is the leader, there is no need to merge the epoch update.
         if (newMessage.getTaskUid().equals(currentContext.getTaskUid())) {
             return builder.build();

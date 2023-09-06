@@ -138,17 +138,20 @@ public class TaskSyncEventListener {
                                 else {
                                     sw.start();
                                 }
+                                LOGGER.info("Task {}, debug polling the sync topic", consumerGroup);
                                 poll(consumer, endOffset);
+                                LOGGER.info("Task {}, done debug polling the sync topic", consumerGroup);
                                 if (!consumerFactory.isAutoCommitEnabled()
                                         && commitOffsetStart + commitOffsetsInterval < System.currentTimeMillis()) {
 
                                     consumer.commitSync(commitOffsetsTimeout);
                                     commitOffsetStart = System.currentTimeMillis();
                                 }
+                                LOGGER.info("Task {}, done committing offset to the sync topic", consumerGroup);
                             }
                             catch (org.apache.kafka.common.errors.InterruptException
                                     | InterruptedException ex) {
-                                LOGGER.info("TaskSyncEventListener, caught interrupt exception {}, {}", consumerGroup, ex);
+                                LOGGER.error("TaskSyncEventListener, caught interrupt exception {}, {}", consumerGroup, ex);
                                 return;
                             }
                             catch (Exception e) {
