@@ -116,82 +116,62 @@ public class SyncEventHandler {
     }
 
     public void processNewEpoch(TaskSyncEvent inSync, SyncEventMetadata metadata) throws InterruptedException, IllegalStateException {
-        taskSyncContextHolder.lock();
-        try {
+        LOGGER.info(
+                "Task {} - processNewEpoch {}: metadata {}, rebalanceId: {}, current task {}, taskSyncContextHOlder lock debug string {}",
+                taskSyncContextHolder.get().getTaskUid(),
+                inSync,
+                taskSyncContextHolder.get(),
+                metadata,
+                inSync.getRebalanceGenerationId(),
+                taskSyncContextHolder.lockDebugString());
 
-            LOGGER.info("Task {} - processNewEpoch {}: metadata {}, rebalanceId: {}, current task {}",
-                    taskSyncContextHolder.get().getTaskUid(),
-                    inSync,
-                    taskSyncContextHolder.get(),
-                    metadata,
-                    inSync.getRebalanceGenerationId());
+        TaskSyncContext newContext = taskSyncContextHolder.updateAndGet(context -> SyncEventMerger.mergeNewEpoch(context, inSync));
 
-            taskSyncContextHolder.update(context -> SyncEventMerger.mergeNewEpoch(context, inSync));
+        LOGGER.info("Task {} - SyncEventHandler sending response for new epoch",
+                taskSyncContextHolder.get().getTaskUid());
 
-            LOGGER.info("Task {} - SyncEventHandler sent response for new epoch",
-                    taskSyncContextHolder.get().getTaskUid());
-
-            taskSyncPublisher.send(taskSyncContextHolder.get().buildCurrentTaskSyncEvent());
-        }
-        finally {
-            taskSyncContextHolder.unlock();
-        }
+        taskSyncPublisher.send(newContext.buildCurrentTaskSyncEvent());
+        LOGGER.info("Task {} - SyncEventHandler sent response for new epoch",
+                taskSyncContextHolder.get().getTaskUid());
 
     }
 
     public void processUpdateEpoch(TaskSyncEvent inSync, SyncEventMetadata metadata) throws InterruptedException {
-        taskSyncContextHolder.lock();
-        try {
-            boolean start_initial_sync = taskSyncContextHolder.get().getRebalanceState() == RebalanceState.START_INITIAL_SYNC;
+        LOGGER.info("Task {} - process epoch update with lock debug string {}",
+                taskSyncContextHolder.get().getTaskUid(), taskSyncContextHolder.lockDebugString());
 
-            if (!start_initial_sync && !taskSyncContextHolder.get().getRebalanceState().equals(RebalanceState.NEW_EPOCH_STARTED)) {
-                return;
-            }
+        LOGGER.info("Task {} - SyncEventHandler updating from update epoch",
+                taskSyncContextHolder.get().getTaskUid());
+        taskSyncContextHolder.update(context -> SyncEventMerger.mergeEpochUpdate(context, inSync));
 
-            LOGGER.info("Task {} - process epoch update", taskSyncContextHolder.get().getTaskUid());
+        LOGGER.info("Task {} - SyncEventHandler updated from update epoch",
+                taskSyncContextHolder.get().getTaskUid());
 
-            taskSyncContextHolder.update(context -> SyncEventMerger.mergeEpochUpdate(context, inSync));
-
-            eventConsumer.accept(new SyncEvent());
-        }
-        finally {
-            taskSyncContextHolder.unlock();
-        }
+        eventConsumer.accept(new SyncEvent());
     }
 
     public void processRegularMessage(TaskSyncEvent inSync, SyncEventMetadata metadata) throws InterruptedException {
-        taskSyncContextHolder.lock();
+        LOGGER.debug("Task {} - process sync event with lock debug string {}", taskSyncContextHolder.get().getTaskUid(),
+                taskSyncContextHolder.lockDebugString());
 
-        try {
-            LOGGER.debug("Task {} - process sync event", taskSyncContextHolder.get().getTaskUid());
+        taskSyncContextHolder.update(context -> SyncEventMerger.mergeIncrementalTaskSyncEvent(context, inSync));
 
-            taskSyncContextHolder.update(context -> SyncEventMerger.mergeIncrementalTaskSyncEvent(context, inSync));
+        eventConsumer.accept(new SyncEvent());
 
-            eventConsumer.accept(new SyncEvent());
-
-        }
-        finally {
-            taskSyncContextHolder.unlock();
-        }
     }
 
     public void processRebalanceAnswer(TaskSyncEvent inSync, SyncEventMetadata metadata) {
-        taskSyncContextHolder.lock();
 
-        try {
+        LOGGER.info("Task {} - process sync event - rebalance answer with lock debug string {}",
+                taskSyncContextHolder.get().getTaskUid(),
+                taskSyncContextHolder.lockDebugString());
 
-            if (!taskSyncContextHolder.get().isLeader() || !taskSyncContextHolder.get().getRebalanceState().equals(RebalanceState.INITIAL_INCREMENTED_STATE_COMPLETED)) {
-                return;
-            }
+        taskSyncContextHolder.update(context -> SyncEventMerger.mergeRebalanceAnswer(context, inSync));
 
-            LOGGER.info("Task {} - process sync event - rebalance answer", taskSyncContextHolder.get().getTaskUid());
+        LOGGER.info("Task {} - process sync event - updated from rebalance answer with lock debug string {}",
+                taskSyncContextHolder.get().getTaskUid(),
+                taskSyncContextHolder.lockDebugString());
 
-            taskSyncContextHolder.update(context -> SyncEventMerger.mergeRebalanceAnswer(context, inSync));
-
-        }
-        finally {
-            taskSyncContextHolder.unlock();
-        }
     }
 
     private boolean skipFromMismatchingGeneration(TaskSyncEvent inSync) {

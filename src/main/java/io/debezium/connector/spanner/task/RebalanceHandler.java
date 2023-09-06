@@ -39,13 +39,12 @@ public class RebalanceHandler {
         this.lowWatermarkStampPublisher = lowWatermarkStampPublisher;
     }
 
-    public synchronized void process(boolean isLeader, String consumerId, long rebalanceGenerationId) throws InterruptedException {
+    public void process(boolean isLeader, String consumerId, long rebalanceGenerationId) throws InterruptedException {
         LOGGER.info(
-                "processRebalancingEvent: start, consumerId: {}, taskId{}, rebalanceGenerationId: {}, isLeader {}, lock debug info {}, lock queue length {}, lock hold count {}, is locked {}, is locked by current thread {}",
+                "processRebalancingEvent: start, consumerId: {}, taskId{}, rebalanceGenerationId: {}, isLeader {}, lock debug info {}",
                 consumerId,
                 taskSyncContextHolder.get().getTaskUid(),
-                rebalanceGenerationId, isLeader, taskSyncContextHolder.lockDebugString(), taskSyncContextHolder.getQueueLength(),
-                taskSyncContextHolder.getHoldCount(), taskSyncContextHolder.isLocked(), taskSyncContextHolder.isLockedByCurrentThread());
+                rebalanceGenerationId, isLeader, taskSyncContextHolder.lockDebugString());
 
         TaskSyncContext context = taskSyncContextHolder.updateAndGet(oldContext -> {
             if (rebalanceGenerationId < taskSyncContextHolder.get().getRebalanceGenerationId()) {
@@ -125,7 +124,7 @@ public class RebalanceHandler {
         this.lowWatermarkStampPublisher.init();
     }
 
-    public synchronized void destroy() {
+    public void destroy() {
         this.leaderAction.stop();
         LOGGER.info("Task {}, destroyed leader action ", taskSyncContextHolder.get().getTaskUid());
 

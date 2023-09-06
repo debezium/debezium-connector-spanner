@@ -75,7 +75,6 @@ public class LeaderAction {
         this.taskSyncPublisher = taskSyncPublisher;
         this.errorHandler = errorHandler;
         this.clock = Clock.system();
-
     }
 
     private Thread createLeaderThread() {
@@ -148,7 +147,7 @@ public class LeaderAction {
         this.leaderThread.start();
     }
 
-    public synchronized void stop() {
+    public void stop() {
         if (this.leaderThread == null) {
             return;
         }

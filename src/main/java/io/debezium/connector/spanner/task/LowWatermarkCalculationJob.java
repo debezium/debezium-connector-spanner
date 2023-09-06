@@ -9,7 +9,6 @@ import static org.slf4j.LoggerFactory.getLogger;
 
 import java.time.Duration;
 import java.util.concurrent.locks.Condition;
-import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
 
@@ -39,7 +38,7 @@ public class LowWatermarkCalculationJob {
 
     private final LowWatermarkHolder lowWatermarkHolder;
 
-    private final Lock lock = new ReentrantLock();
+    private final ReentrantLock lock = new ReentrantLock();
 
     private final Condition signal = lock.newCondition();
     private final String taskUid;
@@ -68,12 +67,7 @@ public class LowWatermarkCalculationJob {
                     Thread.sleep(period);
 
                     if (lock.tryLock()) {
-                        try {
-                            signal.signal();
-                        }
-                        finally {
-                            lock.unlock();
-                        }
+                        signal.signal();
                     }
 
                 }
@@ -81,6 +75,11 @@ public class LowWatermarkCalculationJob {
                     LOGGER.info("Task {}, Interrupted low watermark calculation main thread", taskUid);
                     Thread.currentThread().interrupt();
                     return;
+                }
+                finally {
+                    if (lock.isHeldByCurrentThread()) {
+                        lock.unlock();
+                    }
                 }
             }
         }, "SpannerConnector-WatermarkCalculationJob");
@@ -99,32 +98,31 @@ public class LowWatermarkCalculationJob {
             while (true) {
                 try {
                     lock.lock();
-                    try {
-                        signal.await();
+                    signal.await();
 
-                        final Duration totalDuration = sw.stop().durations().statistics().getTotal();
-                        boolean printOffsets = false;
-                        if (totalDuration.toMillis() >= pollInterval.toMillis()) {
-                            // Restart the stopwatch.
-                            printOffsets = true;
-                            sw = Stopwatch.accumulating().start();
-                            LOGGER.info("Task {}, still calculating low watermark", taskUid);
-                        }
-                        else {
-                            // Resume the existing stop watch, we haven't met the criteria yet.
-                            sw.start();
-                        }
-                        getLowWatermark(printOffsets);
+                    final Duration totalDuration = sw.stop().durations().statistics().getTotal();
+                    boolean printOffsets = false;
+                    if (totalDuration.toMillis() >= pollInterval.toMillis()) {
+                        // Restart the stopwatch.
+                        printOffsets = true;
+                        sw = Stopwatch.accumulating().start();
+                        LOGGER.info("Task {}, still calculating low watermark", taskUid);
                     }
-                    finally {
-                        lock.unlock();
+                    else {
+                        // Resume the existing stop watch, we haven't met the criteria yet.
+                        sw.start();
                     }
-
+                    getLowWatermark(printOffsets);
                 }
                 catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                     LOGGER.info("Task {}, interrupted low watermark calculation", taskUid);
                     return;
+                }
+                finally {
+                    if (lock.isHeldByCurrentThread()) {
+                        lock.unlock();
+                    }
                 }
             }
         }, "SpannerConnector-WatermarkCalculationJob-Calculation");
