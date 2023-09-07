@@ -55,6 +55,7 @@ public class TakePartitionForStreamingOperation implements Operation {
 
         toStreaming.forEach(partitionState -> {
             if (this.submitPartition(partitionState)) {
+                LOGGER.info("Task {}, submitting partition {} with state {}", taskSyncContext.getTaskUid(), partitionState, taskSyncContext.getRebalanceState());
                 toSchedule.add(partitionState.getToken());
             }
             else {

@@ -6,10 +6,9 @@
 package io.debezium.connector.spanner.db.stream;
 
 import java.time.Duration;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Set;
-import java.util.stream.Collectors;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -23,42 +22,37 @@ import io.debezium.util.Metronome;
 public class PartitionThreadPool {
     private static final Logger LOGGER = LoggerFactory.getLogger(PartitionThreadPool.class);
 
-    private final Map<String, Thread> threadMap = new HashMap<>();
+    private final ConcurrentHashMap<String, Thread> threadMap = new ConcurrentHashMap<>();
 
     private final Duration sleepInterval = Duration.ofMillis(100);
 
     private final Clock clock = Clock.system();
 
-    public synchronized boolean submit(String token, Runnable runnable) {
+    public boolean submit(String token, Runnable runnable) {
+        AtomicBoolean insertedThread = new AtomicBoolean(false);
 
-        if (threadMap.containsKey(token)) {
-            LOGGER.info("Failed to submit token {} due to it existing in thread map {}", token,
-                    threadMap.keySet().stream().collect(Collectors.toList()));
-            return false;
+        threadMap.computeIfAbsent(token, k -> {
+            Thread thread = new Thread(runnable, "SpannerConnector-PartitionThreadPool");
+            thread.start();
+            insertedThread.set(true);
+            return thread;
+        });
+        if (!insertedThread.get()) {
+            LOGGER.info("Fail to submit token {}", token);
         }
-
-        clean();
-
-        Thread thread = new Thread(runnable, "SpannerConnector-PartitionThreadPool");
-
-        threadMap.put(token, thread);
-
-        thread.start();
 
         return true;
     }
 
-    public synchronized void stop(String token) {
-        clean();
-        Thread thread = threadMap.get(token);
+    public void stop(String token) {
+        Thread thread = threadMap.remove(token);
         if (thread != null) {
             LOGGER.info("Interrupting SpannerConnector-PartitionThreadPool");
             thread.interrupt();
         }
-        threadMap.remove(token);
     }
 
-    public synchronized void shutdown(String taskUid) {
+    public void shutdown(String taskUid) {
         LOGGER.info("Trying to shut down partition thread pool for task {}", taskUid);
         clean();
         threadMap.values().forEach(Thread::interrupt);
@@ -73,29 +67,24 @@ public class PartitionThreadPool {
                 Thread.currentThread().interrupt();
             }
             LOGGER.info("Beginning to terminate threads, task {}", taskUid);
-            Map<String, Thread> unterminatedThreads = threadMap.entrySet().stream().filter(entry -> !entry.getValue().getState().equals(Thread.State.TERMINATED))
-                    .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
-            LOGGER.info("Task {}, Found {} unterminated threads {}, task {}", taskUid, unterminatedThreads.size(), unterminatedThreads);
-            for (Map.Entry<String, Thread> unterminatedThread : unterminatedThreads.entrySet()) {
-                LOGGER.info("Task {}, trying to terminate the token {} with state {}", taskUid, unterminatedThread.getKey(), unterminatedThread.getValue().getState());
-                unterminatedThread.getValue().interrupt();
-            }
-            LOGGER.info("Finished trying to interrupt threads, cleaning {}", taskUid);
-            clean();
+            // Map<String, Thread> unterminatedThreads = threadMap.entrySet().stream().filter(entry -> !entry.getValue().getState().equals(Thread.State.TERMINATED))
+            // .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+            // LOGGER.info("Task {}, Found {} unterminated threads {}, task {}", taskUid, unterminatedThreads.size(), unterminatedThreads);
+            // for (Map.Entry<String, Thread> unterminatedThread : unterminatedThreads.entrySet()) {
+            // LOGGER.info("Task {}, trying to terminate the token {} with state {}", taskUid, unterminatedThread.getKey(), unterminatedThread.getValue().getState());
+            // unterminatedThread.getValue().interrupt();
+            // }
+            // LOGGER.info("Finished trying to interrupt threads, cleaning {}", taskUid);
+            // clean();
         }
         LOGGER.info("Successfully shut down partition thread poll for task {}", taskUid);
     }
 
-    private synchronized void clean() {
-        Set<String> tokens = threadMap.entrySet().stream()
-                .filter(entry -> entry.getValue().getState().equals(Thread.State.TERMINATED))
-                .map(Map.Entry::getKey)
-                .collect(Collectors.toSet());
-
-        tokens.forEach(threadMap::remove);
+    private void clean() {
+        threadMap.entrySet().removeIf(entry -> entry.getValue().getState().equals(Thread.State.TERMINATED));
     }
 
-    public synchronized Set<String> getActiveThreads() {
+    public Set<String> getActiveThreads() {
         clean();
         return Set.copyOf(threadMap.keySet());
     }
