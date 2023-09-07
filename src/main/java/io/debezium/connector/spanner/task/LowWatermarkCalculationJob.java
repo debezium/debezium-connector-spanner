@@ -63,13 +63,13 @@ public class LowWatermarkCalculationJob {
                 final Metronome metronome = Metronome.sleeper(Duration.ofMillis(period), clock);
                 LOGGER.info("Task {}, beginning calculation of low watermark", taskUid);
                 while (true) {
-                    LOGGER.info("Task {}, still calculating low watermark", taskUid);
                     try {
                         final Duration totalDuration = sw.stop().durations().statistics().getTotal();
                         boolean printOffsets = false;
                         if (totalDuration.toMillis() >= pollInterval.toMillis()) {
                             // Restart the stopwatch.
                             printOffsets = true;
+                            LOGGER.info("Task {}, still calculating low watermark", taskUid);
                             sw = Stopwatch.accumulating().start();
                         }
                         else {
