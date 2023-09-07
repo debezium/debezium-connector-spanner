@@ -46,13 +46,13 @@ public class SyncEventHandler {
             return;
         }
 
-        LOGGER.info("Task {} - before update task sync topic offset with {}", taskSyncContextHolder.get().getTaskUid(), metadata.getOffset());
+        LOGGER.debug("Task {} - before update task sync topic offset with {}", taskSyncContextHolder.get().getTaskUid(), metadata.getOffset());
 
         taskSyncContextHolder.update(oldContext -> oldContext.toBuilder()
                 .currentKafkaRecordOffset(metadata.getOffset())
                 .build());
 
-        LOGGER.info("Task {} - update task sync topic offset with {}", taskSyncContextHolder.get().getTaskUid(), metadata.getOffset());
+        LOGGER.debug("Task {} - update task sync topic offset with {}", taskSyncContextHolder.get().getTaskUid(), metadata.getOffset());
     }
 
     public void processPreviousStates(TaskSyncEvent inSync, SyncEventMetadata metadata) {
