@@ -33,6 +33,7 @@ public class PartitionThreadPool {
 
         if (threadMap.containsKey(token)) {
             LOGGER.info("Fail to submit token in PartitionThreadPool {} since it is already contained in the map", token);
+            return false;
         }
 
         AtomicBoolean insertedThread = new AtomicBoolean(false);
