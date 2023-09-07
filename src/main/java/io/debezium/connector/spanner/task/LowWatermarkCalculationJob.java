@@ -8,8 +8,6 @@ package io.debezium.connector.spanner.task;
 import static org.slf4j.LoggerFactory.getLogger;
 
 import java.time.Duration;
-import java.util.concurrent.locks.Condition;
-import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
 
 import org.slf4j.Logger;
@@ -17,6 +15,8 @@ import org.slf4j.Logger;
 import com.google.cloud.Timestamp;
 
 import io.debezium.connector.spanner.SpannerConnectorConfig;
+import io.debezium.util.Clock;
+import io.debezium.util.Metronome;
 import io.debezium.util.Stopwatch;
 
 /**
@@ -24,8 +24,6 @@ import io.debezium.util.Stopwatch;
  */
 public class LowWatermarkCalculationJob {
     private static final Logger LOGGER = getLogger(LowWatermarkCalculationJob.class);
-    private volatile Thread mainThread;
-
     private volatile Thread calculationThread;
 
     private final Duration pollInterval = Duration.ofMillis(300000);
@@ -38,10 +36,8 @@ public class LowWatermarkCalculationJob {
 
     private final LowWatermarkHolder lowWatermarkHolder;
 
-    private final ReentrantLock lock = new ReentrantLock();
-
-    private final Condition signal = lock.newCondition();
     private final String taskUid;
+    private final Clock clock;
 
     public LowWatermarkCalculationJob(SpannerConnectorConfig connectorConfig,
                                       Consumer<Throwable> errorHandler,
@@ -57,73 +53,50 @@ public class LowWatermarkCalculationJob {
         this.enabled = connectorConfig.isLowWatermarkEnabled();
         this.period = connectorConfig.getLowWatermarkUpdatePeriodMs();
         this.taskUid = taskUid;
-    }
-
-    private Thread createMainThread() {
-        Thread thread = new Thread(() -> {
-            while (true) {
-                try {
-
-                    Thread.sleep(period);
-
-                    if (lock.tryLock()) {
-                        signal.signal();
-                    }
-
-                }
-                catch (InterruptedException e) {
-                    LOGGER.info("Task {}, Interrupted low watermark calculation main thread", taskUid);
-                    Thread.currentThread().interrupt();
-                    return;
-                }
-                finally {
-                    if (lock.isHeldByCurrentThread()) {
-                        lock.unlock();
-                    }
-                }
-            }
-        }, "SpannerConnector-WatermarkCalculationJob");
-
-        thread.setUncaughtExceptionHandler((t, e) -> {
-            LOGGER.error("Task {}, caught exception during low watermark calculation {}", taskUid, e);
-            errorHandler.accept(e);
-        });
-
-        return thread;
+        this.clock = Clock.system();
     }
 
     private Thread createCalculationThread() {
         Thread thread = new Thread(() -> {
-            Stopwatch sw = Stopwatch.accumulating().start();
-            while (true) {
-                try {
-                    lock.lock();
-                    signal.await();
+            try {
+                Stopwatch sw = Stopwatch.accumulating().start();
+                final Metronome metronome = Metronome.sleeper(Duration.ofMillis(period), clock);
+                LOGGER.info("Task {}, beginning calculation of low watermark", taskUid);
+                while (true) {
+                    LOGGER.info("Task {}, still calculating low watermark", taskUid);
+                    try {
+                        final Duration totalDuration = sw.stop().durations().statistics().getTotal();
+                        boolean printOffsets = false;
+                        if (totalDuration.toMillis() >= pollInterval.toMillis()) {
+                            // Restart the stopwatch.
+                            printOffsets = true;
+                            sw = Stopwatch.accumulating().start();
+                        }
+                        else {
+                            // Resume the existing stop watch, we haven't met the criteria yet.
+                            sw.start();
+                        }
+                        getLowWatermark(printOffsets);
+                    }
+                    catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        LOGGER.info("Task {}, interrupted low watermark calculation", taskUid);
+                        return;
+                    }
 
-                    final Duration totalDuration = sw.stop().durations().statistics().getTotal();
-                    boolean printOffsets = false;
-                    if (totalDuration.toMillis() >= pollInterval.toMillis()) {
-                        // Restart the stopwatch.
-                        printOffsets = true;
-                        sw = Stopwatch.accumulating().start();
-                        LOGGER.info("Task {}, still calculating low watermark", taskUid);
+                    // Now try sleeping for a predefined interval.
+                    try {
+                        // Sleep for pollInterval.
+                        metronome.pause();
                     }
-                    else {
-                        // Resume the existing stop watch, we haven't met the criteria yet.
-                        sw.start();
-                    }
-                    getLowWatermark(printOffsets);
-                }
-                catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    LOGGER.info("Task {}, interrupted low watermark calculation", taskUid);
-                    return;
-                }
-                finally {
-                    if (lock.isHeldByCurrentThread()) {
-                        lock.unlock();
+                    catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        return;
                     }
                 }
+            }
+            finally {
+                LOGGER.info("Task {}, ended calculation of low watermark", taskUid);
             }
         }, "SpannerConnector-WatermarkCalculationJob-Calculation");
 
@@ -164,17 +137,9 @@ public class LowWatermarkCalculationJob {
 
         calculationThread = createCalculationThread();
         calculationThread.start();
-
-        mainThread = createMainThread();
-        mainThread.start();
     }
 
     public void stop() {
-        if (mainThread != null) {
-            mainThread.interrupt();
-            mainThread = null;
-        }
-
         if (calculationThread != null) {
             calculationThread.interrupt();
             calculationThread = null;
