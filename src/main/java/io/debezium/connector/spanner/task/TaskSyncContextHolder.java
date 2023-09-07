@@ -63,18 +63,10 @@ public class TaskSyncContextHolder {
     public TaskSyncContext updateAndGet(UnaryOperator<TaskSyncContext> updateFunction) {
         TaskSyncContext taskSyncContext;
         try {
-            LOGGER.info("Task {}, locking,  lock debug string {}, hold count {}, thread name {}", get().getTaskUid(), lockDebugString(), lock.getHoldCount(),
-                    Thread.currentThread().getName());
             lock.lock();
-            LOGGER.info("Task {}, finished locking,  lock debug string {}, hold count {}, thread name {}", get().getTaskUid(), lockDebugString(), lock.getHoldCount(),
-                    Thread.currentThread().getName());
             taskSyncContext = taskSyncContextRef.updateAndGet(updateFunction);
-            LOGGER.info("Task {}, finished updating,  lock debug string {}, hold count {}, thread name {}", get().getTaskUid(), lockDebugString(), lock.getHoldCount(),
-                    Thread.currentThread().getName());
         }
         finally {
-            LOGGER.info("Task {}, trying to unlock,  lock debug string {}, hold count {}, thread name {}", get().getTaskUid(), lockDebugString(), lock.getHoldCount(),
-                    Thread.currentThread().getName());
             if (lock.isHeldByCurrentThread()) {
                 lock.unlock();
             }

@@ -137,22 +137,22 @@ public class SyncEventHandler {
     }
 
     public void processUpdateEpoch(TaskSyncEvent inSync, SyncEventMetadata metadata) throws InterruptedException {
-        LOGGER.info("Task {} - SyncEventHandler updating from update epoch",
+        LOGGER.debug("Task {} - SyncEventHandler updating from update epoch",
                 taskSyncContextHolder.get().getTaskUid());
         taskSyncContextHolder.update(context -> SyncEventMerger.mergeEpochUpdate(context, inSync));
 
-        LOGGER.info("Task {} - SyncEventHandler updated from update epoch",
+        LOGGER.debug("Task {} - SyncEventHandler updated from update epoch",
                 taskSyncContextHolder.get().getTaskUid());
 
         eventConsumer.accept(new SyncEvent());
     }
 
     public void processRegularMessage(TaskSyncEvent inSync, SyncEventMetadata metadata) throws InterruptedException {
-        LOGGER.info("Task {} - process regular message event", taskSyncContextHolder.get().getTaskUid());
+        LOGGER.debug("Task {} - process regular message event", taskSyncContextHolder.get().getTaskUid());
 
         taskSyncContextHolder.update(context -> SyncEventMerger.mergeIncrementalTaskSyncEvent(context, inSync));
 
-        LOGGER.info("Task {} - Finished processing regular message event", taskSyncContextHolder.get().getTaskUid());
+        LOGGER.debug("Task {} - Finished processing regular message event", taskSyncContextHolder.get().getTaskUid());
 
         eventConsumer.accept(new SyncEvent());
 
@@ -160,12 +160,12 @@ public class SyncEventHandler {
 
     public void processRebalanceAnswer(TaskSyncEvent inSync, SyncEventMetadata metadata) {
 
-        LOGGER.info("Task {} - process sync event - rebalance answer",
+        LOGGER.debug("Task {} - process sync event - rebalance answer",
                 taskSyncContextHolder.get().getTaskUid());
 
         taskSyncContextHolder.update(context -> SyncEventMerger.mergeRebalanceAnswer(context, inSync));
 
-        LOGGER.info("Task {} - process sync event - updated from rebalance answer",
+        LOGGER.debug("Task {} - process sync event - updated from rebalance answer",
                 taskSyncContextHolder.get().getTaskUid());
 
     }

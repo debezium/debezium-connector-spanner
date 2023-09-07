@@ -86,7 +86,6 @@ public class LowWatermarkStampPublisher {
         }
 
         LOGGER.info("Task {}, Successfully destroyed LowWatermarkStampPublisher", taskSyncContextHolder.get().getTaskUid());
-        // spannerEventDispatcher.publishLowWatermarkStampEvent();
     }
 
     private Thread createPublisherThread() {
