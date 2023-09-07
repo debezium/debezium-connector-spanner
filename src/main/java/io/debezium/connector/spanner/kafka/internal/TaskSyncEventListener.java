@@ -182,16 +182,13 @@ public class TaskSyncEventListener {
             return 0;
         }
         for (ConsumerRecord<String, byte[]> record : records) {
-
             TaskSyncEvent taskSyncEvent = parseSyncEvent(record);
             debug(LOGGER, "Receive SyncEvent from Kafka topic: {}", taskSyncEvent);
 
             if (record.offset() == endOffset - 1) {
                 LOGGER.info("Task {}, can begin to initiate rebalancing", consumerGroup);
             }
-            int i = 0;
             for (BlockingBiConsumer<TaskSyncEvent, SyncEventMetadata> eventConsumer : eventConsumers) {
-                i++;
                 boolean canInitiateRebalancing = (record.offset() >= endOffset - 1);
                 eventConsumer.accept(
                         taskSyncEvent,

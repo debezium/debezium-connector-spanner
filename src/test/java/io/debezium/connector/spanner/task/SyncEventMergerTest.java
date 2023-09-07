@@ -5,8 +5,10 @@
  */
 package io.debezium.connector.spanner.task;
 
+import static io.debezium.connector.spanner.task.SyncEventMerger.mergeEpochUpdate;
 import static io.debezium.connector.spanner.task.SyncEventMerger.mergeIncrementalTaskSyncEvent;
 import static io.debezium.connector.spanner.task.SyncEventMerger.mergeNewEpoch;
+import static io.debezium.connector.spanner.task.SyncEventMerger.mergeRebalanceAnswer;
 import static io.debezium.connector.spanner.task.TaskTestHelper.generateTaskStateWithPartitions;
 
 import java.util.List;
@@ -17,55 +19,56 @@ import org.junit.jupiter.api.Test;
 
 import io.debezium.connector.spanner.kafka.internal.model.PartitionState;
 import io.debezium.connector.spanner.kafka.internal.model.PartitionStateEnum;
+import io.debezium.connector.spanner.kafka.internal.model.RebalanceState;
 import io.debezium.connector.spanner.kafka.internal.model.TaskState;
 import io.debezium.connector.spanner.kafka.internal.model.TaskSyncEvent;
 
 class SyncEventMergerTest {
-    // @Test
-    // void testMergeRebalanceAnswer() {
-    // TaskSyncContext taskSyncContext1 = buildTaskSyncContext1();
-    // TaskSyncContext taskSyncContext2 = buildTaskSyncContext2();
+    @Test
+    void testMergeRebalanceAnswer() {
+        TaskSyncContext taskSyncContext1 = buildTaskSyncContext1(RebalanceState.INITIAL_INCREMENTED_STATE_COMPLETED, false);
+        TaskSyncContext taskSyncContext2 = buildTaskSyncContext2(RebalanceState.INITIAL_INCREMENTED_STATE_COMPLETED, true);
 
-    // TaskSyncEvent rebalanceAnswer1 = taskSyncContext1.buildRebalanceAnswerTaskSyncEvent();
-    // TaskSyncContext mergedRebalanceAnswer = mergeRebalanceAnswer(
-    // taskSyncContext2, rebalanceAnswer1);
+        TaskSyncEvent rebalanceAnswer1 = taskSyncContext1.buildRebalanceAnswerTaskSyncEvent();
+        TaskSyncContext mergedRebalanceAnswer = mergeRebalanceAnswer(
+                taskSyncContext2, rebalanceAnswer1);
 
-    // Assertions.assertEquals("task2", mergedRebalanceAnswer.getTaskUid());
-    // Assertions.assertEquals(2, mergedRebalanceAnswer.getTaskStates().size());
+        Assertions.assertEquals("task2", mergedRebalanceAnswer.getTaskUid());
+        Assertions.assertEquals(2, mergedRebalanceAnswer.getTaskStates().size());
 
-    // TaskState taskState1 = mergedRebalanceAnswer.getTaskStates().get("task0");
-    // Assertions.assertEquals(taskState1.getTaskUid(), "task0");
+        TaskState taskState1 = mergedRebalanceAnswer.getTaskStates().get("task0");
+        Assertions.assertEquals(taskState1.getTaskUid(), "task0");
 
-    // Assertions.assertEquals(taskState1.getPartitionsMap().size(), 4);
-    // PartitionState partition1 = taskState1.getPartitionsMap().get("token0");
-    // Assertions.assertEquals(partition1.getState(), PartitionStateEnum.CREATED);
-    // PartitionState partition2 = taskState1.getPartitionsMap().get("token1");
-    // Assertions.assertEquals(partition2.getState(), PartitionStateEnum.REMOVED);
-    // PartitionState partition3 = taskState1.getPartitionsMap().get("token2");
-    // Assertions.assertEquals(partition3.getState(), PartitionStateEnum.RUNNING);
-    // PartitionState partition4 = taskState1.getPartitionsMap().get("token3");
-    // Assertions.assertEquals(partition4.getState(), PartitionStateEnum.FINISHED);
+        Assertions.assertEquals(taskState1.getPartitionsMap().size(), 4);
+        PartitionState partition1 = taskState1.getPartitionsMap().get("token0");
+        Assertions.assertEquals(partition1.getState(), PartitionStateEnum.CREATED);
+        PartitionState partition2 = taskState1.getPartitionsMap().get("token1");
+        Assertions.assertEquals(partition2.getState(), PartitionStateEnum.REMOVED);
+        PartitionState partition3 = taskState1.getPartitionsMap().get("token2");
+        Assertions.assertEquals(partition3.getState(), PartitionStateEnum.RUNNING);
+        PartitionState partition4 = taskState1.getPartitionsMap().get("token3");
+        Assertions.assertEquals(partition4.getState(), PartitionStateEnum.FINISHED);
 
-    // Assertions.assertEquals(taskState1.getSharedPartitions().size(), 2);
-    // PartitionState partition5 = taskState1.getSharedPartitionsMap().get("token4");
-    // Assertions.assertEquals(partition5.getState(), PartitionStateEnum.CREATED);
-    // PartitionState partition6 = taskState1.getSharedPartitionsMap().get("token5");
-    // Assertions.assertEquals(partition6.getState(), PartitionStateEnum.REMOVED);
+        Assertions.assertEquals(taskState1.getSharedPartitions().size(), 2);
+        PartitionState partition5 = taskState1.getSharedPartitionsMap().get("token4");
+        Assertions.assertEquals(partition5.getState(), PartitionStateEnum.CREATED);
+        PartitionState partition6 = taskState1.getSharedPartitionsMap().get("token5");
+        Assertions.assertEquals(partition6.getState(), PartitionStateEnum.REMOVED);
 
-    // TaskState taskState2 = mergedRebalanceAnswer.getCurrentTaskState();
-    // Assertions.assertEquals(taskState2.getTaskUid(), "task2");
-    // Assertions.assertEquals(taskState2.getPartitionsMap().size(), 4);
-    // Assertions.assertEquals(taskState2.getSharedPartitionsMap().size(), 1);
+        TaskState taskState2 = mergedRebalanceAnswer.getCurrentTaskState();
+        Assertions.assertEquals(taskState2.getTaskUid(), "task2");
+        Assertions.assertEquals(taskState2.getPartitionsMap().size(), 4);
+        Assertions.assertEquals(taskState2.getSharedPartitionsMap().size(), 1);
 
-    // TaskState taskState3 = mergedRebalanceAnswer.getTaskStates().get("task1");
-    // Assertions.assertEquals(taskState3.getTaskUid(), "task1");
-    // Assertions.assertEquals(taskState3.getPartitionsMap().size(), 2);
-    // Assertions.assertEquals(taskState3.getSharedPartitionsMap().size(), 1);
-    // }
+        TaskState taskState3 = mergedRebalanceAnswer.getTaskStates().get("task1");
+        Assertions.assertEquals(taskState3.getTaskUid(), "task1");
+        Assertions.assertEquals(taskState3.getPartitionsMap().size(), 2);
+        Assertions.assertEquals(taskState3.getSharedPartitionsMap().size(), 1);
+    }
 
     void testMergeIncrementalAnswer() {
-        TaskSyncContext taskSyncContext1 = buildTaskSyncContext1();
-        TaskSyncContext taskSyncContext2 = buildTaskSyncContext2();
+        TaskSyncContext taskSyncContext1 = buildTaskSyncContext1(RebalanceState.NEW_EPOCH_STARTED, false);
+        TaskSyncContext taskSyncContext2 = buildTaskSyncContext2(RebalanceState.NEW_EPOCH_STARTED, false);
 
         TaskSyncEvent incrementalAnswer1 = taskSyncContext1.buildCurrentTaskSyncEvent();
         TaskSyncContext mergeIncrementalAnswer = mergeIncrementalTaskSyncEvent(
@@ -106,8 +109,8 @@ class SyncEventMergerTest {
 
     @Test
     void testMergeNewEpoch() {
-        TaskSyncContext taskSyncContext1 = buildTaskSyncContext1();
-        TaskSyncContext taskSyncContext2 = buildTaskSyncContext2();
+        TaskSyncContext taskSyncContext1 = buildTaskSyncContext1(RebalanceState.NEW_EPOCH_STARTED, false);
+        TaskSyncContext taskSyncContext2 = buildTaskSyncContext2(RebalanceState.NEW_EPOCH_STARTED, false);
 
         TaskSyncEvent syncEvent = taskSyncContext1.buildNewEpochTaskSyncEvent();
         TaskSyncContext mergeNewEpoch = mergeNewEpoch(
@@ -149,52 +152,52 @@ class SyncEventMergerTest {
         Assertions.assertEquals(taskState3.getSharedPartitionsMap().size(), 1);
     }
 
-    // @Test
-    // void testMergeEpochupdate() {
-    // TaskSyncContext taskSyncContext1 = buildTaskSyncContext1();
-    // TaskSyncContext taskSyncContext2 = buildTaskSyncContext2();
+    @Test
+    void testMergeEpochupdate() {
+        TaskSyncContext taskSyncContext1 = buildTaskSyncContext1(RebalanceState.NEW_EPOCH_STARTED, false);
+        TaskSyncContext taskSyncContext2 = buildTaskSyncContext2(RebalanceState.NEW_EPOCH_STARTED, false);
 
-    // TaskSyncEvent syncEvent = taskSyncContext1.buildUpdateEpochTaskSyncEvent();
-    // TaskSyncContext mergedEpochUpdate = mergeEpochUpdate(
-    // taskSyncContext2, syncEvent);
+        TaskSyncEvent syncEvent = taskSyncContext1.buildUpdateEpochTaskSyncEvent();
+        TaskSyncContext mergedEpochUpdate = mergeEpochUpdate(
+                taskSyncContext2, syncEvent);
 
-    // Assertions.assertEquals("task2", mergedEpochUpdate.getTaskUid());
-    // Assertions.assertEquals(2, mergedEpochUpdate.getTaskStates().size());
+        Assertions.assertEquals("task2", mergedEpochUpdate.getTaskUid());
+        Assertions.assertEquals(2, mergedEpochUpdate.getTaskStates().size());
 
-    // Assertions.assertEquals("task2", mergedEpochUpdate.getTaskUid());
-    // Assertions.assertEquals(2, mergedEpochUpdate.getTaskStates().size());
+        Assertions.assertEquals("task2", mergedEpochUpdate.getTaskUid());
+        Assertions.assertEquals(2, mergedEpochUpdate.getTaskStates().size());
 
-    // TaskState taskState1 = mergedEpochUpdate.getTaskStates().get("task0");
-    // Assertions.assertEquals(taskState1.getTaskUid(), "task0");
+        TaskState taskState1 = mergedEpochUpdate.getTaskStates().get("task0");
+        Assertions.assertEquals(taskState1.getTaskUid(), "task0");
 
-    // Assertions.assertEquals(taskState1.getPartitionsMap().size(), 4);
-    // PartitionState partition1 = taskState1.getPartitionsMap().get("token0");
-    // Assertions.assertEquals(partition1.getState(), PartitionStateEnum.CREATED);
-    // PartitionState partition2 = taskState1.getPartitionsMap().get("token1");
-    // Assertions.assertEquals(partition2.getState(), PartitionStateEnum.REMOVED);
-    // PartitionState partition3 = taskState1.getPartitionsMap().get("token2");
-    // Assertions.assertEquals(partition3.getState(), PartitionStateEnum.RUNNING);
-    // PartitionState partition4 = taskState1.getPartitionsMap().get("token3");
-    // Assertions.assertEquals(partition4.getState(), PartitionStateEnum.FINISHED);
+        Assertions.assertEquals(taskState1.getPartitionsMap().size(), 4);
+        PartitionState partition1 = taskState1.getPartitionsMap().get("token0");
+        Assertions.assertEquals(partition1.getState(), PartitionStateEnum.CREATED);
+        PartitionState partition2 = taskState1.getPartitionsMap().get("token1");
+        Assertions.assertEquals(partition2.getState(), PartitionStateEnum.REMOVED);
+        PartitionState partition3 = taskState1.getPartitionsMap().get("token2");
+        Assertions.assertEquals(partition3.getState(), PartitionStateEnum.RUNNING);
+        PartitionState partition4 = taskState1.getPartitionsMap().get("token3");
+        Assertions.assertEquals(partition4.getState(), PartitionStateEnum.FINISHED);
 
-    // Assertions.assertEquals(taskState1.getSharedPartitions().size(), 2);
-    // PartitionState partition5 = taskState1.getSharedPartitionsMap().get("token4");
-    // Assertions.assertEquals(partition5.getState(), PartitionStateEnum.CREATED);
-    // PartitionState partition6 = taskState1.getSharedPartitionsMap().get("token5");
-    // Assertions.assertEquals(partition6.getState(), PartitionStateEnum.REMOVED);
+        Assertions.assertEquals(taskState1.getSharedPartitions().size(), 2);
+        PartitionState partition5 = taskState1.getSharedPartitionsMap().get("token4");
+        Assertions.assertEquals(partition5.getState(), PartitionStateEnum.CREATED);
+        PartitionState partition6 = taskState1.getSharedPartitionsMap().get("token5");
+        Assertions.assertEquals(partition6.getState(), PartitionStateEnum.REMOVED);
 
-    // TaskState taskState2 = mergedEpochUpdate.getCurrentTaskState();
-    // Assertions.assertEquals(taskState2.getTaskUid(), "task2");
-    // Assertions.assertEquals(taskState2.getPartitionsMap().size(), 4);
-    // Assertions.assertEquals(taskState2.getSharedPartitionsMap().size(), 1);
+        TaskState taskState2 = mergedEpochUpdate.getCurrentTaskState();
+        Assertions.assertEquals(taskState2.getTaskUid(), "task2");
+        Assertions.assertEquals(taskState2.getPartitionsMap().size(), 4);
+        Assertions.assertEquals(taskState2.getSharedPartitionsMap().size(), 1);
 
-    // TaskState taskState3 = mergedEpochUpdate.getTaskStates().get("task1");
-    // Assertions.assertEquals(taskState3.getTaskUid(), "task1");
-    // Assertions.assertEquals(taskState3.getPartitionsMap().size(), 2);
-    // Assertions.assertEquals(taskState3.getSharedPartitionsMap().size(), 1);
-    // }
+        TaskState taskState3 = mergedEpochUpdate.getTaskStates().get("task1");
+        Assertions.assertEquals(taskState3.getTaskUid(), "task1");
+        Assertions.assertEquals(taskState3.getPartitionsMap().size(), 2);
+        Assertions.assertEquals(taskState3.getSharedPartitionsMap().size(), 1);
+    }
 
-    private TaskSyncContext buildTaskSyncContext1() {
+    private TaskSyncContext buildTaskSyncContext1(RebalanceState rebalanceState, boolean isLeader) {
 
         TaskState task0 = generateTaskStateWithPartitions("task0",
                 List.of(PartitionState.builder().token("token0").state(PartitionStateEnum.CREATED).build(),
@@ -229,7 +232,7 @@ class SyncEventMergerTest {
                 .build();
     }
 
-    private TaskSyncContext buildTaskSyncContext2() {
+    private TaskSyncContext buildTaskSyncContext2(RebalanceState rebalanceState, boolean isLeader) {
 
         TaskState task0 = generateTaskStateWithPartitions("task0",
                 List.of(PartitionState.builder().token("token0").state(PartitionStateEnum.CREATED).build()),
@@ -258,6 +261,8 @@ class SyncEventMergerTest {
 
         return TaskSyncContext.builder()
                 .taskUid("task2")
+                .rebalanceState(rebalanceState)
+                .isLeader(isLeader)
                 .currentTaskState(task2)
                 .taskStates(Map.of("task1", task1,
                         "task0", task0))

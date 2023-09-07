@@ -32,31 +32,43 @@ class DatabaseClientFactoryTest {
         when(spannerConnectorConfig.gcpSpannerCredentialsPath()).thenReturn("Gcp Spanner Credentials Path");
         when(spannerConnectorConfig.instanceId()).thenReturn("42");
         when(spannerConnectorConfig.projectId()).thenReturn("myproject");
-        new DatabaseClientFactory(spannerConnectorConfig);
+        DatabaseClientFactory databaseClientFactory = new DatabaseClientFactory(spannerConnectorConfig);
         verify(spannerConnectorConfig).databaseId();
         verify(spannerConnectorConfig).gcpSpannerCredentialsJson();
         verify(spannerConnectorConfig).gcpSpannerCredentialsPath();
         verify(spannerConnectorConfig).instanceId();
         verify(spannerConnectorConfig).projectId();
+        databaseClientFactory.closeSpanner();
     }
 
     @Test
     void testGetGoogleCredentials() {
-        try (MockedStatic<GoogleCredentials> credentials = mockStatic(GoogleCredentials.class)) {
-            credentials.when(GoogleCredentials::getApplicationDefault).thenThrow(new IOException());
-            assertNull(new DatabaseClientFactory("myproject", "42", "42", "Credentials Json",
-                    "Credentials Path", null, "test-role")
-                    .getGoogleCredentials("Credentials Json", "Credentials Path"));
-            assertNull(new DatabaseClientFactory("myproject", "42", "42", "Credentials Json",
-                    "Credentials Path", null, "test-role")
-                    .getGoogleCredentials(null, null));
-            assertNull(new DatabaseClientFactory("myproject", "42", "42", "Credentials Json",
-                    "Credentials Path", null, "test-role")
-                    .getGoogleCredentials(null, "Credentials Path"));
-            assertNull(new DatabaseClientFactory("myproject", "42", "42", null,
-                    null, null, "test-role")
-                    .getGoogleCredentials(null, null));
-        }
+         try (MockedStatic<GoogleCredentials> credentials = mockStatic(GoogleCredentials.class)) {
+        DatabaseClientFactory databaseClientFactory1 = new DatabaseClientFactory("myproject", "42", "42", "Credentials Json",
+                "Credentials Path", null, "test-role");
+        assertNull(databaseClientFactory1
+                .getGoogleCredentials("Credentials Json", "Credentials Path"));
+        databaseClientFactory1.closeSpanner();
+
+        DatabaseClientFactory databaseClientFactory2 = new DatabaseClientFactory("myproject", "42", "42", "Credentials Json",
+                "Credentials Path", null, "test-role");
+        assertNull(databaseClientFactory2
+                .getGoogleCredentials(null, null));
+        databaseClientFactory2.closeSpanner();
+
+        DatabaseClientFactory databaseClientFactory3 = new DatabaseClientFactory("myproject", "42", "42", "Credentials Json",
+                "Credentials Path", null, "test-role");
+        assertNull(databaseClientFactory3
+                .getGoogleCredentials(null, "Credentials Path"));
+        databaseClientFactory3.closeSpanner();
+
+         DatabaseClientFactory databaseClientFactory4 = new DatabaseClientFactory("myproject", "42", "42", "Credentials Json",
+                null, null, null);
+        assertNull(databaseClientFactory4
+                .getGoogleCredentials(null, null));
+        databaseClientFactory4.closeSpanner();
+         }
+
     }
 
     @Test
@@ -66,5 +78,6 @@ class DatabaseClientFactoryTest {
 
         DatabaseClient actualDatabaseClient = databaseClientFactory.getDatabaseClient();
         assertNotNull(actualDatabaseClient);
+        databaseClientFactory.closeSpanner();
     }
 }

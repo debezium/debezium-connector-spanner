@@ -74,15 +74,6 @@ public class PartitionThreadPool {
                 Thread.currentThread().interrupt();
             }
             LOGGER.info("Beginning to terminate threads, task {}", taskUid);
-            // Map<String, Thread> unterminatedThreads = threadMap.entrySet().stream().filter(entry -> !entry.getValue().getState().equals(Thread.State.TERMINATED))
-            // .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
-            // LOGGER.info("Task {}, Found {} unterminated threads {}, task {}", taskUid, unterminatedThreads.size(), unterminatedThreads);
-            // for (Map.Entry<String, Thread> unterminatedThread : unterminatedThreads.entrySet()) {
-            // LOGGER.info("Task {}, trying to terminate the token {} with state {}", taskUid, unterminatedThread.getKey(), unterminatedThread.getValue().getState());
-            // unterminatedThread.getValue().interrupt();
-            // }
-            // LOGGER.info("Finished trying to interrupt threads, cleaning {}", taskUid);
-            // clean();
         }
         LOGGER.info("Successfully shut down partition thread poll for task {}", taskUid);
     }
