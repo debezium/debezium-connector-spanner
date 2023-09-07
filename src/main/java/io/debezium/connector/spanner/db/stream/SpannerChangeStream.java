@@ -148,7 +148,6 @@ public class SpannerChangeStream implements ChangeStream {
                 }
 
                 try {
-
                     partitionEventListener.onException(partition, ex);
                 }
                 catch (InterruptedException e) {
