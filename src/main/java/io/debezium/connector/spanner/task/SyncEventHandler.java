@@ -46,11 +46,13 @@ public class SyncEventHandler {
             return;
         }
 
+        LOGGER.info("Task {} - before update task sync topic offset with {}", taskSyncContextHolder.get().getTaskUid(), metadata.getOffset());
+
         taskSyncContextHolder.update(oldContext -> oldContext.toBuilder()
                 .currentKafkaRecordOffset(metadata.getOffset())
                 .build());
 
-        LOGGER.debug("Task {} - update task sync topic offset with {}", taskSyncContextHolder.get().getTaskUid(), metadata.getOffset());
+        LOGGER.info("Task {} - update task sync topic offset with {}", taskSyncContextHolder.get().getTaskUid(), metadata.getOffset());
     }
 
     public void processPreviousStates(TaskSyncEvent inSync, SyncEventMetadata metadata) {
@@ -117,13 +119,11 @@ public class SyncEventHandler {
 
     public void processNewEpoch(TaskSyncEvent inSync, SyncEventMetadata metadata) throws InterruptedException, IllegalStateException {
         LOGGER.info(
-                "Task {} - processNewEpoch {}: metadata {}, rebalanceId: {}, current task {}, taskSyncContextHOlder lock debug string {}",
+                "Task {} - processNewEpoch: metadata {}, rebalanceId: {}, current task {}",
                 taskSyncContextHolder.get().getTaskUid(),
-                inSync,
                 taskSyncContextHolder.get(),
                 metadata,
-                inSync.getRebalanceGenerationId(),
-                taskSyncContextHolder.lockDebugString());
+                inSync.getRebalanceGenerationId());
 
         TaskSyncContext newContext = taskSyncContextHolder.updateAndGet(context -> SyncEventMerger.mergeNewEpoch(context, inSync));
 
@@ -137,9 +137,6 @@ public class SyncEventHandler {
     }
 
     public void processUpdateEpoch(TaskSyncEvent inSync, SyncEventMetadata metadata) throws InterruptedException {
-        LOGGER.info("Task {} - process epoch update with lock debug string {}",
-                taskSyncContextHolder.get().getTaskUid(), taskSyncContextHolder.lockDebugString());
-
         LOGGER.info("Task {} - SyncEventHandler updating from update epoch",
                 taskSyncContextHolder.get().getTaskUid());
         taskSyncContextHolder.update(context -> SyncEventMerger.mergeEpochUpdate(context, inSync));
@@ -151,10 +148,11 @@ public class SyncEventHandler {
     }
 
     public void processRegularMessage(TaskSyncEvent inSync, SyncEventMetadata metadata) throws InterruptedException {
-        LOGGER.debug("Task {} - process sync event with lock debug string {}", taskSyncContextHolder.get().getTaskUid(),
-                taskSyncContextHolder.lockDebugString());
+        LOGGER.info("Task {} - process regular message event", taskSyncContextHolder.get().getTaskUid());
 
         taskSyncContextHolder.update(context -> SyncEventMerger.mergeIncrementalTaskSyncEvent(context, inSync));
+
+        LOGGER.info("Task {} - Finished processing regular message event", taskSyncContextHolder.get().getTaskUid());
 
         eventConsumer.accept(new SyncEvent());
 
@@ -162,15 +160,13 @@ public class SyncEventHandler {
 
     public void processRebalanceAnswer(TaskSyncEvent inSync, SyncEventMetadata metadata) {
 
-        LOGGER.info("Task {} - process sync event - rebalance answer with lock debug string {}",
-                taskSyncContextHolder.get().getTaskUid(),
-                taskSyncContextHolder.lockDebugString());
+        LOGGER.info("Task {} - process sync event - rebalance answer",
+                taskSyncContextHolder.get().getTaskUid());
 
         taskSyncContextHolder.update(context -> SyncEventMerger.mergeRebalanceAnswer(context, inSync));
 
-        LOGGER.info("Task {} - process sync event - updated from rebalance answer with lock debug string {}",
-                taskSyncContextHolder.get().getTaskUid(),
-                taskSyncContextHolder.lockDebugString());
+        LOGGER.info("Task {} - process sync event - updated from rebalance answer",
+                taskSyncContextHolder.get().getTaskUid());
 
     }
 

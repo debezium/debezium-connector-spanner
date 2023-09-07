@@ -138,16 +138,13 @@ public class TaskSyncEventListener {
                                 else {
                                     sw.start();
                                 }
-                                LOGGER.info("Task {}, debug polling the sync topic", consumerGroup);
                                 poll(consumer, endOffset);
-                                LOGGER.info("Task {}, done debug polling the sync topic", consumerGroup);
                                 if (!consumerFactory.isAutoCommitEnabled()
                                         && commitOffsetStart + commitOffsetsInterval < System.currentTimeMillis()) {
 
                                     consumer.commitSync(commitOffsetsTimeout);
                                     commitOffsetStart = System.currentTimeMillis();
                                 }
-                                LOGGER.info("Task {}, done committing offset to the sync topic", consumerGroup);
                             }
                             catch (org.apache.kafka.common.errors.InterruptException
                                     | InterruptedException ex) {
@@ -184,7 +181,6 @@ public class TaskSyncEventListener {
         if (records.isEmpty()) {
             return 0;
         }
-
         for (ConsumerRecord<String, byte[]> record : records) {
 
             TaskSyncEvent taskSyncEvent = parseSyncEvent(record);
@@ -193,7 +189,9 @@ public class TaskSyncEventListener {
             if (record.offset() == endOffset - 1) {
                 LOGGER.info("Task {}, can begin to initiate rebalancing", consumerGroup);
             }
+            int i = 0;
             for (BlockingBiConsumer<TaskSyncEvent, SyncEventMetadata> eventConsumer : eventConsumers) {
+                i++;
                 boolean canInitiateRebalancing = (record.offset() >= endOffset - 1);
                 eventConsumer.accept(
                         taskSyncEvent,

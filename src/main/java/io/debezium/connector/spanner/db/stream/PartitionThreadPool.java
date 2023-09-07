@@ -32,7 +32,8 @@ public class PartitionThreadPool {
     public synchronized boolean submit(String token, Runnable runnable) {
 
         if (threadMap.containsKey(token)) {
-            LOGGER.info("Failed to submit token {} due to it existing in thread map {}", token, threadMap.keySet().stream().collect(Collectors.toList()));
+            LOGGER.info("Failed to submit token {} due to it existing in thread map {}", token,
+                    threadMap.keySet().stream().collect(Collectors.toList()));
             return false;
         }
 

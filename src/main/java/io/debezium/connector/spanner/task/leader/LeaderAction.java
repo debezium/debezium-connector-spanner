@@ -46,7 +46,7 @@ public class LeaderAction {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(LeaderAction.class);
 
-    private static final Duration EPOCH_OFFSET_UPDATE_DURATION = Duration.ofSeconds(60);
+    private static final Duration EPOCH_OFFSET_UPDATE_DURATION = Duration.ofSeconds(300);
 
     private final TaskSyncContextHolder taskSyncContextHolder;
     private final KafkaConsumerAdminService kafkaAdminService;
