@@ -17,7 +17,6 @@ import io.debezium.connector.spanner.SpannerConnectorConfig;
 import io.debezium.connector.spanner.db.stream.ChangeStream;
 import io.debezium.connector.spanner.exception.SpannerConnectorException;
 import io.debezium.connector.spanner.kafka.internal.TaskSyncPublisher;
-import io.debezium.connector.spanner.kafka.internal.model.TaskSyncEvent;
 import io.debezium.connector.spanner.processor.SpannerEventDispatcher;
 import io.debezium.connector.spanner.task.operation.ChildPartitionOperation;
 import io.debezium.connector.spanner.task.operation.ClearSharedPartitionOperation;
@@ -153,13 +152,6 @@ public class TaskStateChangeEventHandler {
     private TaskSyncContext performOperation(Operation... operations) throws InterruptedException {
         AtomicBoolean publishTaskSyncEvent = new AtomicBoolean(false);
 
-        long totalPartitions = taskSyncContextHolder.get().getNumPartitions() + taskSyncContextHolder.get().getNumSharedPartitions();
-
-        String operationClassNames = "";
-        for (Operation operation : operations) {
-            operationClassNames += operation.getClass().getSimpleName() + ",";
-
-        }
         TaskSyncContext taskSyncContext = taskSyncContextHolder.updateAndGet(context -> {
             TaskSyncContext newContext = context;
             for (Operation operation : operations) {
@@ -174,18 +166,7 @@ public class TaskStateChangeEventHandler {
         });
 
         if (publishTaskSyncEvent.get()) {
-            TaskSyncEvent incrementalEvent = taskSyncContext.buildCurrentTaskSyncEvent();
-
-            long newTotalPartitions = taskSyncContext.getNumPartitions() + taskSyncContext.getNumSharedPartitions();
-
-            LOGGER.debug(
-                    "generated incremental event: Task {}  rebalance generation ID {}, task has total partitions {}, num partitions {} num shared partitions {}, incremental event {}, previous partitions {}, new partitions {}, operations {}",
-                    taskSyncContextHolder.get().getTaskUid(), taskSyncContextHolder.get().getRebalanceGenerationId(),
-                    taskSyncContextHolder.get().getNumPartitions() + taskSyncContextHolder.get().getNumSharedPartitions(),
-                    taskSyncContextHolder.get().getNumPartitions(),
-                    taskSyncContextHolder.get().getNumSharedPartitions(), incrementalEvent, totalPartitions, newTotalPartitions, operationClassNames);
-
-            taskSyncPublisher.send(incrementalEvent);
+            taskSyncPublisher.send(taskSyncContext.buildCurrentTaskSyncEvent());
         }
 
         return taskSyncContext;

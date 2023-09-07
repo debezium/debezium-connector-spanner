@@ -77,15 +77,11 @@ public class TaskStateChangeEventProcessor {
                 taskSyncContextHolder.awaitNewEpoch();
 
                 try {
-                    this.taskSyncContextHolder.lock();
                     this.taskStateChangeEventHandler.processEvent(event);
                 }
                 catch (InterruptedException e) {
                     LOGGER.info("Task {}, interrupting the event handler thread", this.taskSyncContextHolder.get().getTaskUid());
                     Thread.currentThread().interrupt();
-                }
-                finally {
-                    this.taskSyncContextHolder.unlock();
                 }
             }
         }, "SpannerConnector-TaskStateChangeEventProcessor");

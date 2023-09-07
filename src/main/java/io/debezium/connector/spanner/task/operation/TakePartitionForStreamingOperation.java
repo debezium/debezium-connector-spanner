@@ -58,7 +58,7 @@ public class TakePartitionForStreamingOperation implements Operation {
                 toSchedule.add(partitionState.getToken());
             }
             else {
-                LOGGER.info("Task {}, failed to submit partition {}", taskSyncContext.getTaskUid(), partitionState);
+                LOGGER.info("Task {}, failed to submit partition {} with state {}", taskSyncContext.getTaskUid(), partitionState, taskSyncContext.getRebalanceState());
             }
         });
 
@@ -75,7 +75,7 @@ public class TakePartitionForStreamingOperation implements Operation {
 
         isRequiredPublishSyncEvent = !toSchedule.isEmpty();
         if (isRequiredPublishSyncEvent) {
-            LOGGER.debug("Task scheduled {} partitions, taskUid: {}", toSchedule, taskSyncContext.getTaskUid());
+            LOGGER.info("Task scheduled {} partitions, taskUid: {}", toSchedule, taskSyncContext.getTaskUid());
         }
 
         return taskSyncContext.toBuilder()
