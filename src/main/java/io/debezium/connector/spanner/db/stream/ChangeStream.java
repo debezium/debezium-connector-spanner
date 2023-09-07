@@ -17,8 +17,6 @@ import io.debezium.connector.spanner.db.stream.exception.ChangeStreamException;
 public interface ChangeStream {
     boolean submitPartition(Partition partition);
 
-    void stop(String token);
-
     void stop();
 
     void run(BooleanSupplier runningFlagSupplier, ChangeStreamEventConsumer changeStreamEventConsumer,
