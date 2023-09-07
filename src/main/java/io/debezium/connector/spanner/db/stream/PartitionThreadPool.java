@@ -29,6 +29,12 @@ public class PartitionThreadPool {
     private final Clock clock = Clock.system();
 
     public boolean submit(String token, Runnable runnable) {
+        clean();
+
+        if (threadMap.containsKey(token)) {
+            LOGGER.info("Fail to submit token in PartitionThreadPool {} since it is already contained in the map", token);
+        }
+
         AtomicBoolean insertedThread = new AtomicBoolean(false);
 
         threadMap.computeIfAbsent(token, k -> {
@@ -38,10 +44,10 @@ public class PartitionThreadPool {
             return thread;
         });
         if (!insertedThread.get()) {
-            LOGGER.info("Fail to submit token {}", token);
+            LOGGER.info("Fail to submit token in PartitionThreadPool {}", token);
         }
 
-        return true;
+        return insertedThread.get();
     }
 
     public void stop(String token) {

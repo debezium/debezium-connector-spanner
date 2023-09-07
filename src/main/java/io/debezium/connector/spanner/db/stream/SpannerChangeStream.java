@@ -148,6 +148,7 @@ public class SpannerChangeStream implements ChangeStream {
                 }
 
                 try {
+
                     partitionEventListener.onException(partition, ex);
                 }
                 catch (InterruptedException e) {
@@ -182,15 +183,6 @@ public class SpannerChangeStream implements ChangeStream {
         if (this.partitionEventListener.onStuckPartition(token)) {
             this.onError(new StuckPartitionException(token));
         }
-    }
-
-    @Override
-    public void stop(String token) {
-        partitionThreadPool.stop(token);
-
-        metricsEventPublisher.publishMetricEvent(new ActiveQueriesUpdateMetricEvent(partitionThreadPool.getActiveThreads().size()));
-
-        LOGGER.info("Stopped streaming from partition with token {}", token);
     }
 
     @Override

@@ -107,8 +107,6 @@ class SpannerChangeStreamTest {
         SpannerChangeStream spannerChangeStream = new SpannerChangeStream(streamService, metricsEventPublisher, Duration.ofSeconds(60), 3, "taskUid",
                 databaseClientFactory);
         spannerChangeStream.stop();
-        spannerChangeStream.stop("test");
-        verify(metricsEventPublisher).publishMetricEvent(any());
     }
 
     @Test
