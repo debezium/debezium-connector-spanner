@@ -154,14 +154,20 @@ public class TaskStateChangeEventHandler {
 
         TaskSyncContext taskSyncContext = taskSyncContextHolder.updateAndGet(context -> {
             TaskSyncContext newContext = context;
+            int i = 0;
             for (Operation operation : operations) {
+                i++;
+                LOGGER.info("Task {} - performing operation on {} out of {} operations",
+                        taskSyncContextHolder.get().getTaskUid(), operation.getClass().getSimpleName(), i, operations.length);
                 newContext = operation.doOperation(newContext);
                 if (operation.isRequiredPublishSyncEvent()) {
-                    LOGGER.debug("Task {} - need to publish sync event for operation {}",
+                    LOGGER.info("Task {} - need to publish sync event for operation {}",
                             taskSyncContextHolder.get().getTaskUid(), operation.getClass().getSimpleName());
                     publishTaskSyncEvent.set(true);
                 }
             }
+            LOGGER.info("Task {} - done performing operations on operations",
+                    taskSyncContextHolder.get().getTaskUid());
             return newContext;
         });
 

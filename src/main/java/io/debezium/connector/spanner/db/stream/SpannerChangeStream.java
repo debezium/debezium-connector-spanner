@@ -128,6 +128,7 @@ public class SpannerChangeStream implements ChangeStream {
             return false;
         }
 
+        LOGGER.info("task {}, Trying to submit token {}", this.taskUid, partition.getToken());
         boolean submitted = partitionThreadPool.submit(partition.getToken(), () -> {
             LOGGER.info("task {}, Started streaming from partition with token {}", this.taskUid, partition.getToken());
             try {

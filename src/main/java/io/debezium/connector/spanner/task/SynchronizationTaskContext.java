@@ -203,10 +203,11 @@ public class SynchronizationTaskContext {
     public synchronized void destroy() {
 
         try {
-            this.taskSyncEventListener.shutdown();
-            LOGGER.info("Task {}, Shut down TaskSyncEventListener", this.taskSyncContextHolder.get().getTaskUid());
             this.rebalancingEventListener.shutdown();
             LOGGER.info("Task {}, Shut down rebalancingEventListener", this.taskSyncContextHolder.get().getTaskUid());
+
+            this.taskSyncEventListener.shutdown();
+            LOGGER.info("Task {}, Shut down TaskSyncEventListener", this.taskSyncContextHolder.get().getTaskUid());
 
             this.taskStateChangeEventProcessor.stopProcessing();
             LOGGER.info("Task {}, Shut down TaskStateChangeEventProcessor", this.taskSyncContextHolder.get().getTaskUid());
