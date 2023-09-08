@@ -218,7 +218,8 @@ public class SyncEventHandler {
             }
         }
         catch (Exception e) {
-            LOGGER.error("Exception during processing task message task Uid {}, message type {}, {}", inSync.getTaskUid(), inSync.getMessageType(), e);
+            LOGGER.error("Exception during processing task message task Uid {}, message type {}, exception {}", inSync.getTaskUid(), inSync.getMessageType(),
+                    e.toString());
             throw e;
         }
     }

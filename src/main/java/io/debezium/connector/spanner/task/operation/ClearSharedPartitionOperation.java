@@ -35,24 +35,16 @@ public class ClearSharedPartitionOperation implements Operation {
                 .map(PartitionState::getToken)
                 .collect(Collectors.toSet());
 
-        // Retrieve the tokens that are shared by other tasks.
-        Set<PartitionState> otherSharedTokens = taskSyncContext.getTaskStates().values().stream().flatMap(taskState -> taskState.getSharedPartitions().stream())
-                .collect(Collectors.toSet());
-
-        // Retrieve the other alive tasks.
-        Set<String> otherTasks = taskSyncContext.getTaskStates().values().stream().map(taskState -> taskState.getTaskUid()).collect(Collectors.toSet());
-
         List<PartitionState> currentSharedList = currentTaskState.getSharedPartitions().stream()
                 .collect(Collectors.toList());
 
         List<PartitionState> finalSharedList = new ArrayList<PartitionState>();
-        boolean reassignedPartition = false;
 
         // Filter or reassign shared partitions that are currently owned or shared to dead tasks.
         for (PartitionState sharedToken : currentSharedList) {
             // This token is owned by another task.
             if (otherTokens.contains(sharedToken.getToken())) {
-                LOGGER.info("Task {}, removing token {} since it is already owned by other tasks {}", taskSyncContext.getTaskUid(), sharedToken, otherTasks);
+                LOGGER.info("Task {}, removing token {} since it is already owned by other tasks", taskSyncContext.getTaskUid(), sharedToken);
             }
 
             else {
@@ -61,7 +53,7 @@ public class ClearSharedPartitionOperation implements Operation {
             }
         }
 
-        if (finalSharedList.size() != currentSharedList.size() || reassignedPartition) {
+        if (finalSharedList.size() != currentSharedList.size()) {
             this.isRequiredPublishSyncEvent = true;
         }
 

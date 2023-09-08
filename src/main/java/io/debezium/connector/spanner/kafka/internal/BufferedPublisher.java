@@ -15,6 +15,8 @@ import java.util.function.Predicate;
 
 import org.slf4j.Logger;
 
+import io.debezium.connector.spanner.kafka.internal.model.TaskState;
+import io.debezium.connector.spanner.kafka.internal.model.TaskSyncEvent;
 import io.debezium.util.Clock;
 import io.debezium.util.Metronome;
 
@@ -79,6 +81,15 @@ public class BufferedPublisher<V> {
         V item = this.value.getAndSet(null);
 
         if (item != null) {
+            if (item.getClass() == TaskSyncEvent.class) {
+                TaskSyncEvent event = (TaskSyncEvent) item;
+                TaskState newTask = event.getTaskStates().get(event.getTaskUid());
+                long taskRebalanceId = newTask == null ? -3 : newTask.getRebalanceGenerationId();
+
+                LOGGER.info("Task {}, publishing event with rebalance generation ID {} and message type {} and task rebalance id {}", this.taskUid,
+                        event.getRebalanceGenerationId(),
+                        event.getMessageType(), taskRebalanceId);
+            }
             this.onPublish.accept(item);
         }
     }

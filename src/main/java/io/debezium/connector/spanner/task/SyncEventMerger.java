@@ -280,6 +280,9 @@ public class SyncEventMerger {
             LOGGER.info("Task {}, updating the rebalance state to NEW_EPOCH_STARTED {}: {}", currentContext.getTaskUid(), inSync.getTaskUid(),
                     inSync.getRebalanceGenerationId());
             builder.rebalanceState(RebalanceState.NEW_EPOCH_STARTED);
+            // Experimental.
+            builder.rebalanceGenerationId(inSync.getRebalanceGenerationId());
+            currentTaskBuilder.rebalanceGenerationId(inSync.getRebalanceGenerationId());
         }
 
         LOGGER.debug("Task {}, updating the epoch offset from the leader new epoch {}: {}", currentContext.getTaskUid(), inSync.getTaskUid(),
