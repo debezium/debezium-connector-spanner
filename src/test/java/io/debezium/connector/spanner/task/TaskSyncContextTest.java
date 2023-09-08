@@ -26,7 +26,7 @@ class TaskSyncContextTest {
         TaskState task0 = generateTaskStateWithPartitions(
                 "task0", List.of(), List.of());
 
-        TaskSyncEvent syncEvent = taskSyncContext.buildRebalanceAnswerTaskSyncEvent();
+        TaskSyncEvent syncEvent = taskSyncContext.buildRebalanceAnswerTaskSyncEvent(0);
 
         // Build rebalance answer.
         Assertions.assertEquals("task0", syncEvent.getTaskUid());
@@ -58,7 +58,7 @@ class TaskSyncContextTest {
         TaskState task0 = generateTaskStateWithPartitions(
                 "task0", List.of(), List.of());
 
-        TaskSyncEvent syncEvent = taskSyncContext.buildRebalanceAnswerTaskSyncEvent();
+        TaskSyncEvent syncEvent = taskSyncContext.buildRebalanceAnswerTaskSyncEvent(0);
 
         // Build rebalance answer.
         Assertions.assertEquals("task0", syncEvent.getTaskUid());

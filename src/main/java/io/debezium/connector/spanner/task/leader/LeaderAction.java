@@ -77,12 +77,12 @@ public class LeaderAction {
         this.clock = Clock.system();
     }
 
-    private Thread createLeaderThread() {
+    private Thread createLeaderThread(long rebalanceGenerationId) {
         Thread thread = new Thread(() -> {
             LOGGER.info("performLeaderAction: Task {} start leader thread with rebalance generation ID {}", taskSyncContextHolder.get().getTaskUid(),
-                    taskSyncContextHolder.get().getRebalanceGenerationId());
+                    rebalanceGenerationId);
             try {
-                this.newEpoch();
+                this.newEpoch(rebalanceGenerationId);
             }
             catch (InterruptedException e) {
 
@@ -139,24 +139,24 @@ public class LeaderAction {
         return taskSyncContext;
     }
 
-    public void start() {
+    public void start(long rebalanceGenerationId) {
         if (this.leaderThread != null) {
-            this.stop();
+            this.stop(rebalanceGenerationId);
         }
-        this.leaderThread = createLeaderThread();
+        this.leaderThread = createLeaderThread(rebalanceGenerationId);
         this.leaderThread.start();
     }
 
-    public void stop() {
+    public void stop(long rebalanceGenerationId) {
         if (this.leaderThread == null) {
             return;
         }
         LOGGER.info("Task {}, trying to stop leader thread with rebalance generation ID {}", taskSyncContextHolder.get().getTaskUid(),
-                taskSyncContextHolder.get().getRebalanceGenerationId());
+                rebalanceGenerationId);
 
         this.leaderThread.interrupt();
         LOGGER.info("Task {}, interrupted leader thread with rebalance generation ID {}", taskSyncContextHolder.get().getTaskUid(),
-                taskSyncContextHolder.get().getRebalanceGenerationId());
+                rebalanceGenerationId);
 
         final Metronome metronome = Metronome.sleeper(sleepInterval, clock);
         while (!this.leaderThread.getState().equals(Thread.State.TERMINATED)) {
@@ -164,31 +164,36 @@ public class LeaderAction {
                 // Sleep for sleepInterval.
                 metronome.pause();
 
-                LOGGER.info("Task {}, interrupting leader thread again with rebalance generation ID {}", taskSyncContextHolder.get().getTaskUid(),
-                        taskSyncContextHolder.get().getRebalanceGenerationId());
-                this.leaderThread.interrupt();
+                LOGGER.info("Task {}, still waiting for leader thread to die with rebalance generation ID {}", taskSyncContextHolder.get().getTaskUid(),
+                        rebalanceGenerationId);
             }
             catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
             }
         }
         LOGGER.info("Task {}, stopped leader thread with rebalance generation ID {}", taskSyncContextHolder.get().getTaskUid(),
-                taskSyncContextHolder.get().getRebalanceGenerationId());
+                rebalanceGenerationId);
 
         this.leaderThread = null;
     }
 
-    private void newEpoch() throws InterruptedException {
+    private void newEpoch(long rebalanceGenerationId) throws InterruptedException {
         LOGGER.info("performLeaderActions: new epoch initialization");
         boolean startFromScratch = leaderService.isStartFromScratch();
 
         Set<String> activeConsumers = kafkaAdminService.getActiveConsumerGroupMembers();
 
-        LOGGER.info("performLeaderActions: consumers found {}", activeConsumers);
+        LOGGER.info("Task {} with consumer {}, performLeaderActions: consumers found {}", taskSyncContextHolder.get().getTaskUid(),
+                taskSyncContextHolder.get().getConsumerId(), activeConsumers);
+
+        activeConsumers.remove(taskSyncContextHolder.get().getConsumerId());
+
+        LOGGER.info("Task {} with consumer {}, performLeaderActions: consumers found without leader {}", taskSyncContextHolder.get().getTaskUid(),
+                taskSyncContextHolder.get().getConsumerId(), activeConsumers);
 
         Map<String, String> consumerToTaskMap = leaderService.awaitAllNewTaskStateUpdates(
                 activeConsumers,
-                taskSyncContextHolder.get().getRebalanceGenerationId());
+                rebalanceGenerationId);
 
         LOGGER.info("performLeaderActions: answers received {}", consumerToTaskMap);
 
@@ -214,7 +219,8 @@ public class LeaderAction {
         TaskSyncContext taskSyncContext = taskSyncContextHolder.updateAndGet(oldContext -> {
             TaskState leaderState = oldContext.getCurrentTaskState();
 
-            Map<String, TaskState> currentTaskStates = oldContext.getAllTaskStates();
+            // Only get the nonleader current task states to split between survived and obsolete.
+            Map<String, TaskState> currentTaskStates = oldContext.getTaskStates();
             Set<String> taskUids = currentTaskStates.keySet().stream().collect(Collectors.toSet());
             LOGGER.info("Task {}, Current task states in old context: {}", oldContext.getTaskUid(), taskUids);
 
@@ -223,11 +229,14 @@ public class LeaderAction {
             Map<String, TaskState> survivedTasks = isSurvivedPartitionedTaskStates.get(true);
             Map<String, TaskState> obsoleteTasks = isSurvivedPartitionedTaskStates.get(false);
 
+            // Update the current task's rebalance generation ID when sending out the new epoch.
             leaderState = taskPartitonRebalancer.rebalance(leaderState, survivedTasks, obsoleteTasks);
+            TaskState finalLeaderState = leaderState.toBuilder().rebalanceGenerationId(rebalanceGenerationId).build();
 
             return oldContext.toBuilder()
-                    .currentTaskState(leaderState)
+                    .currentTaskState(finalLeaderState)
                     .rebalanceState(RebalanceState.NEW_EPOCH_STARTED)
+                    .rebalanceGenerationId(rebalanceGenerationId)
                     .taskStates(filterSurvivedTasksStates(oldContext.getTaskStates(), survivedTasks.keySet()))
                     .epochOffsetHolder(oldContext.getEpochOffsetHolder().nextOffset(oldContext.getCurrentKafkaRecordOffset()))
                     .build();

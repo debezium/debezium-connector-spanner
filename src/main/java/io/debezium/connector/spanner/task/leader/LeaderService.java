@@ -102,44 +102,52 @@ public class LeaderService {
     public Map<String, String> awaitAllNewTaskStateUpdates(Set<String> consumers, long rebalanceGenerationId)
             throws InterruptedException {
         Map<String, String> consumerToTaskMap = new HashMap<>();
+
         LOGGER.info("awaitAllNewTaskStateUpdates: wait taskSyncContextHolder for all new task updates");
 
         TimeoutMeter timeoutMeter = TimeoutMeter.setTimeout(awaitTaskAnswerDuration);
 
-        while (consumerToTaskMap.size() < consumers.size()) {
-
-            LOGGER.info("Task {}, rebalance generation ID {}, awaitAllNewTaskStateUpdates: " +
-                    "expected: {}, actual: {}. Expected consumers: {}", taskSyncContextHolder.get().getTaskUid(), taskSyncContextHolder.get().getRebalanceGenerationId(),
-                    consumers.size(), consumerToTaskMap.size(), consumers);
-
-            if (timeoutMeter.isExpired()) {
-                LOGGER.error("Task {} : Not received all answers from tasks", taskSyncContextHolder.get().getTaskUid());
-                break;
-            }
+        while (!Thread.currentThread().isInterrupted() && consumerToTaskMap.size() < consumers.size()) {
 
             try {
+                LOGGER.info("Task {} with Consumer Id {}, rebalance generation ID {}, awaitAllNewTaskStateUpdates: " +
+                        "expected: {}, actual: {}. Expected consumers: {}", taskSyncContextHolder.get().getTaskUid(), taskSyncContextHolder.get().getConsumerId(),
+                        rebalanceGenerationId,
+                        consumers.size(), consumerToTaskMap.size(), consumers);
+
+                if (timeoutMeter.isExpired()) {
+                    LOGGER.error("Task {} : Not received all answers from tasks", taskSyncContextHolder.get().getTaskUid());
+                    break;
+                }
+
                 Thread.sleep(POLL_INTERVAL_MILLIS);
+
+                taskSyncContextHolder.get().getAllTaskStates()
+                        .entrySet()
+                        .stream()
+                        .filter(e -> !consumerToTaskMap.containsValue(e.getKey())
+                                && consumers.contains(e.getValue().getConsumerId())
+                                && e.getValue().getRebalanceGenerationId() == rebalanceGenerationId)
+                        .findAny()
+                        .ifPresent(state -> consumerToTaskMap.put(state.getValue().getConsumerId(), state.getKey()));
+
+                metricsEventPublisher.publishMetricEvent(
+                        new RebalanceMetricEvent(consumerToTaskMap.size(), consumers.size()));
             }
             catch (InterruptedException e) {
-                throw e; // will be handled by LeaderAction
+
+                LOGGER.info("awaitAllNewTaskStateUpdates: Task {} was interrupted", taskSyncContextHolder.get().getTaskUid());
+
+                throw e;
             }
 
-            taskSyncContextHolder.get().getAllTaskStates()
-                    .entrySet()
-                    .stream()
-                    .filter(e -> !consumerToTaskMap.containsValue(e.getKey())
-                            && consumers.contains(e.getValue().getConsumerId())
-                            && e.getValue().getRebalanceGenerationId() == rebalanceGenerationId)
-                    .findAny()
-                    .ifPresent(state -> consumerToTaskMap.put(state.getValue().getConsumerId(), state.getKey()));
-
-            metricsEventPublisher.publishMetricEvent(
-                    new RebalanceMetricEvent(consumerToTaskMap.size(), consumers.size()));
-
         }
-        LOGGER.info("awaitAllNewTaskStateUpdates: " +
-                "expected: {}, actual: {}. Expected consumers: {}", consumers.size(), consumerToTaskMap.size(), consumers);
-        LOGGER.info("awaitAllNewTaskStateUpdates: new task updated the state with {} consumers: {}", consumerToTaskMap, consumerToTaskMap.size());
+        LOGGER.info("Task {} with consumerID {}, awaitAllNewTaskStateUpdates: " +
+                "expected: {}, actual: {}. Expected consumers: {}", taskSyncContextHolder.get().getTaskUid(), taskSyncContextHolder.get().getConsumerId(),
+                consumers.size(), consumerToTaskMap.size(),
+                consumers);
+        LOGGER.info("Task {}, awaitAllNewTaskStateUpdates: new task updated the state with {} consumers: {}", taskSyncContextHolder.get().getTaskUid(), consumerToTaskMap,
+                consumerToTaskMap.size());
         return consumerToTaskMap;
     }
 

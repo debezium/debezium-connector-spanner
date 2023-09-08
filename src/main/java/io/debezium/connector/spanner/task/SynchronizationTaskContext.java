@@ -211,10 +211,10 @@ public class SynchronizationTaskContext {
         try {
             this.taskSyncEventListener.shutdown();
             LOGGER.info("Task {}, Shut down TaskSyncEventListener", this.taskSyncContextHolder.get().getTaskUid());
-          
+
             this.taskSyncPublisher.close();
             LOGGER.info("Task {}, Shut down TaskSyncPublisher", this.taskSyncContextHolder.get().getTaskUid());
-          
+
             this.rebalancingEventListener.shutdown();
             LOGGER.info("Task {}, Shut down rebalancingEventListener", this.taskSyncContextHolder.get().getTaskUid());
 
@@ -226,7 +226,7 @@ public class SynchronizationTaskContext {
 
             this.rebalanceHandler.destroy();
             LOGGER.info("Task {}, Shut down rebalance handler", this.taskSyncContextHolder.get().getTaskUid());
-    
+
         }
         catch (Throwable ex) {
             LOGGER.warn("Task {}, Exception during sync context destroying", this.taskSyncContextHolder.get().getTaskUid(), ex);
@@ -237,6 +237,7 @@ public class SynchronizationTaskContext {
     public void publishEvent(TaskStateChangeEvent event) throws InterruptedException {
         LoggerUtils.debug(LOGGER, "publishEvent: type: {}, event: {}", event.getClass().getSimpleName(), event);
 
+        LOGGER.info("Task {}, publishing event: {}", this.taskSyncContextHolder.get().getTaskUid(), event);
         this.taskStateChangeEventProcessor.processEvent(event);
     }
 
