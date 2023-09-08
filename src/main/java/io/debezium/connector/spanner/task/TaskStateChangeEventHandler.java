@@ -155,7 +155,7 @@ public class TaskStateChangeEventHandler {
         TaskSyncContext taskSyncContext = taskSyncContextHolder.updateAndGet(context -> {
             TaskSyncContext newContext = context;
             for (Operation operation : operations) {
-                LOGGER.debug("Task {} - doing operation {} out of {} operations",
+                LOGGER.info("Task {} - doing operation {} out of {} operations",
                         taskSyncContextHolder.get().getTaskUid(), operation.getClass().getSimpleName(), operations.length);
                 newContext = operation.doOperation(newContext);
                 if (operation.isRequiredPublishSyncEvent()) {

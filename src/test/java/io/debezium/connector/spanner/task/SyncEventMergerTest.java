@@ -29,7 +29,7 @@ class SyncEventMergerTest {
         TaskSyncContext taskSyncContext1 = buildTaskSyncContext1(RebalanceState.INITIAL_INCREMENTED_STATE_COMPLETED, false);
         TaskSyncContext taskSyncContext2 = buildTaskSyncContext2(RebalanceState.INITIAL_INCREMENTED_STATE_COMPLETED, true);
 
-        TaskSyncEvent rebalanceAnswer1 = taskSyncContext1.buildRebalanceAnswerTaskSyncEvent();
+        TaskSyncEvent rebalanceAnswer1 = taskSyncContext1.buildRebalanceAnswerTaskSyncEvent(0);
         TaskSyncContext mergedRebalanceAnswer = mergeRebalanceAnswer(
                 taskSyncContext2, rebalanceAnswer1);
 

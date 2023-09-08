@@ -62,19 +62,17 @@ public class TaskSyncContextHolder {
 
     public TaskSyncContext updateAndGet(UnaryOperator<TaskSyncContext> updateFunction) {
         TaskSyncContext taskSyncContext;
+        LOGGER.info("Task {}, trying to lock TaskSyncContext, lock debug string {}", get().getTaskUid(), lockDebugString());
+        lock.lock();
+        LOGGER.info("Task {}, locked TaskSyncContext, lock debug string {}", get().getTaskUid(), lockDebugString());
         try {
-            LOGGER.info("Task {}, trying to lock TaskSyncContext, lock debug string {}", get().getTaskUid(), lockDebugString());
-            lock.lock();
-            LOGGER.info("Task {}, locked TaskSyncContext, lock debug string {}", get().getTaskUid(), lockDebugString());
             taskSyncContext = taskSyncContextRef.updateAndGet(updateFunction);
             LOGGER.info("Task {}, updated TaskSyncContext, lock debug string {}", get().getTaskUid(), lockDebugString());
         }
         finally {
-            if (lock.isHeldByCurrentThread()) {
-                LOGGER.info("Task {}, unlocking TaskSyncContext, lock debug string {}", get().getTaskUid(), lockDebugString());
-                lock.unlock();
-                LOGGER.info("Task {}, unlocked TaskSyncContext, lock debug string {}", get().getTaskUid(), lockDebugString());
-            }
+            LOGGER.info("Task {}, unlocking TaskSyncContext, lock debug string {}", get().getTaskUid(), lockDebugString());
+            lock.unlock();
+            LOGGER.info("Task {}, unlocked TaskSyncContext, lock debug string {}", get().getTaskUid(), lockDebugString());
         }
 
         metricsEventPublisher.publishMetricEvent(new TaskSyncContextMetricEvent(taskSyncContext));

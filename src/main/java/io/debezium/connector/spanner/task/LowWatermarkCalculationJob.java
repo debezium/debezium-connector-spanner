@@ -153,8 +153,7 @@ public class LowWatermarkCalculationJob {
                     // Sleep for sleepInterval.
                     metronome.pause();
 
-                    LOGGER.info("Task {}, interrupting low watermark calculation thread again", taskUid);
-                    this.calculationThread.interrupt();
+                    LOGGER.info("Task {}, still waiting for low watermark calculation thread to die", taskUid);
                 }
                 catch (InterruptedException e) {
                     Thread.currentThread().interrupt();

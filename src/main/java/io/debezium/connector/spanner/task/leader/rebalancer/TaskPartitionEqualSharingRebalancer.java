@@ -44,7 +44,6 @@ public class TaskPartitionEqualSharingRebalancer implements TaskPartitionRebalan
                                Map<String, TaskState> obsoleteTaskStates) {
 
         LOGGER.info("Leader task state {}", leaderTaskState);
-        survivedTasks = excludeLeader(leaderTaskState.getTaskUid(), survivedTasks);
         LOGGER.info("Survived tasks {}", survivedTasks);
         LOGGER.info("Obsolete tasks {}", obsoleteTaskStates);
 
@@ -76,12 +75,6 @@ public class TaskPartitionEqualSharingRebalancer implements TaskPartitionRebalan
                 newLeaderTaskState);
 
         return newLeaderTaskState;
-    }
-
-    private Map<String, TaskState> excludeLeader(String leaderTaskUid, Map<String, TaskState> tasks) {
-        tasks = new HashMap<>(tasks);
-        tasks.remove(leaderTaskUid);
-        return tasks;
     }
 
     private TaskState moveFinishedPartitionsFromObsoleteTasks(

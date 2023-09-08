@@ -57,16 +57,20 @@ public class TaskSyncContext {
         Map<String, TaskState> taskStateMap = new HashMap<>(this.taskStates);
         taskStateMap.put(currentTaskState.getTaskUid(), currentTaskState.toBuilder()
                 .consumerId(consumerId)
-                .rebalanceGenerationId(rebalanceGenerationId)
+                .rebalanceGenerationId(this.getRebalanceGenerationId())
                 .stateTimestamp(Instant.now().toEpochMilli()).build());
         return Map.copyOf(taskStateMap);
     }
 
     public Map<String, TaskState> getCurrentTaskStateMap() {
+        return getCurrentTaskStateMapWithRebalanceGenerationId(this.getRebalanceGenerationId());
+    }
+
+    public Map<String, TaskState> getCurrentTaskStateMapWithRebalanceGenerationId(long inputRebalanceGenerationId) {
         Map<String, TaskState> currentTaskStateMap = new HashMap<>();
         currentTaskStateMap.put(currentTaskState.getTaskUid(), currentTaskState.toBuilder()
                 .consumerId(consumerId)
-                .rebalanceGenerationId(rebalanceGenerationId)
+                .rebalanceGenerationId(inputRebalanceGenerationId)
                 .stateTimestamp(Instant.now().toEpochMilli()).build());
         return Map.copyOf(currentTaskStateMap);
     }
@@ -98,12 +102,12 @@ public class TaskSyncContext {
     }
 
     // Builds a rebalance answer task sync event, which will contain only the current task state.
-    public TaskSyncEvent buildRebalanceAnswerTaskSyncEvent() {
+    public TaskSyncEvent buildRebalanceAnswerTaskSyncEvent(long inputRebalanceGenerationId) {
         return TaskSyncEvent.builder().epochOffset(this.epochOffsetHolder.getEpochOffset()).taskStates(
-                this.getCurrentTaskStateMap())
+                this.getCurrentTaskStateMapWithRebalanceGenerationId(inputRebalanceGenerationId))
                 .taskUid(this.getTaskUid())
                 .consumerId(this.getConsumerId())
-                .rebalanceGenerationId(this.getRebalanceGenerationId())
+                .rebalanceGenerationId(inputRebalanceGenerationId)
                 .messageTimestamp(this.getCreatedTimestamp())
                 .messageType(MessageTypeEnum.REBALANCE_ANSWER)
                 .databaseSchemaTimestamp(databaseSchemaTimestamp)

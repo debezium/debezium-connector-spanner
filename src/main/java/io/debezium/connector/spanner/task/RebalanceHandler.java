@@ -46,25 +46,27 @@ public class RebalanceHandler {
                 taskSyncContextHolder.get().getTaskUid(),
                 rebalanceGenerationId, isLeader);
 
-        TaskSyncContext context = taskSyncContextHolder.updateAndGet(oldContext -> {
-            if (rebalanceGenerationId < taskSyncContextHolder.get().getRebalanceGenerationId()) {
-                LOGGER.info(
-                        "processRebalancingEvent: skipping due to stale rebalance generation ID {}, consumerId: {}, taskId{}, rebalanceGenerationId: {}, isLeader {}",
-                        rebalanceGenerationId, consumerId,
-                        taskSyncContextHolder.get().getTaskUid(),
-                        rebalanceGenerationId, isLeader);
-                return oldContext;
+        long oldRebalanceGenerationId = taskSyncContextHolder.get().getRebalanceGenerationId();
+        if (rebalanceGenerationId < oldRebalanceGenerationId) {
+            LOGGER.info(
+                    "processRebalancingEvent: skipping due to stale rebalance generation ID {}, consumerId: {}, taskId{}, rebalanceGenerationId: {}, isLeader {}",
+                    rebalanceGenerationId, consumerId,
+                    taskSyncContextHolder.get().getTaskUid(),
+                    rebalanceGenerationId, isLeader);
+            return;
+        }
 
-            }
+        // Do not update the rebalance generation ID here. Only update when:
+        // 1. sending out the new Epoch
+        // 2. processing the new epoch
+        TaskSyncContext context = taskSyncContextHolder.updateAndGet(oldContext -> {
             TaskState updatedState = oldContext.getCurrentTaskState()
                     .toBuilder()
                     .consumerId(consumerId)
-                    .rebalanceGenerationId(rebalanceGenerationId)
                     .build();
 
             return oldContext.toBuilder()
                     .consumerId(consumerId)
-                    .rebalanceGenerationId(rebalanceGenerationId)
                     .currentTaskState(updatedState)
                     .isLeader(isLeader)
 
@@ -79,40 +81,32 @@ public class RebalanceHandler {
 
         LOGGER.info("Task {} - RebalanceHandler finished updating task sync context for consumer ID {} and rebalance generation ID {}", context.getTaskUid(),
                 consumerId,
-                taskSyncContextHolder.get().getRebalanceGenerationId());
-        if (context.getRebalanceGenerationId() != rebalanceGenerationId) {
-            LOGGER.info(
-                    "processRebalancingEvent: failed to update task sync context, consumerId: {}, taskId{}, rebalanceGenerationId: {}, isLeader {}, task rebalance generation ID {}",
-                    consumerId,
-                    taskSyncContextHolder.get().getTaskUid(),
-                    rebalanceGenerationId, isLeader, taskSyncContextHolder.get().getRebalanceGenerationId());
-            return;
-        }
+                rebalanceGenerationId);
         // Stop the current leader thread if it exists.
-        this.leaderAction.stop();
+        this.leaderAction.stop(oldRebalanceGenerationId);
 
         LOGGER.info("processRebalancingEvent: stopped leader thread, consumerId: {}, taskId{}, rebalanceGenerationId: {}, isLeader {}", consumerId,
                 taskSyncContextHolder.get().getTaskUid(),
                 rebalanceGenerationId, isLeader);
 
-        TaskSyncEvent taskSyncEvent = context.buildRebalanceAnswerTaskSyncEvent();
+        TaskSyncEvent taskSyncEvent = context.buildRebalanceAnswerTaskSyncEvent(rebalanceGenerationId);
 
         LoggerUtils.debug(LOGGER, "processRebalancingEvent: send: {}", taskSyncEvent);
         LOGGER.info("Task {} - RebalanceHandler sent sync event for consumer ID {} and rebalance generation ID {}", taskSyncEvent.getTaskUid(), consumerId,
-                taskSyncContextHolder.get().getRebalanceGenerationId());
+                rebalanceGenerationId);
 
         // Send the rebalance event.
         taskSyncPublisher.send(taskSyncEvent);
 
         LOGGER.info(
                 "processRebalancingEvent: Task {} rebalance answer has been sent for consumer ID {} and rebalance generation ID {}, num partitions {} num shared partitions {}",
-                taskSyncContextHolder.get().getTaskUid(), consumerId, taskSyncContextHolder.get().getRebalanceGenerationId(),
+                taskSyncContextHolder.get().getTaskUid(), consumerId, rebalanceGenerationId,
                 taskSyncContextHolder.get().getNumPartitions(),
                 taskSyncContextHolder.get().getNumSharedPartitions());
         // Start the leader thread if the task is a leader.
         if (isLeader) {
             LOGGER.info("Task {} is leader", context.getTaskUid());
-            this.leaderAction.start();
+            this.leaderAction.start(rebalanceGenerationId);
             this.lowWatermarkStampPublisher.start();
         }
         else {
@@ -125,7 +119,7 @@ public class RebalanceHandler {
     }
 
     public void destroy() {
-        this.leaderAction.stop();
+        this.leaderAction.stop(taskSyncContextHolder.get().getRebalanceGenerationId());
         LOGGER.info("Task {}, destroyed leader action ", taskSyncContextHolder.get().getTaskUid());
 
         try {
