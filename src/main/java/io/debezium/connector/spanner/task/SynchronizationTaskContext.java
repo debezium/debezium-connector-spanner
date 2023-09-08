@@ -185,13 +185,19 @@ public class SynchronizationTaskContext {
             this.rebalancingEventListener
                     .listen(metadata -> rebalanceHandler.process(metadata.isLeader(), metadata.getConsumerId(), metadata.getRebalanceGenerationId()));
 
+            LOGGER.info("{}, Start Low Watermark Calculation Job", task.getTaskUid());
             this.lowWatermarkCalculationJob.start();
 
+            LOGGER.info("{}, Init Schema Registry", task.getTaskUid());
             this.schemaRegistry.init();
 
+            LOGGER.info("{}, Start Processing Task State Change Event Processor", task.getTaskUid());
             this.taskStateChangeEventProcessor.startProcessing();
 
+            LOGGER.info("{}, TaskSyncContextHolder update initialized", task.getTaskUid());
             this.taskSyncContextHolder.update(context -> context.toBuilder().initialized(true).build());
+
+            LOGGER.info("{}, Finished updating TaskSyncContextHolder", task.getTaskUid());
 
         }
         catch (Throwable ex) {
@@ -203,11 +209,14 @@ public class SynchronizationTaskContext {
     public synchronized void destroy() {
 
         try {
-            this.rebalancingEventListener.shutdown();
-            LOGGER.info("Task {}, Shut down rebalancingEventListener", this.taskSyncContextHolder.get().getTaskUid());
-
             this.taskSyncEventListener.shutdown();
             LOGGER.info("Task {}, Shut down TaskSyncEventListener", this.taskSyncContextHolder.get().getTaskUid());
+          
+            this.taskSyncPublisher.close();
+            LOGGER.info("Task {}, Shut down TaskSyncPublisher", this.taskSyncContextHolder.get().getTaskUid());
+          
+            this.rebalancingEventListener.shutdown();
+            LOGGER.info("Task {}, Shut down rebalancingEventListener", this.taskSyncContextHolder.get().getTaskUid());
 
             this.taskStateChangeEventProcessor.stopProcessing();
             LOGGER.info("Task {}, Shut down TaskStateChangeEventProcessor", this.taskSyncContextHolder.get().getTaskUid());
@@ -217,8 +226,7 @@ public class SynchronizationTaskContext {
 
             this.rebalanceHandler.destroy();
             LOGGER.info("Task {}, Shut down rebalance handler", this.taskSyncContextHolder.get().getTaskUid());
-            this.taskSyncPublisher.close();
-            LOGGER.info("Task {}, Shut down TaskSyncPublisher", this.taskSyncContextHolder.get().getTaskUid());
+    
         }
         catch (Throwable ex) {
             LOGGER.warn("Task {}, Exception during sync context destroying", this.taskSyncContextHolder.get().getTaskUid(), ex);

@@ -119,10 +119,10 @@ public class SyncEventHandler {
 
     public void processNewEpoch(TaskSyncEvent inSync, SyncEventMetadata metadata) throws InterruptedException, IllegalStateException {
         LOGGER.info(
-                "Task {} - processNewEpoch: metadata {}, rebalanceId: {}, current task {}",
+                "Task {} - processNewEpoch: metadata {}, rebalance State {}, rebalanceId: {}, current task {}",
                 taskSyncContextHolder.get().getTaskUid(),
-                taskSyncContextHolder.get(),
                 metadata,
+                taskSyncContextHolder.get().getRebalanceState(),
                 inSync.getRebalanceGenerationId());
 
         TaskSyncContext newContext = taskSyncContextHolder.updateAndGet(context -> SyncEventMerger.mergeNewEpoch(context, inSync));

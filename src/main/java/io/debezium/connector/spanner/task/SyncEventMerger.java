@@ -277,6 +277,8 @@ public class SyncEventMerger {
         else {
             // Update the state to NEW_EPOCH_STARTED if we have received a new epoch message during
             // normal task execution.
+            LOGGER.info("Task {}, updating the rebalance state to NEW_EPOCH_STARTED {}: {}", currentContext.getTaskUid(), inSync.getTaskUid(),
+                    inSync.getRebalanceGenerationId());
             builder.rebalanceState(RebalanceState.NEW_EPOCH_STARTED);
         }
 
@@ -291,7 +293,7 @@ public class SyncEventMerger {
         TaskSyncContext result = builder.build();
 
         long newPartitions = result.getNumPartitions() + result.getNumSharedPartitions();
-        LOGGER.debug("Task {}, processed new epoch message {}: {}, task has total partitions {}, num partitions {}, num shared partitions {}, num old partitions {}",
+        LOGGER.info("Task {}, processed new epoch message {}: {}, task has total partitions {}, num partitions {}, num shared partitions {}, num old partitions {}",
                 currentContext.getTaskUid(), inSync.getTaskUid(),
                 inSync.getEpochOffset(), result.getNumPartitions() + result.getNumSharedPartitions(),
                 result.getNumPartitions(), result.getNumSharedPartitions(), oldPartitions);

@@ -38,6 +38,7 @@ public class LowWatermarkCalculationJob {
 
     private final String taskUid;
     private final Clock clock;
+    private final Duration sleepInterval = Duration.ofMillis(100);
 
     public LowWatermarkCalculationJob(SpannerConnectorConfig connectorConfig,
                                       Consumer<Throwable> errorHandler,
@@ -62,7 +63,7 @@ public class LowWatermarkCalculationJob {
                 Stopwatch sw = Stopwatch.accumulating().start();
                 final Metronome metronome = Metronome.sleeper(Duration.ofMillis(period), clock);
                 LOGGER.info("Task {}, beginning calculation of low watermark", taskUid);
-                while (true) {
+                while (!Thread.currentThread().isInterrupted()) {
                     try {
                         final Duration totalDuration = sw.stop().durations().statistics().getTotal();
                         boolean printOffsets = false;
@@ -76,6 +77,7 @@ public class LowWatermarkCalculationJob {
                             // Resume the existing stop watch, we haven't met the criteria yet.
                             sw.start();
                         }
+                        LOGGER.info("Task {}, getting low watermark", taskUid);
                         getLowWatermark(printOffsets);
                     }
                     catch (InterruptedException e) {
@@ -109,23 +111,24 @@ public class LowWatermarkCalculationJob {
     }
 
     private void getLowWatermark(boolean printOffsets) throws InterruptedException {
-        if (Thread.currentThread().isInterrupted()) {
-            return;
-        }
-
         Timestamp timestamp;
+        final Metronome metronome = Metronome.sleeper(Duration.ofMillis(100), clock);
         do {
-            timestamp = lowWatermarkCalculator.calculateLowWatermark(printOffsets);
-            if (timestamp == null) {
-                if (Thread.currentThread().isInterrupted()) {
-                    return;
+            try {
+                timestamp = lowWatermarkCalculator.calculateLowWatermark(printOffsets);
+                if (timestamp == null) {
+                    LOGGER.warn("Task {}, failed to retrieve low watermark", taskUid);
+                    metronome.pause();
                 }
-                Thread.sleep(1);
+                else {
+                    break;
+                }
             }
-            else {
-                break;
+            catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return;
             }
-        } while (true);
+        } while (!Thread.currentThread().isInterrupted());
         lowWatermarkHolder.setLowWatermark(timestamp);
     }
 
@@ -142,6 +145,22 @@ public class LowWatermarkCalculationJob {
     public void stop() {
         if (calculationThread != null) {
             calculationThread.interrupt();
+
+            final Metronome metronome = Metronome.sleeper(sleepInterval, clock);
+            LOGGER.info("Task {}, stopping low watermark calculation thread ", taskUid);
+            while (!this.calculationThread.getState().equals(Thread.State.TERMINATED)) {
+                try {
+                    // Sleep for sleepInterval.
+                    metronome.pause();
+
+                    LOGGER.info("Task {}, interrupting low watermark calculation thread again", taskUid);
+                    this.calculationThread.interrupt();
+                }
+                catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+            LOGGER.info("Task {}, stopped low watermark calculation thread ", taskUid);
             calculationThread = null;
         }
     }
