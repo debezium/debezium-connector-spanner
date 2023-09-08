@@ -49,7 +49,7 @@ public class LowWatermarkCalculator {
         TaskSyncContext taskSyncContext = taskSyncContextHolder.get();
 
         if (!taskSyncContext.isInitialized()) {
-            LOGGER.warn("TaskSyncContextHolder not initialized");
+            LOGGER.warn("Task {}, TaskSyncContextHolder not initialized", taskSyncContextHolder.get().getTaskUid());
             return null;
         }
 
@@ -63,10 +63,8 @@ public class LowWatermarkCalculator {
         Set<String> duplicatesInPartitions = checkDuplication(partitionsMap);
 
         if (!duplicatesInPartitions.isEmpty()) {
-            if (printOffsets) {
-                LOGGER.warn(
-                        "Task {}, calculateLowWatermark: found duplication in partitionsMap: {}", taskSyncContextHolder.get().getTaskUid(), duplicatesInPartitions);
-            }
+            LOGGER.warn(
+                    "Task {}, calculateLowWatermark: found duplication in partitionsMap: {}", taskSyncContextHolder.get().getTaskUid(), duplicatesInPartitions);
             return null;
         }
 
@@ -81,11 +79,9 @@ public class LowWatermarkCalculator {
 
         Set<String> duplicatesInSharedPartitions = checkDuplication(sharedPartitionsMap);
         if (!duplicatesInSharedPartitions.isEmpty()) {
-            if (printOffsets) {
-                LOGGER.warn(
-                        "Task {}, calculateLowWatermark: found duplication in sharedPartitionsMap: {}",
-                        taskSyncContextHolder.get().getTaskUid(), duplicatesInSharedPartitions);
-            }
+            LOGGER.warn(
+                    "Task {}, calculateLowWatermark: found duplication in sharedPartitionsMap: {}",
+                    taskSyncContextHolder.get().getTaskUid(), duplicatesInSharedPartitions);
             return null;
         }
 
