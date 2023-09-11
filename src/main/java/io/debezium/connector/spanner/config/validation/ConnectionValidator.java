@@ -22,7 +22,7 @@ public class ConnectionValidator implements ConfigurationValidator.Validator {
 
     private static final String GOOGLE_APPLICATION_CREDENTIALS_ENV_VAR = "GOOGLE_APPLICATION_CREDENTIALS";
 
-    private static final String PLEASE_SPECIFY_CONFIGURATION_PROPERTY_MSG = "please specify configuration property %s or %s or set %s evn variable";
+    private static final String PLEASE_SPECIFY_CONFIGURATION_PROPERTY_MSG = "Configuration property %s or %s is not specified; Application Default Credentials will be used.";
 
     private static final String GOOGLE_CREDENTIAL_INCORRECT = "Can`t connect to spanner. Google credential is incorrect";
     private static final String INSTANCE_NOT_EXIST = "Instance %s does not exist";
@@ -56,10 +56,7 @@ public class ConnectionValidator implements ConfigurationValidator.Validator {
         if (!FieldValidator.isSpecified(googleCredentials) && !FieldValidator.isSpecified(credentialPath) && !FieldValidator.isSpecified(credentialJson)) {
             String message = String.format(PLEASE_SPECIFY_CONFIGURATION_PROPERTY_MSG, SPANNER_CREDENTIALS_PATH.name(),
                     SPANNER_CREDENTIALS_JSON.name(), GOOGLE_APPLICATION_CREDENTIALS_ENV_VAR);
-            LOGGER.error(message);
-            context.error(message, SPANNER_CREDENTIALS_PATH, SPANNER_CREDENTIALS_JSON);
-            result = false;
-            return this;
+            LOGGER.warn(message, SPANNER_CREDENTIALS_PATH, SPANNER_CREDENTIALS_JSON);
         }
         return this;
     }

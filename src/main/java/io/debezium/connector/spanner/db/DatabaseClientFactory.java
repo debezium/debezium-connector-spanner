@@ -14,6 +14,7 @@ import org.slf4j.LoggerFactory;
 
 import com.google.api.gax.rpc.FixedHeaderProvider;
 import com.google.auth.oauth2.GoogleCredentials;
+import com.google.auth.oauth2.ServiceAccountCredentials;
 import com.google.cloud.spanner.DatabaseClient;
 import com.google.cloud.spanner.DatabaseId;
 import com.google.cloud.spanner.Spanner;
@@ -93,6 +94,15 @@ public class DatabaseClientFactory {
             }
             catch (IOException e) {
                 LOGGER.error("Error read GOOGLE CREDENTIALS from path {}", credentialsPath);
+                LOGGER.error(e.getMessage(), e);
+            }
+        }
+        else {
+            try {
+                credential = ServiceAccountCredentials.getApplicationDefault();
+            }
+            catch (IOException e) {
+                LOGGER.error("The Application Default Credentials are not available.");
                 LOGGER.error(e.getMessage(), e);
             }
         }
