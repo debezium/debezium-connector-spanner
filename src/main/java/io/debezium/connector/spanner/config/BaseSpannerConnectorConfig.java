@@ -181,7 +181,7 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
             .withType(Type.STRING)
             .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR, 1))
             .withWidth(Width.MEDIUM)
-            .withImportance(Importance.LOW)
+            .withImportance(Importance.MEDIUM)
             .withValidation(FieldValidator::isCorrectPath)
             .withDescription("Service account keys file path");
 
@@ -190,7 +190,7 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
             .withType(Type.STRING)
             .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR, 2))
             .withWidth(Width.LONG)
-            .withImportance(Importance.LOW)
+            .withImportance(Importance.MEDIUM)
             .withValidation(FieldValidator::isCorrectJson)
             .withDescription("Service account keys with json format");
 
