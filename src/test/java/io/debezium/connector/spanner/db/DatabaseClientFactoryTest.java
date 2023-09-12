@@ -46,7 +46,9 @@ class DatabaseClientFactoryTest {
         assertNull(new DatabaseClientFactory("myproject", "42", "42", "Credentials Json",
                 "Credentials Path", null, "test-role")
                 .getGoogleCredentials(null, "Credentials Path"));
-
+        assertNull(new DatabaseClientFactory("myproject", "42", "42", null,
+                null, null, "test-role")
+                .getGoogleCredentials(null, null));
     }
 
     @Test
