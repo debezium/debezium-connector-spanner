@@ -56,7 +56,7 @@ public class ConnectionValidator implements ConfigurationValidator.Validator {
         if (!FieldValidator.isSpecified(googleCredentials) && !FieldValidator.isSpecified(credentialPath) && !FieldValidator.isSpecified(credentialJson)) {
             String message = String.format(PLEASE_SPECIFY_CONFIGURATION_PROPERTY_MSG, SPANNER_CREDENTIALS_PATH.name(),
                     SPANNER_CREDENTIALS_JSON.name(), GOOGLE_APPLICATION_CREDENTIALS_ENV_VAR);
-            LOGGER.warn(message, SPANNER_CREDENTIALS_PATH, SPANNER_CREDENTIALS_JSON);
+            LOGGER.info(message, SPANNER_CREDENTIALS_PATH, SPANNER_CREDENTIALS_JSON);
         }
         return this;
     }
