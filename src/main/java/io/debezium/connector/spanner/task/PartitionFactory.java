@@ -51,7 +51,6 @@ public class PartitionFactory {
     }
 
     public Partition getPartition(PartitionState partitionState) {
-        LOGGER.info("Partition factory, getting partition {}", partitionState);
         return Partition.builder()
                 .token(partitionState.getToken())
                 .startTimestamp(getOffset(partitionState))
@@ -61,11 +60,7 @@ public class PartitionFactory {
     }
 
     private Timestamp getOffset(PartitionState partitionState) {
-
-        LOGGER.info("Partition factory, getting offset {}", partitionState);
         final Timestamp offset = partitionOffsetProvider.getOffset(partitionState);
-        LOGGER.info("Partition factory, got partition {}", partitionState);
-
         Timestamp startTime;
 
         if (offset != null) {

@@ -62,17 +62,12 @@ public class TaskSyncContextHolder {
 
     public TaskSyncContext updateAndGet(UnaryOperator<TaskSyncContext> updateFunction) {
         TaskSyncContext taskSyncContext;
-        LOGGER.info("Task {}, trying to lock TaskSyncContext, lock debug string {}", get().getTaskUid(), lockDebugString());
         lock.lock();
-        LOGGER.info("Task {}, locked TaskSyncContext, lock debug string {}", get().getTaskUid(), lockDebugString());
         try {
             taskSyncContext = taskSyncContextRef.updateAndGet(updateFunction);
-            LOGGER.info("Task {}, updated TaskSyncContext, lock debug string {}", get().getTaskUid(), lockDebugString());
         }
         finally {
-            LOGGER.info("Task {}, unlocking TaskSyncContext, lock debug string {}", get().getTaskUid(), lockDebugString());
             lock.unlock();
-            LOGGER.info("Task {}, unlocked TaskSyncContext, lock debug string {}", get().getTaskUid(), lockDebugString());
         }
 
         metricsEventPublisher.publishMetricEvent(new TaskSyncContextMetricEvent(taskSyncContext));
@@ -81,19 +76,18 @@ public class TaskSyncContextHolder {
     }
 
     public void awaitInitialization(Duration awaitTimeout) {
-        LOGGER.info("Task {} awaitInitialization: start", get().getTaskUid());
+        LOGGER.debug("Task {} awaitInitialization: start", get().getTaskUid());
         TimeoutMeter timeout = TimeoutMeter.setTimeout(awaitTimeout);
         while (RebalanceState.START_INITIAL_SYNC.equals(this.get().getRebalanceState())) {
             if (timeout.isExpired()) {
-                LOGGER.info("Await task initialization timeout expired");
+                LOGGER.debug("Await task initialization timeout expired");
                 throw new SpannerConnectorException("Await task initialization timeout expired");
             }
         }
-        LOGGER.info("Task {} awaitInitialization: end", get().getTaskUid());
+        LOGGER.debug("Task {} awaitInitialization: end", get().getTaskUid());
     }
 
     public void awaitNewEpoch() {
-        LOGGER.info("Task {} awaitNewEpoch: start", get().getTaskUid());
         while (!RebalanceState.NEW_EPOCH_STARTED.equals(this.get().getRebalanceState())) {
             if (Thread.interrupted()) {
                 Thread.currentThread().interrupt();
@@ -101,7 +95,6 @@ public class TaskSyncContextHolder {
             }
             final Metronome metronome = Metronome.sleeper(sleepInterval, clock);
 
-            LOGGER.info("Task {} still awaiting new epoch: start, rebalance state {}", get().getTaskUid(), get().getRebalanceState());
             try {
                 // Sleep for sleepInterval.
                 metronome.pause();
@@ -110,7 +103,6 @@ public class TaskSyncContextHolder {
                 Thread.currentThread().interrupt();
             }
         }
-        LOGGER.info("Task {} awaitNewEpoch: end", get().getTaskUid());
     }
 
 }

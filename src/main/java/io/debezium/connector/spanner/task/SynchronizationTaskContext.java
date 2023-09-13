@@ -237,7 +237,6 @@ public class SynchronizationTaskContext {
     public void publishEvent(TaskStateChangeEvent event) throws InterruptedException {
         LoggerUtils.debug(LOGGER, "publishEvent: type: {}, event: {}", event.getClass().getSimpleName(), event);
 
-        LOGGER.info("Task {}, publishing event: {}", this.taskSyncContextHolder.get().getTaskUid(), (event.getClass()) event);
         this.taskStateChangeEventProcessor.processEvent(event);
     }
 

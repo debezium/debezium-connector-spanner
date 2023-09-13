@@ -49,7 +49,7 @@ public class TakePartitionForStreamingOperation implements Operation {
                 .filter(partitionState -> partitionState.getState().equals(PartitionStateEnum.READY_FOR_STREAMING))
                 .collect(Collectors.toList());
         if (!toStreaming.isEmpty()) {
-            LOGGER.info("Task {}, ready for streaming partitions {}", taskSyncContext.getTaskUid(), toStreaming);
+            LOGGER.debug("Task {}, ready for streaming partitions {}", taskSyncContext.getTaskUid(), toStreaming);
         }
 
         try {
@@ -58,13 +58,10 @@ public class TakePartitionForStreamingOperation implements Operation {
             toStreaming.forEach(partitionState -> {
                 LOGGER.info("Task {}, submitting the partition for streaming {}", taskSyncContext.getTaskUid(), partitionState);
                 if (this.submitPartition(partitionState, taskSyncContext)) {
-                    LOGGER.info("Task {}, submitting partition {} with state {}", taskSyncContext.getTaskUid(), partitionState, taskSyncContext.getRebalanceState());
                     toSchedule.add(partitionState.getToken());
-                    LOGGER.info("Task {}, finished submitting partition {} with state {}", taskSyncContext.getTaskUid(), partitionState,
-                            taskSyncContext.getRebalanceState());
                 }
                 else {
-                    LOGGER.info("Task {}, failed to submit partition {} with state {}", taskSyncContext.getTaskUid(), partitionState,
+                    LOGGER.error("Task {}, failed to submit partition {} with state {}", taskSyncContext.getTaskUid(), partitionState,
                             taskSyncContext.getRebalanceState());
                 }
 
@@ -85,29 +82,19 @@ public class TakePartitionForStreamingOperation implements Operation {
             if (isRequiredPublishSyncEvent) {
                 LOGGER.info("Task scheduled {} partitions, taskUid: {}", toSchedule, taskSyncContext.getTaskUid());
             }
-            else {
-                LOGGER.info("Task failed to schedule {} partitions, taskUid: {}", toStreaming, taskSyncContext.getTaskUid());
-
-            }
 
             return taskSyncContext.toBuilder()
                     .currentTaskState(taskState.toBuilder().partitions(partitions).build())
                     .build();
         }
         finally {
-            LOGGER.info("Task {}, finished trying to take partitions for streaming {}", taskSyncContext.getTaskUid(), toStreaming);
+            LOGGER.debug("Task {}, finished trying to take partitions for streaming {}", taskSyncContext.getTaskUid(), toStreaming);
         }
     }
 
     private boolean submitPartition(PartitionState partitionState, TaskSyncContext taskSyncContext) {
 
-        long nowMillis = Instant.now().toEpochMilli();
-        LOGGER.info("Task {}, trying to submit partition {}", taskSyncContext.getTaskUid(), partitionState);
-
         Partition partition = partitionFactory.getPartition(partitionState);
-
-        long thenMillis = Instant.now().toEpochMilli();
-        LOGGER.info("Task {}, retrieved partition from factory {} with time {}", taskSyncContext.getTaskUid(), partition, nowMillis - thenMillis);
 
         return changeStream.submitPartition(partition);
     }
