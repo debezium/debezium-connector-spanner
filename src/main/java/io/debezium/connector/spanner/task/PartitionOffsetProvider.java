@@ -50,21 +50,16 @@ public class PartitionOffsetProvider {
     }
 
     public Timestamp getOffset(PartitionState token) {
-        Instant startTime = Instant.now();
-        LOGGER.info("Token {}, Trying to get offset", token);
         Map<String, String> spannerPartition = new SpannerPartition(token.getToken()).getSourcePartition();
-        LOGGER.info("Token {}, Retrieved spanner partition", token);
 
         Map<String, ?> result = null;
-        LOGGER.info("Token {}, Submitting executor task", token);
         Future<Map<String, ?>> future = executor.submit(new ExecutorServiceCallable(offsetStorageReader, spannerPartition));
         try {
-            LOGGER.info("Token {}, Retrieving future", token);
             result = future.get(5, TimeUnit.SECONDS);
         }
         catch (TimeoutException ex) {
             // handle the timeout
-            LOGGER.error("Token {}, failed to retrieve offset timely {}", token, ex);
+            LOGGER.error("Token {}, failed to retrieve offset in time {}", token, ex);
         }
         catch (InterruptedException e) {
             // handle the interrupts
@@ -79,7 +74,7 @@ public class PartitionOffsetProvider {
         }
 
         if (result == null) {
-            LOGGER.error("Token {}, failed to retrieve offset, returning start timestamp", token);
+            LOGGER.warn("Token {} returning start timestamp because no offset was retrieved", token);
             return token.getStartTimestamp();
         }
 
@@ -90,10 +85,8 @@ public class PartitionOffsetProvider {
 
     public Map<String, String> getOffsetMap(PartitionState token) {
 
-        LOGGER.info("Token {}, Trying to get offset map", token);
         Map<String, String> spannerPartition = new SpannerPartition(token.getToken()).getSourcePartition();
         Map<String, ?> result = this.offsetStorageReader.offset(spannerPartition);
-        LOGGER.info("Token {},  Got offset map", token);
 
         if (result == null) {
             return Map.of();
@@ -108,10 +101,8 @@ public class PartitionOffsetProvider {
                 .map(token -> new SpannerPartition(token).getSourcePartition())
                 .collect(Collectors.toList());
 
-        // LOGGER.info("Token {}, Trying to get offsets", partitions);
         Map<Map<String, String>, Map<String, Object>> result = this.offsetStorageReader.offsets(partitionsMapList);
 
-        // LOGGER.info("Token {}, Got offsets", partitions);
 
         if (result == null) {
             return Map.of();
