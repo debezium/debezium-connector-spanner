@@ -52,33 +52,11 @@ public class PartitionOffsetProvider {
     public Timestamp getOffset(PartitionState token) {
         Map<String, String> spannerPartition = new SpannerPartition(token.getToken()).getSourcePartition();
 
-        Map<String, ?> result = null;
-        Future<Map<String, ?>> future = executor.submit(new ExecutorServiceCallable(offsetStorageReader, spannerPartition));
-        try {
-            result = future.get(5, TimeUnit.SECONDS);
-        }
-        catch (TimeoutException ex) {
-            // handle the timeout
-            LOGGER.error("Token {}, failed to retrieve offset in time {}", token, ex);
-        }
-        catch (InterruptedException e) {
-            // handle the interrupts
-            Thread.currentThread().interrupt();
-        }
-        catch (ExecutionException e) {
-            // handle other exceptions
-            LOGGER.error("Token {}, failed to retrieve offset {}", token, e);
-        }
-        finally {
-            future.cancel(true); // may or may not desire this
-        }
-
+        Map<String, ?> result = retrieveOffsetMap(spannerPartition);
         if (result == null) {
             LOGGER.warn("Token {} returning start timestamp because no offset was retrieved", token);
             return token.getStartTimestamp();
         }
-
-        metricsEventPublisher.publishMetricEvent(OffsetReceivingTimeMetricEvent.from(startTime));
 
         return PartitionOffset.extractOffset(result);
     }
@@ -86,7 +64,7 @@ public class PartitionOffsetProvider {
     public Map<String, String> getOffsetMap(PartitionState token) {
 
         Map<String, String> spannerPartition = new SpannerPartition(token.getToken()).getSourcePartition();
-        Map<String, ?> result = this.offsetStorageReader.offset(spannerPartition);
+        Map<String, ?> result = retrieveOffsetMap(spannerPartition);
 
         if (result == null) {
             return Map.of();
@@ -103,7 +81,6 @@ public class PartitionOffsetProvider {
 
         Map<Map<String, String>, Map<String, Object>> result = this.offsetStorageReader.offsets(partitionsMapList);
 
-
         if (result == null) {
             return Map.of();
         }
@@ -118,6 +95,33 @@ public class PartitionOffsetProvider {
         }
 
         return map;
+    }
+
+    private Map<String, ?> retrieveOffsetMap(Map<String, String> spannerPartition) {
+        Instant startTime = Instant.now();
+        Map<String, ?> result = null;
+        Future<Map<String, ?>> future = executor.submit(new ExecutorServiceCallable(offsetStorageReader, spannerPartition));
+        try {
+            result = future.get(5, TimeUnit.SECONDS);
+        }
+        catch (TimeoutException ex) {
+            // handle the timeout
+            LOGGER.error("Token {}, failed to retrieve offset in time {}", spannerPartition, ex);
+        }
+        catch (InterruptedException e) {
+            // handle the interrupts
+            LOGGER.error("Token {},interrupting PartitionOffsetProvider {}", spannerPartition, e);
+            Thread.currentThread().interrupt();
+        }
+        catch (ExecutionException e) {
+            // handle other exceptions
+            LOGGER.error("Token {}, failed to retrieve offset {}", spannerPartition, e);
+        }
+        finally {
+            future.cancel(true); // may or may not desire this
+        }
+        metricsEventPublisher.publishMetricEvent(OffsetReceivingTimeMetricEvent.from(startTime));
+        return result;
     }
 
     public static class ExecutorServiceCallable implements Callable<Map<String, ?>> {

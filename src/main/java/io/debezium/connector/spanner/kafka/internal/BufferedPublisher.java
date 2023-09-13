@@ -15,7 +15,6 @@ import java.util.function.Predicate;
 
 import org.slf4j.Logger;
 
-import io.debezium.connector.spanner.kafka.internal.model.TaskState;
 import io.debezium.connector.spanner.kafka.internal.model.TaskSyncEvent;
 import io.debezium.util.Clock;
 import io.debezium.util.Metronome;
