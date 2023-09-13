@@ -93,6 +93,7 @@ public class SpannerChangeStream implements ChangeStream {
         this.partitionQueryingMonitor.start();
 
         this.lock.lock();
+        LOGGER.info("Task {}, Starting Spanner Change Stream", this.taskUid);
 
         try {
             while (runningFlagSupplier.getAsBoolean()) {
@@ -124,11 +125,10 @@ public class SpannerChangeStream implements ChangeStream {
     @Override
     public boolean submitPartition(Partition partition) {
         if (!isRunning.get()) {
-            LOGGER.info("Task {}, Failed to submit partition: {}", this.taskUid, partition.getToken());
+            LOGGER.warn("Task {}, Failed to submit partition: {}", this.taskUid, partition.getToken());
             return false;
         }
 
-        LOGGER.info("task {}, Trying to submit token {}", this.taskUid, partition.getToken());
         boolean submitted = partitionThreadPool.submit(partition.getToken(), () -> {
             LOGGER.info("task {}, Started streaming from partition with token {}", this.taskUid, partition.getToken());
             try {

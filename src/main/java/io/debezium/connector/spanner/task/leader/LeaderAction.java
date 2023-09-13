@@ -164,6 +164,8 @@ public class LeaderAction {
                 // Sleep for sleepInterval.
                 metronome.pause();
 
+                this.leaderThread.interrupt();
+
                 LOGGER.info("Task {}, still waiting for leader thread to die with rebalance generation ID {}", taskSyncContextHolder.get().getTaskUid(),
                         rebalanceGenerationId);
             }

@@ -63,7 +63,7 @@ public class SyncEventHandler {
             if (inSync != null) {
                 long inGeneration = inSync.getRebalanceGenerationId();
                 long currentGeneration = taskSyncContextHolder.get().getRebalanceGenerationId();
-                LOGGER.debug("Task {}, skipFromMismatchingGeneration: currentGen: {}, inGen: {}, inTaskUid: {}, message type {}",
+                LOGGER.info("Task {}, skipFromMismatchingGeneration: currentGen: {}, inGen: {}, inTaskUid: {}, message type {}",
                         taskSyncContextHolder.get().getTaskUid(),
                         currentGeneration, inGeneration,
                         inSync.getTaskUid(),
@@ -178,8 +178,11 @@ public class SyncEventHandler {
             // For REGULAR type messages, we filter them out in SyncEventMerger if the preexisting
             // task states map does not contain them, and if the state timestamp is not greater.
 
-            if (inSync.getMessageType() == MessageTypeEnum.REBALANCE_ANSWER ||
-                    inSync.getMessageType() == MessageTypeEnum.NEW_EPOCH
+            if (inSync.getMessageType() == MessageTypeEnum.NEW_EPOCH) {
+                return inGeneration <= currentGeneration;
+            }
+
+            if (inSync.getMessageType() == MessageTypeEnum.REBALANCE_ANSWER
                     || inSync.getMessageType() == MessageTypeEnum.UPDATE_EPOCH) {
                 return inGeneration < currentGeneration;
             }
@@ -193,7 +196,7 @@ public class SyncEventHandler {
         }
 
         if (skipFromMismatchingGeneration(inSync)) {
-            LOGGER.debug("Task {}, skipping message from task {}, from prior generation {} and message type {} with current generation {}",
+            LOGGER.info("Task {}, skipping message from task {}, from prior generation {} and message type {} with current generation {}",
                     taskSyncContextHolder.get().getTaskUid(), inSync.getTaskUid(), inSync.getRebalanceGenerationId(), inSync.getMessageType(),
                     taskSyncContextHolder.get().getRebalanceGenerationId());
             return;

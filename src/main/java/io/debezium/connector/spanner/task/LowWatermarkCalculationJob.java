@@ -26,7 +26,7 @@ public class LowWatermarkCalculationJob {
     private static final Logger LOGGER = getLogger(LowWatermarkCalculationJob.class);
     private volatile Thread calculationThread;
 
-    private final Duration pollInterval = Duration.ofMillis(300000);
+    private final Duration pollInterval = Duration.ofMillis(60000);
 
     private final Consumer<Throwable> errorHandler;
     private final boolean enabled;
@@ -70,14 +70,12 @@ public class LowWatermarkCalculationJob {
                         if (totalDuration.toMillis() >= pollInterval.toMillis()) {
                             // Restart the stopwatch.
                             printOffsets = true;
-                            LOGGER.info("Task {}, still calculating low watermark", taskUid);
                             sw = Stopwatch.accumulating().start();
                         }
                         else {
                             // Resume the existing stop watch, we haven't met the criteria yet.
                             sw.start();
                         }
-                        LOGGER.info("Task {}, getting low watermark", taskUid);
                         getLowWatermark(printOffsets);
                     }
                     catch (InterruptedException e) {
@@ -117,7 +115,6 @@ public class LowWatermarkCalculationJob {
             try {
                 timestamp = lowWatermarkCalculator.calculateLowWatermark(printOffsets);
                 if (timestamp == null) {
-                    LOGGER.warn("Task {}, failed to retrieve low watermark", taskUid);
                     metronome.pause();
                 }
                 else {
@@ -125,8 +122,8 @@ public class LowWatermarkCalculationJob {
                 }
             }
             catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                return;
+                LOGGER.warn("Task {}, low watermark calculation was interrupted", taskUid);
+                throw e;
             }
         } while (!Thread.currentThread().isInterrupted());
         lowWatermarkHolder.setLowWatermark(timestamp);
@@ -152,6 +149,8 @@ public class LowWatermarkCalculationJob {
                 try {
                     // Sleep for sleepInterval.
                     metronome.pause();
+
+                    this.calculationThread.interrupt();
 
                     LOGGER.info("Task {}, still waiting for low watermark calculation thread to die", taskUid);
                 }

@@ -28,6 +28,8 @@ import io.debezium.connector.spanner.kafka.event.proto.SyncEventProtos;
 import io.debezium.connector.spanner.kafka.internal.model.SyncEventMetadata;
 import io.debezium.connector.spanner.kafka.internal.model.TaskSyncEvent;
 import io.debezium.connector.spanner.kafka.internal.proto.SyncEventFromProtoMapper;
+import io.debezium.util.Clock;
+import io.debezium.util.Metronome;
 import io.debezium.util.Stopwatch;
 
 /** Consumes messages from the Sync Topic */
@@ -43,6 +45,7 @@ public class TaskSyncEventListener {
     private final List<BlockingBiConsumer<TaskSyncEvent, SyncEventMetadata>> eventConsumers = new ArrayList<>();
     private final java.util.function.Consumer<RuntimeException> errorHandler;
     private final Duration pollInterval = Duration.ofMillis(300000);
+    private final Clock clock;
 
     private volatile Thread thread;
 
@@ -61,6 +64,7 @@ public class TaskSyncEventListener {
         this.commitOffsetsInterval = consumerFactory.getConfig().syncCommitOffsetsInterval();
         this.consumerFactory = consumerFactory;
         this.errorHandler = errorHandler;
+        this.clock = Clock.system();
     }
 
     public void subscribe(BlockingBiConsumer<TaskSyncEvent, SyncEventMetadata> eventConsumer) {
@@ -149,6 +153,7 @@ public class TaskSyncEventListener {
                             catch (org.apache.kafka.common.errors.InterruptException
                                     | InterruptedException ex) {
                                 LOGGER.error("TaskSyncEventListener, caught interrupt exception {}, {}", consumerGroup, ex);
+                                Thread.currentThread().interrupt();
                                 return;
                             }
                             catch (Exception e) {
@@ -254,13 +259,31 @@ public class TaskSyncEventListener {
     }
 
     public void shutdown() {
+        LOGGER.info(
+                "Stopping TaskSyncEventListener for Task Uid {}",
+                consumerGroup);
         if (thread == null) {
             return;
         }
         thread.interrupt();
-
+        final Metronome metronome = Metronome.sleeper(Duration.ofMillis(100), clock);
         while (!thread.getState().equals(Thread.State.TERMINATED)) {
+            try {
+                // Sleep for sleepInterval.
+                LOGGER.info(
+                        "Still stopping TaskSyncEventListener for Task Uid {} with state {}",
+                        consumerGroup, thread.getState());
+                thread.interrupt();
+
+                metronome.pause();
+            }
+            catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
         }
+        LOGGER.info(
+                "Stopped TaskSyncEventListener for Task Uid {}",
+                consumerGroup);
         thread = null;
     }
 }
