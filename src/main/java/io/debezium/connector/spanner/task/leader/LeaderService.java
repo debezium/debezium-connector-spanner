@@ -13,6 +13,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import org.slf4j.Logger;
@@ -110,10 +111,12 @@ public class LeaderService {
         while (!Thread.currentThread().isInterrupted() && consumerToTaskMap.size() < consumers.size()) {
 
             try {
+                Set<String> missingConsumers = consumers.stream().filter(c -> !consumerToTaskMap.containsKey(c)).collect(Collectors.toSet());
                 LOGGER.info("Task {} with Consumer Id {}, rebalance generation ID {}, awaitAllNewTaskStateUpdates: " +
-                        "expected: {}, actual: {}. Expected consumers: {}", taskSyncContextHolder.get().getTaskUid(), taskSyncContextHolder.get().getConsumerId(),
+                        "expected: {}, actual: {}. Expected consumers: {}, missing consumers {}", taskSyncContextHolder.get().getTaskUid(),
+                        taskSyncContextHolder.get().getConsumerId(),
                         rebalanceGenerationId,
-                        consumers.size(), consumerToTaskMap.size(), consumers);
+                        consumers.size(), consumerToTaskMap.size(), consumers, missingConsumers);
 
                 if (timeoutMeter.isExpired()) {
                     LOGGER.error("Task {} : Not received all answers from tasks", taskSyncContextHolder.get().getTaskUid());

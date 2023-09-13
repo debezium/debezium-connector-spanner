@@ -59,6 +59,8 @@ public class BufferedPublisher<V> {
                     Thread.sleep(timeout);
                 }
                 catch (InterruptedException e) {
+                    LOGGER.info("Task Uid {}, publishing thread caught interrupt", this.taskUid);
+                    Thread.currentThread().interrupt();
                     return;
                 }
             }
@@ -83,12 +85,10 @@ public class BufferedPublisher<V> {
         if (item != null) {
             if (item.getClass() == TaskSyncEvent.class) {
                 TaskSyncEvent event = (TaskSyncEvent) item;
-                TaskState newTask = event.getTaskStates().get(event.getTaskUid());
-                long taskRebalanceId = newTask == null ? -3 : newTask.getRebalanceGenerationId();
 
-                LOGGER.info("Task {}, publishing event with rebalance generation ID {} and message type {} and task rebalance id {}", this.taskUid,
+                LOGGER.debug("Task {}, publishing event with rebalance generation ID {} and message type {}", this.taskUid,
                         event.getRebalanceGenerationId(),
-                        event.getMessageType(), taskRebalanceId);
+                        event.getMessageType());
             }
             this.onPublish.accept(item);
         }
@@ -115,6 +115,11 @@ public class BufferedPublisher<V> {
         while (!thread.getState().equals(Thread.State.TERMINATED)) {
             try {
                 // Sleep for sleepInterval.
+                LOGGER.info(
+                        "Still stopping BufferedPublisher for Task Uid {}",
+                        this.taskUid);
+                thread.interrupt();
+
                 metronome.pause();
             }
             catch (InterruptedException e) {

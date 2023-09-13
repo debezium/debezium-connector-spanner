@@ -51,6 +51,7 @@ public class PartitionFactory {
     }
 
     public Partition getPartition(PartitionState partitionState) {
+        LOGGER.info("Partition factory, getting partition {}", partitionState);
         return Partition.builder()
                 .token(partitionState.getToken())
                 .startTimestamp(getOffset(partitionState))
@@ -61,14 +62,16 @@ public class PartitionFactory {
 
     private Timestamp getOffset(PartitionState partitionState) {
 
-        final Timestamp offset = partitionOffsetProvider.getOffset(partitionState.getToken());
+        LOGGER.info("Partition factory, getting offset {}", partitionState);
+        final Timestamp offset = partitionOffsetProvider.getOffset(partitionState);
+        LOGGER.info("Partition factory, got partition {}", partitionState);
 
         Timestamp startTime;
 
         if (offset != null) {
 
             if (offset.toSqlTimestamp().before(partitionState.getStartTimestamp().toSqlTimestamp())) {
-                Map<String, String> offsetMap = partitionOffsetProvider.getOffsetMap(partitionState.getToken());
+                Map<String, String> offsetMap = partitionOffsetProvider.getOffsetMap(partitionState);
 
                 LOGGER.warn("Incorrect offset, start time will be taken for partition {}, offsetMap {}", partitionState.getToken(), offsetMap);
 

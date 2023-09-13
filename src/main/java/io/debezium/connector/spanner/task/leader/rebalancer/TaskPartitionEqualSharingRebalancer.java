@@ -43,34 +43,34 @@ public class TaskPartitionEqualSharingRebalancer implements TaskPartitionRebalan
                                Map<String, TaskState> survivedTasks,
                                Map<String, TaskState> obsoleteTaskStates) {
 
-        LOGGER.info("Leader task state {}", leaderTaskState);
-        LOGGER.info("Survived tasks {}", survivedTasks);
-        LOGGER.info("Obsolete tasks {}", obsoleteTaskStates);
+        LOGGER.info("Leader task state {}", leaderTaskState.getTaskUid());
+        LOGGER.info("Survived tasks {}", survivedTasks.keySet().stream().collect(Collectors.toList()));
+        LOGGER.info("Obsolete tasks {}", obsoleteTaskStates.keySet().stream().collect(Collectors.toList()));
 
         TaskState newLeaderTaskState = moveFinishedPartitionsFromObsoleteTasks(leaderTaskState, obsoleteTaskStates);
-        LOGGER.info(
+        LOGGER.debug(
                 "Leader task state after moving finished partitions from obsolete tasks {}",
                 newLeaderTaskState);
 
         newLeaderTaskState = moveSharedPartitionsFromObsoleteTasks(
                 newLeaderTaskState, survivedTasks, obsoleteTaskStates);
-        LOGGER.info(
+        LOGGER.debug(
                 "Leader task state after moving finished partitions from obsolete tasks {}",
                 newLeaderTaskState);
 
         newLeaderTaskState = takeSharedPartitionsFromSurvivedTasks(newLeaderTaskState, survivedTasks);
-        LOGGER.info(
+        LOGGER.debug(
                 "Leader task state after moving shared partitions from survived tasks {}",
                 newLeaderTaskState);
 
         newLeaderTaskState = takeSharedPartitionsToObsoleteTask(newLeaderTaskState, survivedTasks);
-        LOGGER.info(
+        LOGGER.debug(
                 "Leader task state after moving shared partitions to obsolete tasks {}",
                 newLeaderTaskState);
 
         newLeaderTaskState = distributePartitionsFromObsoleteTasks(
                 newLeaderTaskState, survivedTasks, obsoleteTaskStates);
-        LOGGER.info(
+        LOGGER.debug(
                 "Leader task state after distributing partitions from obsolete tasks {}",
                 newLeaderTaskState);
 

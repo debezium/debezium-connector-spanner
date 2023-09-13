@@ -39,6 +39,7 @@ public class SynchronizedPartitionManager implements PartitionManager {
 
     @Override
     public void updateToFinished(String token) throws InterruptedException {
+        LOGGER.info("Token {}, updating to finished");
 
         syncEventPublisher.accept(new PartitionStatusUpdateEvent(token, PartitionStateEnum.FINISHED));
     }

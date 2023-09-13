@@ -91,7 +91,7 @@ public class FinishingPartitionManager {
         if (lastEmittedRecord.get(token) == null || lastEmittedRecord.get(token).equals(lastCommittedRecord.get(token))) {
             LOGGER.info("Task: {}, Forcing the token to be finished {}", taskUid, token);
             forceFinish(token);
-            LOGGER.info("Task: {}, Finished forcing the token to be finished {}", taskUid, token);
+            LOGGER.info("Task: {}, Done forcing the token to be finished {}", taskUid, token);
         }
         else {
             LOGGER.info(

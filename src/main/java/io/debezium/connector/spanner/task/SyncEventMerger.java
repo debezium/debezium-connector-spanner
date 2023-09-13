@@ -236,14 +236,10 @@ public class SyncEventMerger {
 
     public static TaskSyncContext mergeNewEpoch(TaskSyncContext currentContext, TaskSyncEvent inSync) {
         var builder = currentContext.toBuilder();
-        Set<String> allNewEpochTasks = inSync.getTaskStates().values().stream().map(taskState -> taskState.getTaskUid()).collect(Collectors.toSet());
-        boolean start_initial_sync = currentContext.getRebalanceState() == RebalanceState.START_INITIAL_SYNC;
-        if (!start_initial_sync && !allNewEpochTasks.contains(currentContext.getTaskUid())) {
-            LOGGER.warn(
-                    "Task {} - Received new epoch message , but leader did not include the task in the new epoch message, throwing exception",
-                    currentContext.getTaskUid());
 
-            throw new DebeziumException("New epoch message does not contain task state " + currentContext.getTaskUid());
+        // If the current task is the leader, there is no need to merge the new epoch message.
+        if (inSync.getTaskUid().equals(currentContext.getTaskUid())) {
+            return builder.build();
         }
 
         // Check that there is no preexisting partition duplication in the task.
@@ -252,43 +248,37 @@ public class SyncEventMerger {
             foundDuplication = true;
         }
 
-        // If the current task is the leader, there is no need to merge the new epoch message.
-        if (inSync.getTaskUid().equals(currentContext.getTaskUid())) {
-            return builder.build();
-        }
-
         long oldPartitions = currentContext.getNumPartitions() + currentContext.getNumSharedPartitions();
 
         Map<String, TaskState> newTaskStates = new HashMap<>(inSync.getTaskStates());
         newTaskStates.remove(currentContext.getTaskUid());
 
+        boolean start_initial_sync = currentContext.getRebalanceState() == RebalanceState.START_INITIAL_SYNC;
+        if (!start_initial_sync) {
+            Set<String> allNewEpochTasks = inSync.getTaskStates().values().stream().map(taskState -> taskState.getTaskUid()).collect(Collectors.toSet());
+            if (!allNewEpochTasks.contains(currentContext.getTaskUid())) {
+                LOGGER.warn(
+                        "Task {} - Received new epoch message , but leader {} did not include the task in the new epoch message with rebalance ID {} with tasks {}, probably just initialized, throw exception",
+                        currentContext.getTaskUid(), inSync.getTaskUid(), inSync.getRebalanceGenerationId(),
+                        inSync.getTaskStates().keySet().stream().collect(Collectors.toList()));
+                throw new DebeziumException("Leader did not include task in new epoch message");
+            }
+            else {
+                LOGGER.info("Task {}, updating the rebalance state to NEW_EPOCH_STARTED {}: {}", currentContext.getTaskUid(), inSync.getTaskUid(),
+                        inSync.getRebalanceGenerationId());
+                builder.rebalanceState(RebalanceState.NEW_EPOCH_STARTED);
+            }
+        }
+
         TaskState.TaskStateBuilder currentTaskBuilder = currentContext.getCurrentTaskState().toBuilder();
+        LOGGER.info("Task {}, updating the rebalance generation ID and epoch offset from the leader new epoch {}: {}, {}", currentContext.getTaskUid(),
+                inSync.getTaskUid(),
+                inSync.getRebalanceGenerationId(), inSync.getEpochOffset());
+        currentTaskBuilder.rebalanceGenerationId(inSync.getRebalanceGenerationId());
 
-        if (RebalanceState.START_INITIAL_SYNC.equals(currentContext.getRebalanceState())) {
-            // Update the rebalance generation ID for both the task and the overall context
-            // in case we are still processing from previous states and haven't connected to
-            // the rebalance topic yet. We don't want to update the state to NEW_EPOCH_STARTED
-            // here.
-            LOGGER.info("Task {}, updating the rebalance generation ID from the leader new epoch {}: {}", currentContext.getTaskUid(), inSync.getTaskUid(),
-                    inSync.getRebalanceGenerationId());
-            builder.rebalanceGenerationId(inSync.getRebalanceGenerationId());
-            currentTaskBuilder.rebalanceGenerationId(inSync.getRebalanceGenerationId());
-        }
-        else {
-            // Update the state to NEW_EPOCH_STARTED if we have received a new epoch message during
-            // normal task execution.
-            LOGGER.info("Task {}, updating the rebalance state to NEW_EPOCH_STARTED {}: {}", currentContext.getTaskUid(), inSync.getTaskUid(),
-                    inSync.getRebalanceGenerationId());
-            builder.rebalanceState(RebalanceState.NEW_EPOCH_STARTED);
-            // Experimental.
-            builder.rebalanceGenerationId(inSync.getRebalanceGenerationId());
-            currentTaskBuilder.rebalanceGenerationId(inSync.getRebalanceGenerationId());
-        }
-
-        LOGGER.debug("Task {}, updating the epoch offset from the leader new epoch {}: {}", currentContext.getTaskUid(), inSync.getTaskUid(),
-                inSync.getEpochOffset());
         builder
                 .createdTimestamp(inSync.getMessageTimestamp())
+                .rebalanceGenerationId(inSync.getRebalanceGenerationId())
                 // Update the epoch offset from the leader's epoch offset.
                 .epochOffsetHolder(currentContext.getEpochOffsetHolder().nextOffset(inSync.getEpochOffset()))
                 .taskStates(newTaskStates)
