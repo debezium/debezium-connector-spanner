@@ -12,6 +12,10 @@ import static io.debezium.connector.spanner.config.BaseSpannerConnectorConfig.SP
 import static io.debezium.connector.spanner.config.BaseSpannerConnectorConfig.SPANNER_CREDENTIALS_PATH;
 import static org.slf4j.LoggerFactory.getLogger;
 
+import java.io.IOException;
+
+import com.google.auth.oauth2.ServiceAccountCredentials;
+
 import org.slf4j.Logger;
 
 /**
@@ -54,6 +58,14 @@ public class ConnectionValidator implements ConfigurationValidator.Validator {
         String credentialJson = context.getString(SPANNER_CREDENTIALS_JSON);
 
         if (!FieldValidator.isSpecified(googleCredentials) && !FieldValidator.isSpecified(credentialPath) && !FieldValidator.isSpecified(credentialJson)) {
+            try {
+                ServiceAccountCredentials.getApplicationDefault();
+            }
+            catch (IOException e) {
+                LOGGER.error("The Application Default Credentials are not available.", e);
+                this.result = false;
+                return this;
+            }
             String message = String.format(PLEASE_SPECIFY_CONFIGURATION_PROPERTY_MSG, SPANNER_CREDENTIALS_PATH.name(),
                     SPANNER_CREDENTIALS_JSON.name(), GOOGLE_APPLICATION_CREDENTIALS_ENV_VAR);
             LOGGER.info(message, SPANNER_CREDENTIALS_PATH, SPANNER_CREDENTIALS_JSON);
