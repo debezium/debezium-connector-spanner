@@ -85,7 +85,7 @@ public class BufferedPublisher<V> {
             if (item.getClass() == TaskSyncEvent.class) {
                 TaskSyncEvent event = (TaskSyncEvent) item;
 
-                LOGGER.debug("Task {}, publishing event with rebalance generation ID {} and message type {}", this.taskUid,
+                LOGGER.info("Task {}, publishing event with rebalance generation ID {} and message type {}", this.taskUid,
                         event.getRebalanceGenerationId(),
                         event.getMessageType());
             }

@@ -121,17 +121,12 @@ public class SyncEventMerger {
                             newMessage.getMessageTimestamp()));
             TaskSyncContext result = builder
                     .build();
-            LOGGER.info("Processed rebalance answer {} from task {} for rebalance generation id {}", newMessage, newMessage.getTaskUid(),
-                    newMessage.getRebalanceGenerationId());
+            LOGGER.info(
+                    "Task {}, Processed rebalance answer from task {} for rebalance generation id {}, task has total partitions {}, num partitions {}, num shared partitions {}, num old partitions {}",
+                    currentContext.getTaskUid(), newMessage.getTaskUid(),
+                    newMessage.getRebalanceGenerationId(), result.getNumPartitions() + result.getNumSharedPartitions(),
+                    result.getNumPartitions(), result.getNumSharedPartitions(), oldPartitions);
 
-            long newPartitions = result.getNumPartitions() + result.getNumSharedPartitions();
-            if (newPartitions != oldPartitions) {
-                LOGGER.info(
-                        "Task {}, processed rebalance answer {}: {}, task has total partitions {}, num partitions {}, num shared partitions {}, num old partitions {}",
-                        currentContext.getTaskUid(), newMessage, result.getNumPartitions() + result.getNumSharedPartitions(),
-                        result.getNumPartitions(), result.getNumSharedPartitions(), oldPartitions);
-
-            }
             return result;
         }
         LOGGER.debug("merge: final state is not changed");

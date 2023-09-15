@@ -87,7 +87,7 @@ public class TakePartitionForStreamingOperation implements Operation {
                     .build();
         }
         finally {
-            LOGGER.debug("Task {}, finished trying to take partitions for streaming {}", taskSyncContext.getTaskUid(), toStreaming);
+            LOGGER.debug("Task {}, finished trying to take partitions for streaming {}", taskSyncContext.getTaskUid());
         }
     }
 

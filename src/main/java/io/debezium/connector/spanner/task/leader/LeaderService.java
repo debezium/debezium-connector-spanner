@@ -112,11 +112,13 @@ public class LeaderService {
 
             try {
                 Set<String> missingConsumers = consumers.stream().filter(c -> !consumerToTaskMap.containsKey(c)).collect(Collectors.toSet());
+                Set<TaskState> missingConsumerStates = taskSyncContextHolder.get().getAllTaskStates().values().stream()
+                        .filter(taskState -> missingConsumers.contains(taskState.getConsumerId())).collect(Collectors.toSet());
                 LOGGER.info("Task {} with Consumer Id {}, rebalance generation ID {}, awaitAllNewTaskStateUpdates: " +
-                        "expected: {}, actual: {}. Expected consumers: {}, missing consumers {}", taskSyncContextHolder.get().getTaskUid(),
+                        "expected: {}, actual: {}. Expected consumers: {}, missing consumers {}, consumer state {}", taskSyncContextHolder.get().getTaskUid(),
                         taskSyncContextHolder.get().getConsumerId(),
                         rebalanceGenerationId,
-                        consumers.size(), consumerToTaskMap.size(), consumers, missingConsumers);
+                        consumers.size(), consumerToTaskMap.size(), consumers, missingConsumers, missingConsumerStates);
 
                 if (timeoutMeter.isExpired()) {
                     LOGGER.error("Task {} : Not received all answers from tasks", taskSyncContextHolder.get().getTaskUid());
