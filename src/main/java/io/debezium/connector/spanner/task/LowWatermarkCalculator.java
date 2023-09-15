@@ -123,6 +123,7 @@ public class LowWatermarkCalculator {
                 LOGGER.info(
                         "Task {}, Kafka connect offsetStorageReader is interrupting... Thread interrupted: {}",
                         taskSyncContextHolder.get().getTaskUid(), Thread.currentThread().isInterrupted());
+                Thread.currentThread().interrupt();
             }
             else {
                 LOGGER.warn(

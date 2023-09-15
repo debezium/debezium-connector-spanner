@@ -104,6 +104,7 @@ public class TaskPartitionEqualSharingRebalancer implements TaskPartitionRebalan
                 .collect(Collectors.toList());
 
         leaderPartitionList.addAll(finishedPartitions);
+        LOGGER.info("moveFinishedPartitionsFromObsoleteTasks, Leader task {} now owning finished partition {}", leaderTaskState.getTaskUid(), finishedPartitions);
 
         return leaderTaskState.toBuilder().partitions(leaderPartitionList).build();
     }
@@ -112,13 +113,16 @@ public class TaskPartitionEqualSharingRebalancer implements TaskPartitionRebalan
                                                             TaskState leaderTaskState,
                                                             Map<String, TaskState> survivedTasks,
                                                             Map<String, TaskState> obsoleteTasks) {
+        // Get a list of all partitions owned or shared by all survived tasks, including leader
         Set<String> tokens = collectPartitionTokens(Set.of(leaderTaskState), survivedTasks.values());
 
+        // Get a list of all partitions owned by the obsolete tasks.
         List<PartitionState> allPartitions = filterDuplications(
                 obsoleteTasks.values().stream()
                         .flatMap(taskState -> taskState.getPartitions().stream())
                         .collect(Collectors.toList()));
 
+        // Filter the above list to include non finished or non removed partitions.
         List<PartitionState> notFinishedPartitions = allPartitions.stream()
                 .filter(partitionState -> !tokens.contains(partitionState.getToken()))
                 .map(
@@ -144,6 +148,8 @@ public class TaskPartitionEqualSharingRebalancer implements TaskPartitionRebalan
                                 .assigneeTaskUid(taskUid)
                                 .state(PartitionStateEnum.CREATED)
                                 .build());
+                LOGGER.info("distributePartitionsFromObsoleteTasks, Leader task {} now sharing partition {} to {}", leaderTaskState.getTaskUid(),
+                        partitionState.getToken(), taskUid);
             }
             else {
                 leaderPartitionList.add(
@@ -151,6 +157,7 @@ public class TaskPartitionEqualSharingRebalancer implements TaskPartitionRebalan
                                 .assigneeTaskUid(taskUid)
                                 .state(PartitionStateEnum.CREATED)
                                 .build());
+                LOGGER.info("distributePartitionsFromObsoleteTasks, Leader task {} now owning partition {}", leaderTaskState.getTaskUid(), partitionState.getToken());
             }
 
             leaderTaskState = leaderTaskState.toBuilder()
@@ -216,12 +223,14 @@ public class TaskPartitionEqualSharingRebalancer implements TaskPartitionRebalan
                                                             Map<String, TaskState> survivedTasks,
                                                             Map<String, TaskState> obsoleteTasks) {
 
-        // Collect partition tokens from the leader task state.
-        Set<String> tokens = collectPartitionTokens(Set.of(leaderTaskState));
+        // Collect owned and shared partition tokens from the leader task state.
+        Set<String> leaderTokens = collectPartitionTokens(Set.of(leaderTaskState));
+
+        // Collect a list of all tokens owned by survived tasks not including leader.
         Set<String> survivedOwnedTokens = collectOwnedPartitionTokens(survivedTasks.values());
         String leaderUid = leaderTaskState.getTaskUid();
 
-        // Get a list of the shared partitions from the tasks.
+        // Get a list of the shared partitions from the obsolete tasks.
         List<PartitionState> obsoleteTasksSharedPartitions = filterDuplications(
                 obsoleteTasks.values().stream()
                         .flatMap(taskState -> taskState.getSharedPartitions().stream())
@@ -231,17 +240,16 @@ public class TaskPartitionEqualSharingRebalancer implements TaskPartitionRebalan
 
         List<PartitionState> leaderPartitionList = new ArrayList<>(leaderTaskState.getPartitions());
 
-        // We get the shared partitions from the obsolete tasks that are assigned to the survived tasks,
+        // 1. We get the shared partitions from the obsolete tasks that are assigned to the survived tasks,
         // not including the leader.
         // These tokens also should not be shared by the leader or owned by the leader or owned by the
         // survived tasks.
         List<PartitionState> newSharedPartitions = obsoleteTasksSharedPartitions.stream()
-                .filter(partitionState -> !tokens.contains(partitionState.getToken()))
+                .filter(partitionState -> !leaderTokens.contains(partitionState.getToken()))
                 .filter(partitionState -> !survivedOwnedTokens.contains(partitionState.getToken()))
                 .map(
                         partitionState -> {
-                            if (survivedTasks.containsKey(partitionState.getAssigneeTaskUid())
-                                    && !partitionState.getAssigneeTaskUid().equals(leaderUid)) {
+                            if (survivedTasks.containsKey(partitionState.getAssigneeTaskUid())) {
                                 return partitionState;
                             }
                             return null;
@@ -249,27 +257,45 @@ public class TaskPartitionEqualSharingRebalancer implements TaskPartitionRebalan
                 .filter(Objects::nonNull)
                 .collect(Collectors.toList());
 
+        LOGGER.info("moveSharedPartitionsFromObsoleteTasks, Leader task {} now sharing partitions {}", leaderTaskState.getTaskUid(), newSharedPartitions);
         leaderSharedPartitionList.addAll(newSharedPartitions);
-        leaderTaskState = leaderTaskState.toBuilder()
-                .partitions(leaderPartitionList)
-                .sharedPartitions(leaderSharedPartitionList)
-                .build();
 
-        // Get the partitions shared by the obsolete tasks that are not assigned to a survived task or
-        // are assigned to the leader
-        // These partitions should not be owned by the leader or the survived tasks.
-        List<PartitionState> newPartitions = obsoleteTasksSharedPartitions.stream()
-                .filter(partitionState -> !tokens.contains(partitionState.getToken()))
+        // 2. We get the shared partitions from the obsolete tasks that are assigned to the leader task
+        // These tokens also should not be shared by the leader or owned by the leader or owned by the
+        // survived tasks.
+        List<PartitionState> newOwnedPartitions = obsoleteTasksSharedPartitions.stream()
+                .filter(partitionState -> !leaderTokens.contains(partitionState.getToken()))
                 .filter(partitionState -> !survivedOwnedTokens.contains(partitionState.getToken()))
                 .map(
                         partitionState -> {
-                            if (!survivedTasks.containsKey(partitionState.getAssigneeTaskUid())
-                                    || partitionState.getAssigneeTaskUid().equals(leaderUid)) {
+                            if (leaderUid.equals(partitionState.getAssigneeTaskUid())) {
                                 return partitionState;
                             }
                             return null;
                         })
                 .filter(Objects::nonNull)
+                .collect(Collectors.toList());
+        leaderPartitionList.addAll(newOwnedPartitions);
+        LOGGER.info("moveSharedPartitionsFromObsoleteTasks, Leader task {} now owning partitions {}", leaderTaskState.getTaskUid(), newOwnedPartitions);
+
+        leaderTaskState = leaderTaskState.toBuilder()
+                .partitions(leaderPartitionList)
+                .sharedPartitions(leaderSharedPartitionList)
+                .build();
+
+        // Get the tokens shared to survived tasks, and re-collect the tokens owned / shared by the leader.
+        Set<String> tokensSharedToSurvivedTasks = collectTokensSharedToSurvivedTasks(leaderTaskState, survivedTasks.values());
+        Set<String> newLeaderTokens = collectPartitionTokens(Set.of(leaderTaskState));
+
+        // Finally, we get the partitions shared by the obsolete tasks that are:
+        // 1. not owned or shared by the leader.
+        // 2. not owned by a survived task, not including the leader.
+        // 3. not shared to a survived task or leader currently.
+        // These partitions should not be owned by the leader or the survived tasks.
+        List<PartitionState> newPartitions = obsoleteTasksSharedPartitions.stream()
+                .filter(partitionState -> !newLeaderTokens.contains(partitionState.getToken()))
+                .filter(partitionState -> !survivedOwnedTokens.contains(partitionState.getToken()))
+                .filter(partitionState -> !tokensSharedToSurvivedTasks.contains(partitionState.getToken()))
                 .collect(Collectors.toList());
         for (PartitionState partitionState : newPartitions) {
             String taskUid = findCandidateToSharePartition(leaderTaskState, survivedTasks);
@@ -280,6 +306,8 @@ public class TaskPartitionEqualSharingRebalancer implements TaskPartitionRebalan
                                 .assigneeTaskUid(taskUid)
                                 .state(PartitionStateEnum.CREATED)
                                 .build());
+                LOGGER.info("moveSharedPartitionsFromObsoleteTasks, Leader task {} now sharing partition {} to {}", leaderTaskState.getTaskUid(),
+                        partitionState.getToken(), taskUid);
             }
             else {
                 leaderPartitionList.add(
@@ -287,6 +315,7 @@ public class TaskPartitionEqualSharingRebalancer implements TaskPartitionRebalan
                                 .assigneeTaskUid(taskUid)
                                 .state(PartitionStateEnum.CREATED)
                                 .build());
+                LOGGER.info("moveSharedPartitionsFromObsoleteTasks, Leader task {} now owning partition {}", leaderTaskState.getTaskUid(), partitionState.getToken());
             }
 
             leaderTaskState = leaderTaskState.toBuilder()
@@ -303,12 +332,14 @@ public class TaskPartitionEqualSharingRebalancer implements TaskPartitionRebalan
 
         Set<String> tokens = collectPartitionTokens(Set.of(leaderTaskState));
         Set<String> survivedOwnedTokens = collectOwnedPartitionTokens(survivedTasks.values());
+        Set<String> tokensSharedToSurvivedTasks = collectTokensSharedToSurvivedTasks(leaderTaskState, survivedTasks.values());
         String leaderUid = leaderTaskState.getTaskUid();
 
-        // You get a list of partition tokens shared by the survived tasks that are not owned or shared
-        // by the leader.
-        // These partition tokens are also not assigned to a survived task, including a leader.
-        // These partition tokens should not be owned by any of the survived tasks either.
+        // You get a list of partition tokens shared by the survived tasks that are not:
+        // 1. owned or shared by the leader.
+        // 2. not owned by a survived task, not including the leader.a
+        // 3. not shared to a survived task, including the leader.
+
         List<PartitionState> partitions = filterDuplications(
                 survivedTasks.values().stream()
                         .flatMap(taskState -> taskState.getSharedPartitions().stream())
@@ -317,9 +348,7 @@ public class TaskPartitionEqualSharingRebalancer implements TaskPartitionRebalan
                 .filter(partitionState -> !tokens.contains(partitionState.getToken()))
                 .filter(partitionState -> !survivedOwnedTokens.contains(partitionState.getToken()))
                 .filter(
-                        partitionState -> !survivedTasks.containsKey(partitionState.getAssigneeTaskUid()))
-                .filter(
-                        partitionState -> !leaderUid.equals(partitionState.getAssigneeTaskUid()))
+                        partitionState -> !tokensSharedToSurvivedTasks.contains(partitionState.getToken()))
                 .collect(Collectors.toList());
 
         List<PartitionState> leaderPartitionList = new ArrayList<>(leaderTaskState.getPartitions());
@@ -337,6 +366,8 @@ public class TaskPartitionEqualSharingRebalancer implements TaskPartitionRebalan
                                 .assigneeTaskUid(taskUid)
                                 .state(PartitionStateEnum.CREATED)
                                 .build());
+                LOGGER.info("takeSharedPartitionsFromSurvivedTasks, Leader task {} now sharing partition {} to {}", leaderTaskState.getTaskUid(),
+                        partitionState.getToken(), taskUid);
             }
             else {
                 // If not assigned to the leader, we put it in the leader share list.
@@ -345,6 +376,7 @@ public class TaskPartitionEqualSharingRebalancer implements TaskPartitionRebalan
                                 .assigneeTaskUid(taskUid)
                                 .state(PartitionStateEnum.CREATED)
                                 .build());
+                LOGGER.info("takeSharedPartitionsFromSurvivedTasks, Leader task {} now owning partition {}", leaderTaskState.getTaskUid(), partitionState.getToken());
             }
 
             leaderTaskState = leaderTaskState.toBuilder()
@@ -361,14 +393,15 @@ public class TaskPartitionEqualSharingRebalancer implements TaskPartitionRebalan
 
         Set<String> tokens = leaderTaskState.getPartitionsMap().keySet();
         Set<String> survivedOwnedTokens = collectOwnedPartitionTokens(survivedTasks.values());
+        Set<String> tokensSharedToSurvivedTasks = collectTokensSharedToSurvivedTasks(leaderTaskState, survivedTasks.values());
 
         // The leader itself has shared a token to an obsolete task. The token is not owned by the
-        // leader.
+        // leader, not owned by any of the survived tasks, nor is it shared to a survived task.
         List<PartitionState> partitions = leaderTaskState.getSharedPartitions().stream()
                 .filter(partitionState -> !tokens.contains(partitionState.getToken()))
                 .filter(partitionState -> !survivedOwnedTokens.contains(partitionState.getToken()))
                 .filter(
-                        partitionState -> !survivedTasks.containsKey(partitionState.getAssigneeTaskUid()))
+                        partitionState -> !tokensSharedToSurvivedTasks.contains(partitionState.getToken()))
                 .map(
                         partitionState -> partitionState.toBuilder()
                                 .assigneeTaskUid(leaderTaskState.getTaskUid())
@@ -377,6 +410,7 @@ public class TaskPartitionEqualSharingRebalancer implements TaskPartitionRebalan
 
         List<PartitionState> leaderPartitionList = new ArrayList<>(leaderTaskState.getPartitions());
         leaderPartitionList.addAll(partitions);
+        LOGGER.info("takeSharedPartitionsToObsoleteTask, Leader task {} now owning partitions {}", leaderTaskState.getTaskUid(), partitions);
 
         TaskState newLeaderTaskState = leaderTaskState.toBuilder().partitions(leaderPartitionList).build();
 
@@ -397,6 +431,7 @@ public class TaskPartitionEqualSharingRebalancer implements TaskPartitionRebalan
                 .collect(Collectors.toList());
     }
 
+    // Collect the tokens owned and shared by the set of tasks.
     private Set<String> collectPartitionTokens(Collection<TaskState>... taskStates) {
         return Arrays.stream(taskStates)
                 .flatMap(Collection::stream)
@@ -407,10 +442,27 @@ public class TaskPartitionEqualSharingRebalancer implements TaskPartitionRebalan
                 .collect(Collectors.toSet());
     }
 
+    // Collect the partitions owned by the set of tasks.
     private Set<String> collectOwnedPartitionTokens(Collection<TaskState>... taskStates) {
         return Arrays.stream(taskStates)
                 .flatMap(Collection::stream)
                 .flatMap(taskState -> taskState.getPartitionsMap().keySet().stream())
+                .collect(Collectors.toSet());
+    }
+
+    // Collect all tokens shared to all survived tasks, including leader.
+    private Set<String> collectTokensSharedToSurvivedTasks(TaskState leaderTaskState, Collection<TaskState>... survivedTasks) {
+        // Get the list of total survived tasks, including the leader.
+        Set<TaskState> allSurvivedTasks = new HashSet<>();
+        allSurvivedTasks.addAll(Arrays.stream(survivedTasks).flatMap(Collection::stream).collect(Collectors.toSet()));
+        allSurvivedTasks.add(leaderTaskState);
+        Set<String> allSurvivedTaskUids = allSurvivedTasks.stream().map(taskState -> taskState.getTaskUid())
+                .collect(Collectors.toSet());
+        // For each of the survived tasks, including the leader, get the shared partitions that have been assigned to an alive task.
+        return allSurvivedTasks.stream()
+                .flatMap(taskState -> taskState.getSharedPartitionsMap().values().stream())
+                .filter(partition -> allSurvivedTaskUids.contains(partition.getAssigneeTaskUid()))
+                .map(partition -> partition.getToken())
                 .collect(Collectors.toSet());
     }
 }
