@@ -45,11 +45,6 @@ public class FindPartitionForStreamingOperation implements Operation {
                                     taskSyncContext.getTaskUid(), partitionState.getToken());
 
                         }
-                        else if (!atLeastOneParentExists(taskSyncContext, partitionState.getParents())) {
-                            LOGGER.info("Task takes partition for streaming, since parents no longer exist, taskUid: {}, partition {}, parents {}",
-                                    taskSyncContext.getTaskUid(), partitionState.getToken(), partitionState.getParents());
-                            takePartitionForStreaming = true;
-                        }
 
                         if (takePartitionForStreaming) {
                             this.isRequiredPublishSyncEvent = true;
@@ -82,24 +77,6 @@ public class FindPartitionForStreamingOperation implements Operation {
                         || PartitionStateEnum.REMOVED.equals(partitionState.getState()))
                 .map(PartitionState::getToken)
                 .collect(Collectors.toSet());
-    }
-
-    private boolean atLeastOneParentExists(TaskSyncContext taskSyncContext, Set<String> parents) {
-        List<PartitionState> partitionStateList = new ArrayList<>();
-        partitionStateList.addAll(taskSyncContext.getCurrentTaskState().getPartitions());
-        partitionStateList.addAll(taskSyncContext.getTaskStates().values().stream()
-                .flatMap(taskState -> taskState.getPartitions().stream())
-                .collect(Collectors.toList()));
-
-        Set<String> ownedPartitions = partitionStateList.stream()
-                .map(PartitionState::getToken)
-                .collect(Collectors.toSet());
-        for (String parent : parents) {
-            if (ownedPartitions.contains(parent)) {
-                return true;
-            }
-        }
-        return false;
     }
 
     @Override

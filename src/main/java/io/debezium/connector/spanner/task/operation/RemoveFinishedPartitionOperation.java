@@ -54,14 +54,14 @@ public class RemoveFinishedPartitionOperation implements Operation {
                                     throw new DebeziumException(
                                             "FinishedTimestamp must be specified for finished partitions");
                                 }
-
                                 Timestamp deletionTime = Timestamp.ofTimeSecondsAndNanos(
                                         partitionState.getFinishedTimestamp().getSeconds()
                                                 + connectorConfig.getFinishedPartitionDeletionDelay().getSeconds(),
                                         0);
                                 Timestamp currentTime = Timestamp.now();
+
                                 if (deletionTime.compareTo(currentTime) < 0 &&
-                                        allChildrenFinishedAndAtLeastOnePresent(
+                                        allChildrenFinished(
                                                 taskSyncContext, partitionState.getToken())) {
                                     LOGGER.info(
                                             "Partition {} will be removed from the task with finished timestamp {},"
@@ -99,8 +99,8 @@ public class RemoveFinishedPartitionOperation implements Operation {
                 .build();
     }
 
-    private static boolean allChildrenFinishedAndAtLeastOnePresent(
-                                                                   TaskSyncContext taskSyncContext, String token) {
+    private static boolean allChildrenFinished(
+                                               TaskSyncContext taskSyncContext, String token) {
         List<PartitionState> allPartitionStates = Stream.concat(
                 Stream.concat(
                         taskSyncContext.getTaskStates().values().stream()
@@ -117,8 +117,11 @@ public class RemoveFinishedPartitionOperation implements Operation {
                 .map(PartitionState::getToken)
                 .collect(Collectors.toSet());
 
-        return !children.isEmpty()
-                && children.stream()
+        return
+        // Children were already removed.
+        children.isEmpty()
+                // Children were marked as finished.
+                || children.stream()
                         .allMatch(
                                 childToken -> {
                                     return allPartitionStates.stream()

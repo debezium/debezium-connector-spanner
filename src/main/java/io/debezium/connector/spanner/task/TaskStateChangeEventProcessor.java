@@ -61,12 +61,11 @@ public class TaskStateChangeEventProcessor {
                 TaskStateChangeEvent event;
                 try {
                     LOGGER.debug("createEventHandlerThread: Wait for sync event");
+
                     event = this.queue.take();
 
                     metricsEventPublisher.publishMetricEvent(new TaskStateChangeQueueUpdateMetricEvent(queue.remainingCapacity()));
 
-                    LoggerUtils.debug(LOGGER, "createEventHandlerThread: Received sync event of type: {}, event: {}",
-                            event.getClass().getSimpleName(), event);
                 }
                 catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
@@ -120,6 +119,7 @@ public class TaskStateChangeEventProcessor {
         else {
             queue.put(event);
         }
+
         metricsEventPublisher.publishMetricEvent(new TaskStateChangeQueueUpdateMetricEvent(queue.remainingCapacity()));
     }
 

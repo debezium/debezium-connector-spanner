@@ -7,6 +7,7 @@ package io.debezium.connector.spanner.task;
 
 import static org.slf4j.LoggerFactory.getLogger;
 
+import java.time.Instant;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
@@ -77,6 +78,7 @@ public class TaskStateChangeEventHandler {
     public void processEvent(TaskStateChangeEvent syncEvent) throws InterruptedException {
         LOGGER.debug("process TaskStateChangeEvent of type: {}", syncEvent.getClass().getSimpleName());
 
+        long nowMillis = Instant.now().toEpochMilli();
         if (syncEvent instanceof PartitionStatusUpdateEvent) {
             processEvent((PartitionStatusUpdateEvent) syncEvent);
         }
@@ -90,22 +92,25 @@ public class TaskStateChangeEventHandler {
         else {
             throw new IllegalStateException("Unknown event");
         }
+        long thenMillis = Instant.now().toEpochMilli();
+        LOGGER.debug(
+                "Task {}, TaskStateChangeEventHandler: Processed {} in {} millis",
+                taskSyncContextHolder.get().getTaskUid(), syncEvent.getClass().getSimpleName(), thenMillis - nowMillis);
+
     }
 
     private void processEvent(PartitionStatusUpdateEvent event) throws InterruptedException {
         performOperation(
                 new PartitionStatusUpdateOperation(event.getToken(), event.getState()),
                 new FindPartitionForStreamingOperation(),
-                new TakePartitionForStreamingOperation(changeStream, partitionFactory),
-                new RemoveFinishedPartitionOperation(spannerEventDispatcher, connectorConfig));
+                new TakePartitionForStreamingOperation(changeStream, partitionFactory));
     }
 
     private void processEvent(NewPartitionsEvent newPartitionsEvent) throws InterruptedException {
         performOperation(
                 new ChildPartitionOperation(newPartitionsEvent.getPartitions()),
                 new FindPartitionForStreamingOperation(),
-                new TakePartitionForStreamingOperation(changeStream, partitionFactory),
-                new RemoveFinishedPartitionOperation(spannerEventDispatcher, connectorConfig));
+                new TakePartitionForStreamingOperation(changeStream, partitionFactory));
     }
 
     private void processSyncEvent() throws InterruptedException {
@@ -155,12 +160,16 @@ public class TaskStateChangeEventHandler {
         TaskSyncContext taskSyncContext = taskSyncContextHolder.updateAndGet(context -> {
             TaskSyncContext newContext = context;
             for (Operation operation : operations) {
+                long nowMillis = Instant.now().toEpochMilli();
                 newContext = operation.doOperation(newContext);
                 if (operation.isRequiredPublishSyncEvent()) {
                     LOGGER.debug("Task {} - need to publish sync event for operation {}",
                             taskSyncContextHolder.get().getTaskUid(), operation.getClass().getSimpleName());
                     publishTaskSyncEvent.set(true);
                 }
+                long thenMillis = Instant.now().toEpochMilli();
+                LOGGER.debug("Task {} - did operation {} in {} millis",
+                        taskSyncContextHolder.get().getTaskUid(), operation.getClass().getSimpleName(), thenMillis - nowMillis);
             }
             return newContext;
         });

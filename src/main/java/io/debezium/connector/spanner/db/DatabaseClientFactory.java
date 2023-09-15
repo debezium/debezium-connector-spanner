@@ -109,7 +109,7 @@ public class DatabaseClientFactory {
         return credential;
     }
 
-    public synchronized void closeSpanner() {
+    public void closeSpanner() {
         if (spanner == null) {
             return;
         }
@@ -121,11 +121,10 @@ public class DatabaseClientFactory {
         if (spanner == null) {
             return null;
         }
-        if (databaseClient != null) {
-            return databaseClient;
+        if (databaseClient == null) {
+            databaseClient = spanner.getDatabaseClient(
+                    DatabaseId.of(this.projectId, this.instanceId, this.databaseId));
         }
-        databaseClient = spanner.getDatabaseClient(
-                DatabaseId.of(this.projectId, this.instanceId, this.databaseId));
         return databaseClient;
     }
 }
