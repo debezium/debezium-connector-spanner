@@ -93,7 +93,7 @@ public class TaskStateChangeEventHandler {
             throw new IllegalStateException("Unknown event");
         }
         long thenMillis = Instant.now().toEpochMilli();
-        LOGGER.debug(
+        LOGGER.info(
                 "Task {}, TaskStateChangeEventHandler: Processed {} in {} millis",
                 taskSyncContextHolder.get().getTaskUid(), syncEvent.getClass().getSimpleName(), thenMillis - nowMillis);
 
@@ -168,7 +168,7 @@ public class TaskStateChangeEventHandler {
                     publishTaskSyncEvent.set(true);
                 }
                 long thenMillis = Instant.now().toEpochMilli();
-                LOGGER.debug("Task {} - did operation {} in {} millis",
+                LOGGER.info("Task {} - did operation {} in {} millis",
                         taskSyncContextHolder.get().getTaskUid(), operation.getClass().getSimpleName(), thenMillis - nowMillis);
             }
             return newContext;

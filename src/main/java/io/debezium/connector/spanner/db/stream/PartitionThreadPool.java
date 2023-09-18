@@ -76,6 +76,8 @@ public class PartitionThreadPool {
             LOGGER.info("Beginning to terminate threads, task {}", taskUid);
         }
         LOGGER.info("Successfully shut down partition thread poll for task {}", taskUid);
+        clean();
+        LOGGER.info("Successfully cleaned partition thread poll for task {}", taskUid);
     }
 
     private void clean() {

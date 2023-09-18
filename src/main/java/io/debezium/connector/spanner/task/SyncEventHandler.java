@@ -114,8 +114,8 @@ public class SyncEventHandler {
             taskSyncContextHolder.update(context -> context.toBuilder()
                     .rebalanceState(RebalanceState.INITIAL_INCREMENTED_STATE_COMPLETED)
                     .build());
-            LOGGER.info("Task {} - now initialized with epoch offset {} and context {}", taskSyncContextHolder.get().getTaskUid(),
-                    taskSyncContextHolder.get().getEpochOffsetHolder().getEpochOffset(), taskSyncContextHolder.get());
+            LOGGER.info("Task {} - now initialized with epoch offset {}", taskSyncContextHolder.get().getTaskUid(),
+                    taskSyncContextHolder.get().getEpochOffsetHolder().getEpochOffset());
 
             // Check that there are no duplicate partitions after the task has finished initializing.
             taskSyncContextHolder.get().checkDuplication(true, "Finished Initializing Task State");
