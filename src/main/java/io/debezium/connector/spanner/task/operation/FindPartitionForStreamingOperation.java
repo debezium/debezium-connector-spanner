@@ -30,7 +30,7 @@ public class FindPartitionForStreamingOperation implements Operation {
     }
 
     private TaskSyncContext takePartitionForStreaming(TaskSyncContext taskSyncContext) {
-
+        Set<String> allPartitions = getAllPartitions(taskSyncContext);
         Set<String> finishedPartitions = getFinishedPartitions(taskSyncContext);
 
         TaskState taskState = taskSyncContext.getCurrentTaskState();
@@ -43,6 +43,16 @@ public class FindPartitionForStreamingOperation implements Operation {
                             takePartitionForStreaming = true;
                             LOGGER.info("Task takes partition for streaming, taskUid: {}, partition {}",
                                     taskSyncContext.getTaskUid(), partitionState.getToken());
+
+                        }
+                        else if (!atLeastOneParentExists(taskSyncContext, partitionState.getParents())) {
+                            LOGGER.info("Task takes partition for streaming, since parents no longer exist, taskUid: {}, partition {}, parents {}",
+                                    taskSyncContext.getTaskUid(), partitionState.getToken(), partitionState.getParents());
+                            takePartitionForStreaming = true;
+                        }
+                        else {
+                            LOGGER.info("Task not taking partition for streaming, since parents are not finished, taskUid: {}, partition {}, parents {}",
+                                    taskSyncContext.getTaskUid(), partitionState.getToken(), partitionState.getParents());
 
                         }
 
@@ -77,6 +87,46 @@ public class FindPartitionForStreamingOperation implements Operation {
                         || PartitionStateEnum.REMOVED.equals(partitionState.getState()))
                 .map(PartitionState::getToken)
                 .collect(Collectors.toSet());
+    }
+
+    private Set<String> getAllPartitions(TaskSyncContext taskSyncContext) {
+        List<PartitionState> partitionStateList = new ArrayList<>();
+        // add all owned partitions
+        partitionStateList.addAll(taskSyncContext.getCurrentTaskState().getPartitions());
+        partitionStateList.addAll(taskSyncContext.getTaskStates().values().stream()
+                .flatMap(taskState -> taskState.getPartitions().stream())
+                .collect(Collectors.toList()));
+
+        // add all shared parttions.
+        partitionStateList.addAll(taskSyncContext.getCurrentTaskState().getSharedPartitions());
+        partitionStateList.addAll(taskSyncContext.getTaskStates().values().stream()
+                .flatMap(taskState -> taskState.getSharedPartitions().stream())
+                .collect(Collectors.toList()));
+        return partitionStateList.stream()
+                .map(PartitionState::getToken)
+                .collect(Collectors.toSet());
+    }
+
+    private boolean atLeastOneParentExists(TaskSyncContext taskSyncContext, Set<String> parents) {
+        List<PartitionState> partitionStateList = new ArrayList<>();
+        partitionStateList.addAll(taskSyncContext.getCurrentTaskState().getPartitions());
+        partitionStateList.addAll(taskSyncContext.getTaskStates().values().stream()
+                .flatMap(taskState -> taskState.getPartitions().stream())
+                .collect(Collectors.toList()));
+        partitionStateList.addAll(taskSyncContext.getCurrentTaskState().getSharedPartitions());
+        partitionStateList.addAll(taskSyncContext.getTaskStates().values().stream()
+                .flatMap(taskState -> taskState.getSharedPartitions().stream())
+                .collect(Collectors.toList()));
+
+        Set<String> allPartitions = partitionStateList.stream()
+                .map(PartitionState::getToken)
+                .collect(Collectors.toSet());
+        for (String parent : parents) {
+            if (allPartitions.contains(parent)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override

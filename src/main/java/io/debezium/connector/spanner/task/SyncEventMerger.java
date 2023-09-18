@@ -18,7 +18,6 @@ import java.util.stream.Stream;
 
 import org.slf4j.Logger;
 
-import io.debezium.DebeziumException;
 import io.debezium.connector.spanner.kafka.internal.model.RebalanceState;
 import io.debezium.connector.spanner.kafka.internal.model.TaskState;
 import io.debezium.connector.spanner.kafka.internal.model.TaskSyncEvent;
@@ -256,7 +255,7 @@ public class SyncEventMerger {
                         "Task {} - Received new epoch message , but leader {} did not include the task in the new epoch message with rebalance ID {} with tasks {}, probably just initialized, throw exception",
                         currentContext.getTaskUid(), inSync.getTaskUid(), inSync.getRebalanceGenerationId(),
                         inSync.getTaskStates().keySet().stream().collect(Collectors.toList()));
-                throw new DebeziumException("Leader did not include task in new epoch message");
+                // throw new DebeziumException("Leader did not include task in new epoch message");
             }
             else {
                 LOGGER.info("Task {}, updating the rebalance state to NEW_EPOCH_STARTED {}: {}", currentContext.getTaskUid(), inSync.getTaskUid(),

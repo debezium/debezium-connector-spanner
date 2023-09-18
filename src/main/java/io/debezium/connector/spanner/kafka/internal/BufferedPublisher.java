@@ -72,6 +72,13 @@ public class BufferedPublisher<V> {
                 this.value.set(null);
                 this.onPublish.accept(update);
             }
+            if (update.getClass() == TaskSyncEvent.class) {
+                TaskSyncEvent event = (TaskSyncEvent) update;
+
+                LOGGER.info("Task {}, publishing event with rebalance generation ID {} and message type {}", this.taskUid,
+                        event.getRebalanceGenerationId(),
+                        event.getMessageType());
+            }
         }
         else {
             value.set(update);

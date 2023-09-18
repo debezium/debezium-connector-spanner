@@ -60,30 +60,36 @@ public class RemoveFinishedPartitionOperation implements Operation {
                                         0);
                                 Timestamp currentTime = Timestamp.now();
 
-                                if (deletionTime.compareTo(currentTime) < 0 &&
-                                        allChildrenFinished(
-                                                taskSyncContext, partitionState.getToken())) {
-                                    LOGGER.info(
-                                            "Partition {} will be removed from the task with finished timestamp {},"
-                                                    + " deletion timestamp {} and current time {}",
-                                            partitionState,
-                                            partitionState.getFinishedTimestamp(),
-                                            deletionTime,
-                                            currentTime);
+                                if (deletionTime.compareTo(currentTime) < 0) {
 
-                                    LOGGER.info("Task {}, Dispatching null offset for partition {} because it is removed", taskSyncContext.getTaskUid(),
-                                            partitionState.getToken());
-                                    PartitionOffset partitionOffset = new PartitionOffset();
-                                    SpannerOffsetContext spannerOffsetContext = new SpannerOffsetContext(partitionOffset, new TransactionContext());
-                                    SpannerPartition partition = new SpannerPartition(partitionState.getToken());
-                                    try {
-                                        spannerEventDispatcher.alwaysDispatchHeartbeatEvent(partition, spannerOffsetContext);
+                                    if (allChildrenFinished(
+                                            taskSyncContext, partitionState.getToken())) {
+                                        LOGGER.info(
+                                                "Partition {} will be removed from the task with finished timestamp {},"
+                                                        + " deletion timestamp {} and current time {}",
+                                                partitionState,
+                                                partitionState.getFinishedTimestamp(),
+                                                deletionTime,
+                                                currentTime);
+
+                                        LOGGER.info("Task {}, Dispatching null offset for partition {} because it is removed", taskSyncContext.getTaskUid(),
+                                                partitionState.getToken());
+                                        PartitionOffset partitionOffset = new PartitionOffset();
+                                        SpannerOffsetContext spannerOffsetContext = new SpannerOffsetContext(partitionOffset, new TransactionContext());
+                                        SpannerPartition partition = new SpannerPartition(partitionState.getToken());
+                                        try {
+                                            spannerEventDispatcher.alwaysDispatchHeartbeatEvent(partition, spannerOffsetContext);
+                                        }
+                                        catch (InterruptedException e) {
+                                            LOGGER.error("Task {}, Failed to send null offset for partition {}", taskSyncContext.getTaskUid(), partitionState.getToken());
+                                        }
+                                        return null;
                                     }
-                                    catch (InterruptedException e) {
-                                        LOGGER.error("Task {}, Failed to send null offset for partition {}", taskSyncContext.getTaskUid(), partitionState.getToken());
+                                    else {
+                                        LOGGER.info("Task {}, waiting to remove partition {}", taskSyncContext.getTaskUid(), partitionState);
                                     }
-                                    return null;
                                 }
+
                                 return partitionState;
                             }
                             return partitionState;
@@ -117,10 +123,7 @@ public class RemoveFinishedPartitionOperation implements Operation {
                 .map(PartitionState::getToken)
                 .collect(Collectors.toSet());
 
-        return
-        // Children were already removed.
-        children.isEmpty()
-                // Children were marked as finished.
+        return children.isEmpty()
                 || children.stream()
                         .allMatch(
                                 childToken -> {

@@ -136,7 +136,13 @@ public class PartitionOffsetProvider {
 
         @Override
         public Map<String, ?> call() throws Exception {
-            return this.offsetStorageReader.offset(spannerPartition);
+            try {
+                return this.offsetStorageReader.offset(spannerPartition);
+            }
+            catch (Exception e) {
+                LOGGER.error("Offsetstoragereader throwing exception {}", e);
+                throw e;
+            }
         }
     }
 
