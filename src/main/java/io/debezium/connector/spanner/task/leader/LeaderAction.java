@@ -111,7 +111,7 @@ public class LeaderAction {
         }, "SpannerConnector-LeaderAction");
 
         thread.setUncaughtExceptionHandler((t, ex) -> {
-            LOGGER.error("Leader action execution error, task {}, ex {}", taskSyncContextHolder.get().getTaskUid(), ex.getStackTrace());
+            LOGGER.error("Leader action execution error, task {}, ex", taskSyncContextHolder.get().getTaskUid(), ex);
             errorHandler.accept(ex);
         });
 

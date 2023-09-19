@@ -8,6 +8,7 @@ package io.debezium.connector.spanner.db.stream;
 import java.time.Duration;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.slf4j.Logger;
@@ -22,7 +23,7 @@ import io.debezium.util.Metronome;
 public class PartitionThreadPool {
     private static final Logger LOGGER = LoggerFactory.getLogger(PartitionThreadPool.class);
 
-    private final ConcurrentHashMap<String, Thread> threadMap = new ConcurrentHashMap<>();
+    private final ConcurrentMap<String, Thread> threadMap = new ConcurrentHashMap<>();
 
     private final Duration sleepInterval = Duration.ofMillis(100);
 
@@ -32,7 +33,7 @@ public class PartitionThreadPool {
         clean();
 
         if (threadMap.containsKey(token)) {
-            LOGGER.info("Fail to submit token in PartitionThreadPool {} since it is already contained in the map", token);
+            LOGGER.info("Failed to submit token in PartitionThreadPool {} since it is already contained in the map", token);
             return false;
         }
 
@@ -45,7 +46,7 @@ public class PartitionThreadPool {
             return thread;
         });
         if (!insertedThread.get()) {
-            LOGGER.info("Fail to submit token in PartitionThreadPool {}", token);
+            LOGGER.info("Failed to submit token in PartitionThreadPool {}", token);
         }
 
         return insertedThread.get();

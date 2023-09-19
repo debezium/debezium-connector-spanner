@@ -31,6 +31,7 @@ import org.junit.jupiter.api.Test;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.cloud.Timestamp;
+import com.google.cloud.spanner.DatabaseClient;
 import com.google.cloud.spanner.Dialect;
 import com.google.cloud.spanner.Struct;
 import com.google.cloud.spanner.Type;
@@ -54,9 +55,12 @@ class ChangeStreamRecordMapperTest {
     ChangeStreamResultSetMetadata resultSetMetadata;
     Partition partition;
     ChangeStreamRecordMapper changeStreamRecordMapper;
+    DatabaseClient psqlDatabaseClient = mock(DatabaseClient.class);
+    DatabaseClient gsqlDatabaseClient = mock(DatabaseClient.class);
 
     @BeforeEach
     public void setUp() {
+        when(psqlDatabaseClient.getDialect()).thenReturn(Dialect.POSTGRESQL);
         resultSetMetadata = mock(ChangeStreamResultSetMetadata.class);
         when(resultSetMetadata.getQueryStartedAt()).thenReturn(Timestamp.ofTimeMicroseconds(1L));
         when(resultSetMetadata.getRecordStreamStartedAt()).thenReturn(Timestamp.ofTimeMicroseconds(2L));
@@ -67,7 +71,7 @@ class ChangeStreamRecordMapperTest {
         partition = new Partition("partitionToken", Sets.newHashSet("parentToken"), Timestamp.ofTimeMicroseconds(11L),
                 Timestamp.ofTimeMicroseconds(12L), "parentToken");
         changeStreamRecordMapper = new ChangeStreamRecordMapper(
-                Dialect.POSTGRESQL);
+                psqlDatabaseClient);
     }
 
     @Test
@@ -333,8 +337,9 @@ class ChangeStreamRecordMapperTest {
 
     @Test
     void testToChangeStreamEvents() {
+        when(gsqlDatabaseClient.getDialect()).thenReturn(Dialect.GOOGLE_STANDARD_SQL);
         ChangeStreamRecordMapper changeStreamRecordMapper = new ChangeStreamRecordMapper(
-                Dialect.GOOGLE_STANDARD_SQL);
+                gsqlDatabaseClient);
         HashSet<String> parentTokens = new HashSet<>();
         Timestamp startTimestamp = Timestamp.ofTimeMicroseconds(1L);
         Partition partition = new Partition("token", parentTokens, startTimestamp, Timestamp.ofTimeMicroseconds(1L), "originPartition");
@@ -352,7 +357,8 @@ class ChangeStreamRecordMapperTest {
 
     @Test
     void testToChangeStreamEvents2() {
-        ChangeStreamRecordMapper changeStreamRecordMapper = new ChangeStreamRecordMapper(Dialect.GOOGLE_STANDARD_SQL);
+        when(gsqlDatabaseClient.getDialect()).thenReturn(Dialect.GOOGLE_STANDARD_SQL);
+        ChangeStreamRecordMapper changeStreamRecordMapper = new ChangeStreamRecordMapper(gsqlDatabaseClient);
         HashSet<String> parentTokens = new HashSet<>();
         Timestamp startTimestamp = Timestamp.ofTimeMicroseconds(1L);
         Partition partition = new Partition("token", parentTokens, startTimestamp, Timestamp.ofTimeMicroseconds(1L), "originPartition");
@@ -377,7 +383,8 @@ class ChangeStreamRecordMapperTest {
 
     @Test
     void testToChangeStreamEvents3() {
-        ChangeStreamRecordMapper changeStreamRecordMapper = new ChangeStreamRecordMapper(Dialect.GOOGLE_STANDARD_SQL);
+        when(gsqlDatabaseClient.getDialect()).thenReturn(Dialect.GOOGLE_STANDARD_SQL);
+        ChangeStreamRecordMapper changeStreamRecordMapper = new ChangeStreamRecordMapper(gsqlDatabaseClient);
         HashSet<String> parentTokens = new HashSet<>();
         Timestamp startTimestamp = Timestamp.ofTimeMicroseconds(1L);
         Partition partition = new Partition("token", parentTokens, startTimestamp, Timestamp.ofTimeMicroseconds(1L), "originPartition");
@@ -407,7 +414,8 @@ class ChangeStreamRecordMapperTest {
 
     @Test
     void testToChangeStreamEvents4() {
-        ChangeStreamRecordMapper changeStreamRecordMapper = new ChangeStreamRecordMapper(Dialect.GOOGLE_STANDARD_SQL);
+        when(gsqlDatabaseClient.getDialect()).thenReturn(Dialect.GOOGLE_STANDARD_SQL);
+        ChangeStreamRecordMapper changeStreamRecordMapper = new ChangeStreamRecordMapper(gsqlDatabaseClient);
         HashSet<String> parentTokens = new HashSet<>();
         Timestamp startTimestamp = Timestamp.ofTimeMicroseconds(1L);
         Partition partition = new Partition("token", parentTokens, startTimestamp, Timestamp.ofTimeMicroseconds(1L), "originPartition");
@@ -439,7 +447,8 @@ class ChangeStreamRecordMapperTest {
 
     @Test
     void testToChangeStreamEvents5() {
-        ChangeStreamRecordMapper changeStreamRecordMapper = new ChangeStreamRecordMapper(Dialect.GOOGLE_STANDARD_SQL);
+        when(gsqlDatabaseClient.getDialect()).thenReturn(Dialect.GOOGLE_STANDARD_SQL);
+        ChangeStreamRecordMapper changeStreamRecordMapper = new ChangeStreamRecordMapper(gsqlDatabaseClient);
         HashSet<String> parentTokens = new HashSet<>();
         Timestamp startTimestamp = Timestamp.ofTimeMicroseconds(1L);
         Partition partition = new Partition("String", parentTokens, startTimestamp, Timestamp.ofTimeMicroseconds(1L), "originPartition");
@@ -456,7 +465,8 @@ class ChangeStreamRecordMapperTest {
 
     @Test
     void testToChangeStreamEvents6() {
-        ChangeStreamRecordMapper changeStreamRecordMapper = new ChangeStreamRecordMapper(Dialect.GOOGLE_STANDARD_SQL);
+        when(gsqlDatabaseClient.getDialect()).thenReturn(Dialect.GOOGLE_STANDARD_SQL);
+        ChangeStreamRecordMapper changeStreamRecordMapper = new ChangeStreamRecordMapper(gsqlDatabaseClient);
         HashSet<String> parentTokens = new HashSet<>();
         Timestamp startTimestamp = Timestamp.ofTimeMicroseconds(1L);
         Partition partition = new Partition("String", parentTokens, startTimestamp, Timestamp.ofTimeMicroseconds(1L), "originPartition");
@@ -478,7 +488,8 @@ class ChangeStreamRecordMapperTest {
 
     @Test
     void testToChangeStreamEvents7() {
-        ChangeStreamRecordMapper changeStreamRecordMapper = new ChangeStreamRecordMapper(Dialect.GOOGLE_STANDARD_SQL);
+        when(gsqlDatabaseClient.getDialect()).thenReturn(Dialect.GOOGLE_STANDARD_SQL);
+        ChangeStreamRecordMapper changeStreamRecordMapper = new ChangeStreamRecordMapper(gsqlDatabaseClient);
         HashSet<String> parentTokens = new HashSet<>();
         Timestamp startTimestamp = Timestamp.ofTimeMicroseconds(1L);
         Partition partition = new Partition("String", parentTokens, startTimestamp, Timestamp.ofTimeMicroseconds(1L), "originPartition");
@@ -504,7 +515,8 @@ class ChangeStreamRecordMapperTest {
 
     @Test
     void testToChangeStreamEvents8() {
-        ChangeStreamRecordMapper changeStreamRecordMapper = new ChangeStreamRecordMapper(Dialect.GOOGLE_STANDARD_SQL);
+        when(gsqlDatabaseClient.getDialect()).thenReturn(Dialect.GOOGLE_STANDARD_SQL);
+        ChangeStreamRecordMapper changeStreamRecordMapper = new ChangeStreamRecordMapper(gsqlDatabaseClient);
         HashSet<String> parentTokens = new HashSet<>();
         Timestamp startTimestamp = Timestamp.ofTimeMicroseconds(1L);
         Partition partition = new Partition("String", parentTokens, startTimestamp, Timestamp.ofTimeMicroseconds(1L), "originPartition");
@@ -532,7 +544,8 @@ class ChangeStreamRecordMapperTest {
 
     @Test
     void testToStreamEvent() {
-        ChangeStreamRecordMapper changeStreamRecordMapper = new ChangeStreamRecordMapper(Dialect.GOOGLE_STANDARD_SQL);
+        when(gsqlDatabaseClient.getDialect()).thenReturn(Dialect.GOOGLE_STANDARD_SQL);
+        ChangeStreamRecordMapper changeStreamRecordMapper = new ChangeStreamRecordMapper(gsqlDatabaseClient);
         HashSet<String> parentTokens = new HashSet<>();
         Timestamp startTimestamp = Timestamp.ofTimeMicroseconds(1L);
         Partition partition = new Partition("String", parentTokens, startTimestamp, Timestamp.ofTimeMicroseconds(1L), "originPartition");
@@ -549,7 +562,8 @@ class ChangeStreamRecordMapperTest {
 
     @Test
     void testToStreamEventThrows() {
-        ChangeStreamRecordMapper changeStreamRecordMapper = new ChangeStreamRecordMapper(Dialect.GOOGLE_STANDARD_SQL);
+        when(gsqlDatabaseClient.getDialect()).thenReturn(Dialect.GOOGLE_STANDARD_SQL);
+        ChangeStreamRecordMapper changeStreamRecordMapper = new ChangeStreamRecordMapper(gsqlDatabaseClient);
         HashSet<String> parentTokens = new HashSet<>();
         Timestamp startTimestamp = Timestamp.ofTimeMicroseconds(1L);
         Partition partition = new Partition("String", parentTokens, startTimestamp, Timestamp.ofTimeMicroseconds(1L), "originPartition");
@@ -567,7 +581,8 @@ class ChangeStreamRecordMapperTest {
 
     @Test
     void testIsNonNullDataChangeRecordNullDataChangeRecord() {
-        ChangeStreamRecordMapper changeStreamRecordMapper = new ChangeStreamRecordMapper(Dialect.GOOGLE_STANDARD_SQL);
+        when(gsqlDatabaseClient.getDialect()).thenReturn(Dialect.GOOGLE_STANDARD_SQL);
+        ChangeStreamRecordMapper changeStreamRecordMapper = new ChangeStreamRecordMapper(gsqlDatabaseClient);
         Struct struct = mock(Struct.class);
         when(struct.isNull(any())).thenReturn(true);
         assertFalse(changeStreamRecordMapper.isNonNullDataChangeRecord(struct));
@@ -576,7 +591,8 @@ class ChangeStreamRecordMapperTest {
 
     @Test
     void testIsNonNullDataChangeRecordNonNullDataChangeRecord() {
-        ChangeStreamRecordMapper changeStreamRecordMapper = new ChangeStreamRecordMapper(Dialect.GOOGLE_STANDARD_SQL);
+        when(gsqlDatabaseClient.getDialect()).thenReturn(Dialect.GOOGLE_STANDARD_SQL);
+        ChangeStreamRecordMapper changeStreamRecordMapper = new ChangeStreamRecordMapper(gsqlDatabaseClient);
         Struct struct = mock(Struct.class);
         when(struct.isNull(any())).thenReturn(false);
         assertTrue(changeStreamRecordMapper.isNonNullDataChangeRecord(struct));
@@ -585,7 +601,8 @@ class ChangeStreamRecordMapperTest {
 
     @Test
     void testIsNonNullDataChangeRecordThrows() {
-        ChangeStreamRecordMapper changeStreamRecordMapper = new ChangeStreamRecordMapper(Dialect.GOOGLE_STANDARD_SQL);
+        when(gsqlDatabaseClient.getDialect()).thenReturn(Dialect.GOOGLE_STANDARD_SQL);
+        ChangeStreamRecordMapper changeStreamRecordMapper = new ChangeStreamRecordMapper(gsqlDatabaseClient);
         Struct struct = mock(Struct.class);
         when(struct.isNull(any())).thenThrow(new IllegalArgumentException());
         assertThrows(IllegalArgumentException.class, () -> changeStreamRecordMapper.isNonNullDataChangeRecord(struct));
@@ -594,7 +611,8 @@ class ChangeStreamRecordMapperTest {
 
     @Test
     void testIsNonNullHeartbeatRecordNullHeartbeatRecord() {
-        ChangeStreamRecordMapper changeStreamRecordMapper = new ChangeStreamRecordMapper(Dialect.GOOGLE_STANDARD_SQL);
+        when(gsqlDatabaseClient.getDialect()).thenReturn(Dialect.GOOGLE_STANDARD_SQL);
+        ChangeStreamRecordMapper changeStreamRecordMapper = new ChangeStreamRecordMapper(gsqlDatabaseClient);
         Struct struct = mock(Struct.class);
         when(struct.isNull(any())).thenReturn(true);
         assertFalse(changeStreamRecordMapper.isNonNullHeartbeatRecord(struct));
@@ -603,7 +621,8 @@ class ChangeStreamRecordMapperTest {
 
     @Test
     void testIsNonNullHeartbeatRecordNonNullHeartbeatRecord() {
-        ChangeStreamRecordMapper changeStreamRecordMapper = new ChangeStreamRecordMapper(Dialect.GOOGLE_STANDARD_SQL);
+        when(gsqlDatabaseClient.getDialect()).thenReturn(Dialect.GOOGLE_STANDARD_SQL);
+        ChangeStreamRecordMapper changeStreamRecordMapper = new ChangeStreamRecordMapper(gsqlDatabaseClient);
         Struct struct = mock(Struct.class);
         when(struct.isNull(any())).thenReturn(false);
         assertTrue(changeStreamRecordMapper.isNonNullHeartbeatRecord(struct));
@@ -612,7 +631,8 @@ class ChangeStreamRecordMapperTest {
 
     @Test
     void testIsNonNullHeartbeatRecordThrows() {
-        ChangeStreamRecordMapper changeStreamRecordMapper = new ChangeStreamRecordMapper(Dialect.GOOGLE_STANDARD_SQL);
+        when(gsqlDatabaseClient.getDialect()).thenReturn(Dialect.GOOGLE_STANDARD_SQL);
+        ChangeStreamRecordMapper changeStreamRecordMapper = new ChangeStreamRecordMapper(gsqlDatabaseClient);
         Struct struct = mock(Struct.class);
         when(struct.isNull(any())).thenThrow(new IllegalArgumentException());
         assertThrows(IllegalArgumentException.class, () -> changeStreamRecordMapper.isNonNullHeartbeatRecord(struct));
@@ -621,7 +641,8 @@ class ChangeStreamRecordMapperTest {
 
     @Test
     void testIsNonNullChildPartitionsRecordNullChildPartitionsRecord() {
-        ChangeStreamRecordMapper changeStreamRecordMapper = new ChangeStreamRecordMapper(Dialect.GOOGLE_STANDARD_SQL);
+        when(gsqlDatabaseClient.getDialect()).thenReturn(Dialect.GOOGLE_STANDARD_SQL);
+        ChangeStreamRecordMapper changeStreamRecordMapper = new ChangeStreamRecordMapper(gsqlDatabaseClient);
         Struct struct = mock(Struct.class);
         when(struct.isNull(any())).thenReturn(true);
         assertFalse(changeStreamRecordMapper.isNonNullChildPartitionsRecord(struct));
@@ -630,7 +651,8 @@ class ChangeStreamRecordMapperTest {
 
     @Test
     void testIsNonNullChildPartitionsRecordNonNullChildPartitionsRecord() {
-        ChangeStreamRecordMapper changeStreamRecordMapper = new ChangeStreamRecordMapper(Dialect.GOOGLE_STANDARD_SQL);
+        when(gsqlDatabaseClient.getDialect()).thenReturn(Dialect.GOOGLE_STANDARD_SQL);
+        ChangeStreamRecordMapper changeStreamRecordMapper = new ChangeStreamRecordMapper(gsqlDatabaseClient);
         Struct struct = mock(Struct.class);
         when(struct.isNull(any())).thenReturn(false);
         assertTrue(changeStreamRecordMapper.isNonNullChildPartitionsRecord(struct));
@@ -639,7 +661,8 @@ class ChangeStreamRecordMapperTest {
 
     @Test
     void testIsNonNullChildPartitionsRecordThrows() {
-        ChangeStreamRecordMapper changeStreamRecordMapper = new ChangeStreamRecordMapper(Dialect.GOOGLE_STANDARD_SQL);
+        when(gsqlDatabaseClient.getDialect()).thenReturn(Dialect.GOOGLE_STANDARD_SQL);
+        ChangeStreamRecordMapper changeStreamRecordMapper = new ChangeStreamRecordMapper(gsqlDatabaseClient);
         Struct struct = mock(Struct.class);
         when(struct.isNull(any())).thenThrow(new IllegalArgumentException());
         assertThrows(IllegalArgumentException.class,
@@ -649,7 +672,8 @@ class ChangeStreamRecordMapperTest {
 
     @Test
     void testToDataChangeEvent() {
-        ChangeStreamRecordMapper changeStreamRecordMapper = new ChangeStreamRecordMapper(Dialect.GOOGLE_STANDARD_SQL);
+        when(gsqlDatabaseClient.getDialect()).thenReturn(Dialect.GOOGLE_STANDARD_SQL);
+        ChangeStreamRecordMapper changeStreamRecordMapper = new ChangeStreamRecordMapper(gsqlDatabaseClient);
         HashSet<String> parentTokens = new HashSet<>();
         Timestamp startTimestamp = Timestamp.ofTimeMicroseconds(1L);
         Partition partition = new Partition("String", parentTokens, startTimestamp, Timestamp.ofTimeMicroseconds(1L), "originPartition");
@@ -673,7 +697,8 @@ class ChangeStreamRecordMapperTest {
 
     @Test
     void testToDataChangeEventThrows() {
-        ChangeStreamRecordMapper changeStreamRecordMapper = new ChangeStreamRecordMapper(Dialect.GOOGLE_STANDARD_SQL);
+        when(gsqlDatabaseClient.getDialect()).thenReturn(Dialect.GOOGLE_STANDARD_SQL);
+        ChangeStreamRecordMapper changeStreamRecordMapper = new ChangeStreamRecordMapper(gsqlDatabaseClient);
         HashSet<String> parentTokens = new HashSet<>();
         Timestamp startTimestamp = Timestamp.ofTimeMicroseconds(1L);
         Partition partition = new Partition("String", parentTokens, startTimestamp, Timestamp.ofTimeMicroseconds(1L), "originPartition");
@@ -699,7 +724,8 @@ class ChangeStreamRecordMapperTest {
 
     @Test
     void testToHeartbeatEvent() {
-        ChangeStreamRecordMapper changeStreamRecordMapper = new ChangeStreamRecordMapper(Dialect.GOOGLE_STANDARD_SQL);
+        when(gsqlDatabaseClient.getDialect()).thenReturn(Dialect.GOOGLE_STANDARD_SQL);
+        ChangeStreamRecordMapper changeStreamRecordMapper = new ChangeStreamRecordMapper(gsqlDatabaseClient);
         HashSet<String> parentTokens = new HashSet<>();
         Timestamp ofTimeMicrosecondsResult = Timestamp.ofTimeMicroseconds(1L);
         Partition partition = new Partition("String", parentTokens, ofTimeMicrosecondsResult,
@@ -741,7 +767,8 @@ class ChangeStreamRecordMapperTest {
 
     @Test
     void testToHeartbeatEvent2() {
-        ChangeStreamRecordMapper changeStreamRecordMapper = new ChangeStreamRecordMapper(Dialect.GOOGLE_STANDARD_SQL);
+        when(gsqlDatabaseClient.getDialect()).thenReturn(Dialect.GOOGLE_STANDARD_SQL);
+        ChangeStreamRecordMapper changeStreamRecordMapper = new ChangeStreamRecordMapper(gsqlDatabaseClient);
         HashSet<String> parentTokens = new HashSet<>();
         Timestamp startTimestamp = Timestamp.ofTimeMicroseconds(1L);
         Partition partition = new Partition("String", parentTokens, startTimestamp, Timestamp.ofTimeMicroseconds(1L), "originPartition");
@@ -768,7 +795,8 @@ class ChangeStreamRecordMapperTest {
 
     @Test
     void testToChildPartitionsEvent() {
-        ChangeStreamRecordMapper changeStreamRecordMapper = new ChangeStreamRecordMapper(Dialect.GOOGLE_STANDARD_SQL);
+        when(gsqlDatabaseClient.getDialect()).thenReturn(Dialect.GOOGLE_STANDARD_SQL);
+        ChangeStreamRecordMapper changeStreamRecordMapper = new ChangeStreamRecordMapper(gsqlDatabaseClient);
         HashSet<String> parentTokens = new HashSet<>();
         Timestamp ofTimeMicrosecondsResult = Timestamp.ofTimeMicroseconds(1L);
         Partition partition = new Partition("String", parentTokens, ofTimeMicrosecondsResult,
@@ -816,7 +844,8 @@ class ChangeStreamRecordMapperTest {
 
     @Test
     void testToChildPartitionsEventThrows() {
-        ChangeStreamRecordMapper changeStreamRecordMapper = new ChangeStreamRecordMapper(Dialect.GOOGLE_STANDARD_SQL);
+        when(gsqlDatabaseClient.getDialect()).thenReturn(Dialect.GOOGLE_STANDARD_SQL);
+        ChangeStreamRecordMapper changeStreamRecordMapper = new ChangeStreamRecordMapper(gsqlDatabaseClient);
         HashSet<String> parentTokens = new HashSet<>();
         Timestamp startTimestamp = Timestamp.ofTimeMicroseconds(1L);
         Partition partition = new Partition("String", parentTokens, startTimestamp, Timestamp.ofTimeMicroseconds(1L), "originPartition");
@@ -847,7 +876,8 @@ class ChangeStreamRecordMapperTest {
 
     @Test
     void testToChildPartitionsEvent4() {
-        ChangeStreamRecordMapper changeStreamRecordMapper = new ChangeStreamRecordMapper(Dialect.GOOGLE_STANDARD_SQL);
+        when(gsqlDatabaseClient.getDialect()).thenReturn(Dialect.GOOGLE_STANDARD_SQL);
+        ChangeStreamRecordMapper changeStreamRecordMapper = new ChangeStreamRecordMapper(gsqlDatabaseClient);
         HashSet<String> parentTokens = new HashSet<>();
         Timestamp ofTimeMicrosecondsResult = Timestamp.ofTimeMicroseconds(1L);
         Partition partition = new Partition("String", parentTokens, ofTimeMicrosecondsResult,
@@ -911,7 +941,8 @@ class ChangeStreamRecordMapperTest {
      */
     @Test
     void testToChildPartitionsEvent5() {
-        ChangeStreamRecordMapper changeStreamRecordMapper = new ChangeStreamRecordMapper(Dialect.GOOGLE_STANDARD_SQL);
+        when(gsqlDatabaseClient.getDialect()).thenReturn(Dialect.GOOGLE_STANDARD_SQL);
+        ChangeStreamRecordMapper changeStreamRecordMapper = new ChangeStreamRecordMapper(gsqlDatabaseClient);
         HashSet<String> parentTokens = new HashSet<>();
         Timestamp ofTimeMicrosecondsResult = Timestamp.ofTimeMicroseconds(1L);
         Partition partition = new Partition("Parent0", parentTokens, ofTimeMicrosecondsResult,
@@ -972,7 +1003,8 @@ class ChangeStreamRecordMapperTest {
 
     @Test
     void testToChildPartitionsEvent7() {
-        ChangeStreamRecordMapper changeStreamRecordMapper = new ChangeStreamRecordMapper(Dialect.GOOGLE_STANDARD_SQL);
+        when(gsqlDatabaseClient.getDialect()).thenReturn(Dialect.GOOGLE_STANDARD_SQL);
+        ChangeStreamRecordMapper changeStreamRecordMapper = new ChangeStreamRecordMapper(gsqlDatabaseClient);
         HashSet<String> parentTokens = new HashSet<>();
         Timestamp ofTimeMicrosecondsResult = Timestamp.ofTimeMicroseconds(1L);
         Partition partition = new Partition("String", parentTokens, ofTimeMicrosecondsResult,
@@ -1043,7 +1075,8 @@ class ChangeStreamRecordMapperTest {
 
     @Test
     void testColumnTypeFrom() {
-        ChangeStreamRecordMapper changeStreamRecordMapper = new ChangeStreamRecordMapper(Dialect.GOOGLE_STANDARD_SQL);
+        when(gsqlDatabaseClient.getDialect()).thenReturn(Dialect.GOOGLE_STANDARD_SQL);
+        ChangeStreamRecordMapper changeStreamRecordMapper = new ChangeStreamRecordMapper(gsqlDatabaseClient);
         Struct struct = mock(Struct.class);
         when(struct.getColumnType(any())).thenReturn(Type.string());
         when(struct.getString(any())).thenReturn("{\"code\":\"STRING\"}");
@@ -1054,7 +1087,8 @@ class ChangeStreamRecordMapperTest {
 
     @Test
     void testColumnTypeFromThrowsBool() {
-        ChangeStreamRecordMapper changeStreamRecordMapper = new ChangeStreamRecordMapper(Dialect.GOOGLE_STANDARD_SQL);
+        when(gsqlDatabaseClient.getDialect()).thenReturn(Dialect.GOOGLE_STANDARD_SQL);
+        ChangeStreamRecordMapper changeStreamRecordMapper = new ChangeStreamRecordMapper(gsqlDatabaseClient);
         Struct struct = mock(Struct.class);
         when(struct.getColumnType(any())).thenReturn(Type.bool());
         assertThrows(IllegalArgumentException.class, () -> changeStreamRecordMapper.columnTypeFrom(struct));
@@ -1063,7 +1097,8 @@ class ChangeStreamRecordMapperTest {
 
     @Test
     void testColumnTypeFromThrows() {
-        ChangeStreamRecordMapper changeStreamRecordMapper = new ChangeStreamRecordMapper(Dialect.GOOGLE_STANDARD_SQL);
+        when(gsqlDatabaseClient.getDialect()).thenReturn(Dialect.GOOGLE_STANDARD_SQL);
+        ChangeStreamRecordMapper changeStreamRecordMapper = new ChangeStreamRecordMapper(gsqlDatabaseClient);
         Struct struct = mock(Struct.class);
         when(struct.getColumnType(any())).thenThrow(new IllegalArgumentException());
         assertThrows(IllegalArgumentException.class, () -> changeStreamRecordMapper.columnTypeFrom(struct));
@@ -1072,7 +1107,8 @@ class ChangeStreamRecordMapperTest {
 
     @Test
     void testModFrom() {
-        ChangeStreamRecordMapper changeStreamRecordMapper = new ChangeStreamRecordMapper(Dialect.GOOGLE_STANDARD_SQL);
+        when(gsqlDatabaseClient.getDialect()).thenReturn(Dialect.GOOGLE_STANDARD_SQL);
+        ChangeStreamRecordMapper changeStreamRecordMapper = new ChangeStreamRecordMapper(gsqlDatabaseClient);
         Struct struct = mock(Struct.class);
         when(struct.getColumnType(any())).thenReturn(Type.bool());
         assertThrows(IllegalArgumentException.class, () -> changeStreamRecordMapper.modFrom(0, struct));
@@ -1081,7 +1117,8 @@ class ChangeStreamRecordMapperTest {
 
     @Test
     void testModFromString() {
-        ChangeStreamRecordMapper changeStreamRecordMapper = new ChangeStreamRecordMapper(Dialect.GOOGLE_STANDARD_SQL);
+        when(gsqlDatabaseClient.getDialect()).thenReturn(Dialect.GOOGLE_STANDARD_SQL);
+        ChangeStreamRecordMapper changeStreamRecordMapper = new ChangeStreamRecordMapper(gsqlDatabaseClient);
         Struct struct = mock(Struct.class);
         when(struct.getColumnType(any())).thenReturn(Type.string());
         String jsonString = "{\"code\":\"STRING\"}";
@@ -1097,7 +1134,8 @@ class ChangeStreamRecordMapperTest {
 
     @Test
     void testEmptyChildPartitionFrom() {
-        ChangeStreamRecordMapper changeStreamRecordMapper = new ChangeStreamRecordMapper(Dialect.GOOGLE_STANDARD_SQL);
+        when(gsqlDatabaseClient.getDialect()).thenReturn(Dialect.GOOGLE_STANDARD_SQL);
+        ChangeStreamRecordMapper changeStreamRecordMapper = new ChangeStreamRecordMapper(gsqlDatabaseClient);
         Struct struct = mock(Struct.class);
         when(struct.getString(any())).thenReturn("String");
         when(struct.getStringList(any())).thenReturn(new ArrayList<>());
@@ -1110,7 +1148,8 @@ class ChangeStreamRecordMapperTest {
 
     @Test
     void testChildPartitionFrom() {
-        ChangeStreamRecordMapper changeStreamRecordMapper = new ChangeStreamRecordMapper(Dialect.GOOGLE_STANDARD_SQL);
+        when(gsqlDatabaseClient.getDialect()).thenReturn(Dialect.GOOGLE_STANDARD_SQL);
+        ChangeStreamRecordMapper changeStreamRecordMapper = new ChangeStreamRecordMapper(gsqlDatabaseClient);
         Struct struct = mock(Struct.class);
         when(struct.getString(any())).thenReturn("String");
         when(struct.getStringList(any())).thenReturn(new ArrayList<>());
@@ -1123,7 +1162,8 @@ class ChangeStreamRecordMapperTest {
 
     @Test
     void testChildPartitionFromThrows() {
-        ChangeStreamRecordMapper changeStreamRecordMapper = new ChangeStreamRecordMapper(Dialect.GOOGLE_STANDARD_SQL);
+        when(gsqlDatabaseClient.getDialect()).thenReturn(Dialect.GOOGLE_STANDARD_SQL);
+        ChangeStreamRecordMapper changeStreamRecordMapper = new ChangeStreamRecordMapper(gsqlDatabaseClient);
         Struct struct = mock(Struct.class);
         when(struct.getString(any())).thenThrow(new IllegalArgumentException());
         when(struct.getStringList(any())).thenThrow(new IllegalArgumentException());
@@ -1133,7 +1173,8 @@ class ChangeStreamRecordMapperTest {
 
     @Test
     void testStreamEventMetadataFrom() {
-        ChangeStreamRecordMapper changeStreamRecordMapper = new ChangeStreamRecordMapper(Dialect.GOOGLE_STANDARD_SQL);
+        when(gsqlDatabaseClient.getDialect()).thenReturn(Dialect.GOOGLE_STANDARD_SQL);
+        ChangeStreamRecordMapper changeStreamRecordMapper = new ChangeStreamRecordMapper(gsqlDatabaseClient);
         HashSet<String> parentTokens = new HashSet<>();
         Timestamp ofTimeMicrosecondsResult = Timestamp.ofTimeMicroseconds(1L);
         Partition partition = new Partition("String", parentTokens, ofTimeMicrosecondsResult,
@@ -1172,7 +1213,8 @@ class ChangeStreamRecordMapperTest {
 
     @Test
     void testGetJsonStringThrows() {
-        ChangeStreamRecordMapper changeStreamRecordMapper = new ChangeStreamRecordMapper(Dialect.GOOGLE_STANDARD_SQL);
+        when(gsqlDatabaseClient.getDialect()).thenReturn(Dialect.GOOGLE_STANDARD_SQL);
+        ChangeStreamRecordMapper changeStreamRecordMapper = new ChangeStreamRecordMapper(gsqlDatabaseClient);
         Struct struct = mock(Struct.class);
         when(struct.getColumnType(any())).thenReturn(Type.bool());
         assertThrows(IllegalArgumentException.class, () -> changeStreamRecordMapper.getJsonString(struct, "Column Name"));
@@ -1181,7 +1223,8 @@ class ChangeStreamRecordMapperTest {
 
     @Test
     void testGetJsonString() {
-        ChangeStreamRecordMapper changeStreamRecordMapper = new ChangeStreamRecordMapper(Dialect.GOOGLE_STANDARD_SQL);
+        when(gsqlDatabaseClient.getDialect()).thenReturn(Dialect.GOOGLE_STANDARD_SQL);
+        ChangeStreamRecordMapper changeStreamRecordMapper = new ChangeStreamRecordMapper(gsqlDatabaseClient);
         Struct struct = mock(Struct.class);
         when(struct.getJson(any())).thenReturn("Json");
         when(struct.getColumnType(any())).thenReturn(Type.json());

@@ -103,7 +103,7 @@ public class LowWatermarkStampPublisher {
                         Thread.sleep(publishInterval.toMillis());
                     }
                     catch (InterruptedException e) {
-                        LOGGER.info("Task {}, LowWatermarkStampPublisher caught exception {}", taskSyncContextHolder.get().getTaskUid(), e);
+                        LOGGER.info("Task {}, LowWatermarkStampPublisher caught exception", taskSyncContextHolder.get().getTaskUid(), e);
                         Thread.currentThread().interrupt();
                     }
                 }

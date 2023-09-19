@@ -107,11 +107,11 @@ public class TaskSyncEventListener {
                     seekBackToPreviousEpoch(consumer, topicPartition, beginOffset, startOffset);
                 }
                 catch (org.apache.kafka.common.errors.InterruptException e) {
-                    LOGGER.info("Task {}, caught interrupt exception during reading the sync topic {}", consumerGroup, e);
+                    LOGGER.info("Task {}, caught interrupt exception during reading the sync topic", consumerGroup, e);
                     throw new InterruptedException();
                 }
                 catch (Exception e) {
-                    LOGGER.info("Task {}, Error during seek back the Sync Topic {}", consumerGroup, e);
+                    LOGGER.info("Task {}, Error during seek back the Sync Topic {}", consumerGroup);
                     errorHandler.accept(
                             new SpannerConnectorException("Error during seek back the Sync Topic", e));
                     return;
@@ -152,7 +152,7 @@ public class TaskSyncEventListener {
                             }
                             catch (org.apache.kafka.common.errors.InterruptException
                                     | InterruptedException ex) {
-                                LOGGER.error("TaskSyncEventListener, caught interrupt exception {}, {}", consumerGroup, ex);
+                                LOGGER.error("TaskSyncEventListener, caught interrupt exception {}", consumerGroup, ex);
                                 Thread.currentThread().interrupt();
                                 return;
                             }

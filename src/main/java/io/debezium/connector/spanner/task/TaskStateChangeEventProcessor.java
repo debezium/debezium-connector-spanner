@@ -8,6 +8,7 @@ package io.debezium.connector.spanner.task;
 import static java.util.stream.Collectors.toList;
 import static org.slf4j.LoggerFactory.getLogger;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -20,7 +21,10 @@ import io.debezium.connector.spanner.db.model.Partition;
 import io.debezium.connector.spanner.metrics.MetricsEventPublisher;
 import io.debezium.connector.spanner.metrics.event.TaskStateChangeQueueUpdateMetricEvent;
 import io.debezium.connector.spanner.task.state.NewPartitionsEvent;
+import io.debezium.connector.spanner.task.state.SyncEvent;
 import io.debezium.connector.spanner.task.state.TaskStateChangeEvent;
+import io.debezium.util.Clock;
+import io.debezium.util.Metronome;
 
 /**
  * Owns queue of {@link TaskStateChangeEvent} elements,
@@ -42,6 +46,8 @@ public class TaskStateChangeEventProcessor {
     private final MetricsEventPublisher metricsEventPublisher;
 
     private volatile Thread thread;
+    private volatile Thread eventQueueingThread;
+    private final Duration sleepInterval = Duration.ofMillis(100);
 
     public TaskStateChangeEventProcessor(int queueCapacity, TaskSyncContextHolder taskSyncContextHolder,
                                          TaskStateChangeEventHandler taskStateChangeEventHandler,
@@ -53,6 +59,35 @@ public class TaskStateChangeEventProcessor {
         this.taskStateChangeEventHandler = taskStateChangeEventHandler;
 
         this.metricsEventPublisher = metricsEventPublisher;
+    }
+
+    private Thread createEventQueueingThread() {
+        Thread thread = new Thread(() -> {
+            LOGGER.info("Started Event Queueing Thread");
+            Clock clock = Clock.system();
+            final Metronome metronome = Metronome.sleeper(Duration.ofSeconds(5), clock);
+            while (!Thread.currentThread().isInterrupted()) {
+                try {
+                    if (taskSyncContextHolder.get() == null) {
+                        continue;
+                    }
+                    LOGGER.info("Task {}, continuing Event Queueing Thread",
+                            taskSyncContextHolder.get().getTaskUid());
+                    this.queue.put(new SyncEvent());
+                    metronome.pause();
+                }
+                catch (InterruptedException e) {
+                    LOGGER.error("Task interrupting event queueing thread");
+                    Thread.currentThread().interrupt();
+                    return;
+                }
+                catch (Exception e) {
+                    LOGGER.error("Task caught exception from event queueing thread");
+                }
+            }
+        });
+        thread.setUncaughtExceptionHandler((t, e) -> errorHandler.accept(e));
+        return thread;
     }
 
     private Thread createEventHandlerThread() {
@@ -96,15 +131,38 @@ public class TaskStateChangeEventProcessor {
         }
         this.thread = createEventHandlerThread();
         this.thread.start();
+        this.eventQueueingThread = createEventQueueingThread();
+        this.eventQueueingThread.start();
     }
 
     public void stopProcessing() {
+        if (this.eventQueueingThread != null) {
+            Clock clock = Clock.system();
+            final Metronome metronome = Metronome.sleeper(sleepInterval, clock);
+            LOGGER.info("Task {}, stopping event queueing thread ", this.taskSyncContextHolder.get().getTaskUid());
+            while (!this.eventQueueingThread.getState().equals(Thread.State.TERMINATED)) {
+                try {
+                    // Sleep for sleepInterval.
+                    metronome.pause();
+
+                    this.eventQueueingThread.interrupt();
+
+                    LOGGER.info("Task {}, still waiting for event queueing thread to die", this.taskSyncContextHolder.get().getTaskUid());
+                }
+                catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+            this.eventQueueingThread = null;
+            LOGGER.info("Task {}, killed event queueing thread ", this.taskSyncContextHolder.get().getTaskUid());
+        }
         if (thread != null) {
             this.queue.clear();
 
             this.thread.interrupt();
             this.thread = null;
         }
+
     }
 
     public void processEvent(TaskStateChangeEvent event) throws InterruptedException {

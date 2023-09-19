@@ -105,8 +105,7 @@ public class RemoveFinishedPartitionOperation implements Operation {
                 .build();
     }
 
-    private static boolean allChildrenFinished(
-                                               TaskSyncContext taskSyncContext, String token) {
+    private static boolean allChildrenFinished(TaskSyncContext taskSyncContext, String token) {
         List<PartitionState> allPartitionStates = Stream.concat(
                 Stream.concat(
                         taskSyncContext.getTaskStates().values().stream()

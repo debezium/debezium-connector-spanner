@@ -141,9 +141,9 @@ public class SyncEventMerger {
 
         var builder = currentContext.toBuilder();
         // do not merge if not starting initial sync / not new epoch started.
-        boolean start_initial_sync = currentContext.getRebalanceState() == RebalanceState.START_INITIAL_SYNC;
+        boolean startInitialSync = currentContext.getRebalanceState() == RebalanceState.START_INITIAL_SYNC;
 
-        if (!start_initial_sync && !currentContext.getRebalanceState().equals(RebalanceState.NEW_EPOCH_STARTED)) {
+        if (!startInitialSync && !currentContext.getRebalanceState().equals(RebalanceState.NEW_EPOCH_STARTED)) {
             return builder.build();
         }
 
@@ -247,15 +247,14 @@ public class SyncEventMerger {
         Map<String, TaskState> newTaskStates = new HashMap<>(inSync.getTaskStates());
         newTaskStates.remove(currentContext.getTaskUid());
 
-        boolean start_initial_sync = currentContext.getRebalanceState() == RebalanceState.START_INITIAL_SYNC;
-        if (!start_initial_sync) {
+        boolean startInitialSync = currentContext.getRebalanceState() == RebalanceState.START_INITIAL_SYNC;
+        if (!startInitialSync) {
             Set<String> allNewEpochTasks = inSync.getTaskStates().values().stream().map(taskState -> taskState.getTaskUid()).collect(Collectors.toSet());
             if (!allNewEpochTasks.contains(currentContext.getTaskUid())) {
                 LOGGER.warn(
                         "Task {} - Received new epoch message , but leader {} did not include the task in the new epoch message with rebalance ID {} with tasks {}, probably just initialized, throw exception",
                         currentContext.getTaskUid(), inSync.getTaskUid(), inSync.getRebalanceGenerationId(),
                         inSync.getTaskStates().keySet().stream().collect(Collectors.toList()));
-                // throw new DebeziumException("Leader did not include task in new epoch message");
             }
             else if (inSync.getRebalanceGenerationId() < currentContext.getReceivedRebalanceGenerationId()) {
                 LOGGER.warn(

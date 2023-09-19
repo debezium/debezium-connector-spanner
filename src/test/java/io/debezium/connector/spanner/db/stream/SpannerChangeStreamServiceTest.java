@@ -18,6 +18,7 @@ import java.util.HashSet;
 import org.junit.jupiter.api.Test;
 
 import com.google.cloud.Timestamp;
+import com.google.cloud.spanner.DatabaseClient;
 import com.google.cloud.spanner.Dialect;
 
 import io.debezium.connector.spanner.db.dao.ChangeStreamDao;
@@ -36,8 +37,10 @@ class SpannerChangeStreamServiceTest {
         when(changeStreamResultSet.next()).thenReturn(false);
         when(changeStreamDao.streamQuery(any(), any(), any(), anyLong())).thenReturn(changeStreamResultSet);
 
+        DatabaseClient gsqlDatabaseClient = mock(DatabaseClient.class);
+        when(gsqlDatabaseClient.getDialect()).thenReturn(Dialect.GOOGLE_STANDARD_SQL);
         SpannerChangeStreamService spannerChangeStreamService = new SpannerChangeStreamService("TaskUid", changeStreamDao,
-                new ChangeStreamRecordMapper(Dialect.GOOGLE_STANDARD_SQL), Duration.ofMillis(1000), metricsEventPublisher);
+                new ChangeStreamRecordMapper(gsqlDatabaseClient), Duration.ofMillis(1000), metricsEventPublisher);
 
         HashSet<String> parentTokens = new HashSet<>();
         Timestamp startTimestamp = Timestamp.ofTimeMicroseconds(1L);

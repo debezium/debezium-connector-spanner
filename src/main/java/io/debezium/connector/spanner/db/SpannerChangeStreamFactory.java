@@ -8,7 +8,6 @@ package io.debezium.connector.spanner.db;
 import java.time.Duration;
 import java.util.UUID;
 
-import com.google.cloud.spanner.Dialect;
 import com.google.cloud.spanner.Options;
 
 import io.debezium.connector.spanner.db.dao.ChangeStreamDao;
@@ -23,21 +22,19 @@ public class SpannerChangeStreamFactory {
     private static final String JOB_NAME = "SpannerChangeStream_Kafka";
 
     private final DaoFactory daoFactory;
-    private final DatabaseClientFactory databaseClientFactory;
     private final MetricsEventPublisher metricsEventPublisher;
     private final String connectorName;
-    private final Dialect dialect;
     private final String taskUid;
+    private final DatabaseClientFactory databaseClientFactory;
 
     public SpannerChangeStreamFactory(String taskUid,
                                       DaoFactory daoFactory, MetricsEventPublisher metricsEventPublisher, String connectorName,
-                                      Dialect dialect, DatabaseClientFactory databaseClientFactory) {
+                                      DatabaseClientFactory databaseClientFactory) {
         this.taskUid = taskUid;
         this.daoFactory = daoFactory;
         this.databaseClientFactory = databaseClientFactory;
         this.metricsEventPublisher = metricsEventPublisher;
         this.connectorName = connectorName;
-        this.dialect = dialect;
     }
 
     public SpannerChangeStream getStream(
@@ -48,7 +45,7 @@ public class SpannerChangeStreamFactory {
                 Options.RpcPriority.MEDIUM,
                 JOB_NAME + "_" + connectorName + "_" + UUID.randomUUID());
 
-        ChangeStreamRecordMapper changeStreamRecordMapper = new ChangeStreamRecordMapper(dialect);
+        ChangeStreamRecordMapper changeStreamRecordMapper = new ChangeStreamRecordMapper(databaseClientFactory.getDatabaseClient());
 
         SpannerChangeStreamService streamService = new SpannerChangeStreamService(
                 taskUid, changeStreamDao, changeStreamRecordMapper, heartbeatMillis, metricsEventPublisher);
