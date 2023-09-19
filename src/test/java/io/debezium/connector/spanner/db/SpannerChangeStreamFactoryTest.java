@@ -12,8 +12,6 @@ import java.time.Duration;
 
 import org.junit.jupiter.api.Test;
 
-import com.google.cloud.spanner.Dialect;
-
 import io.debezium.connector.spanner.db.stream.SpannerChangeStream;
 import io.debezium.connector.spanner.metrics.MetricsEventPublisher;
 
@@ -25,7 +23,7 @@ class SpannerChangeStreamFactoryTest {
         DaoFactory daoFactory = new DaoFactory(databaseClientFactory);
         SpannerChangeStreamFactory spannerChangeStreamFactory = new SpannerChangeStreamFactory(
                 "taskUid", daoFactory, new MetricsEventPublisher(), "test-connector",
-                Dialect.GOOGLE_STANDARD_SQL, databaseClientFactory);
+                databaseClientFactory);
         SpannerChangeStream stream = spannerChangeStreamFactory.getStream("stream1",
                 Duration.ofMillis(100), 1);
         assertNotNull(stream);

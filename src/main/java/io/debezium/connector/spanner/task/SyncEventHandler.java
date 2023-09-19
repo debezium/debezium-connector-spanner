@@ -7,8 +7,6 @@ package io.debezium.connector.spanner.task;
 
 import static org.slf4j.LoggerFactory.getLogger;
 
-import java.time.Duration;
-
 import org.slf4j.Logger;
 
 import io.debezium.connector.spanner.kafka.internal.TaskSyncPublisher;
@@ -19,7 +17,6 @@ import io.debezium.connector.spanner.kafka.internal.model.TaskSyncEvent;
 import io.debezium.connector.spanner.task.state.SyncEvent;
 import io.debezium.connector.spanner.task.state.TaskStateChangeEvent;
 import io.debezium.function.BlockingConsumer;
-import io.debezium.util.Stopwatch;
 
 /**
  * Provides a logic for processing Sync Events of different types:
@@ -33,8 +30,6 @@ public class SyncEventHandler {
     private final TaskSyncPublisher taskSyncPublisher;
 
     private final BlockingConsumer<TaskStateChangeEvent> eventConsumer;
-
-    private volatile Stopwatch sw = Stopwatch.accumulating().start();
 
     public SyncEventHandler(TaskSyncContextHolder taskSyncContextHolder, TaskSyncPublisher taskSyncPublisher,
                             BlockingConsumer<TaskStateChangeEvent> eventConsumer) {
@@ -160,19 +155,6 @@ public class SyncEventHandler {
         taskSyncContextHolder.update(context -> SyncEventMerger.mergeIncrementalTaskSyncEvent(context, inSync));
 
         LOGGER.debug("Task {} - Finished processing regular message event", taskSyncContextHolder.get().getTaskUid());
-        final Duration totalDuration = sw.stop().durations().statistics().getTotal();
-        // Enqueue a new sync event every 5 seconds.
-        if (totalDuration.toMillis() >= 5000) {
-            // Restart the stopwatch.
-            LOGGER.info("Task {}, createEventHandlerThread: queueing SyncEvent",
-                    taskSyncContextHolder.get().getTaskUid());
-            eventConsumer.accept(new SyncEvent());
-            sw = Stopwatch.accumulating().start();
-        }
-        else {
-            // Resume the existing stop watch, we haven't met the criteria yet.
-            sw.start();
-        }
     }
 
     public void processRebalanceAnswer(TaskSyncEvent inSync, SyncEventMetadata metadata) {
@@ -238,8 +220,8 @@ public class SyncEventHandler {
             }
         }
         catch (Exception e) {
-            LOGGER.error("Exception during processing task message task Uid {}, message type {}, exception {}", inSync.getTaskUid(), inSync.getMessageType(),
-                    e.toString());
+            LOGGER.error("Exception during processing task message task Uid {}, message type {}, exception", inSync.getTaskUid(), inSync.getMessageType(),
+                    e);
             throw e;
         }
     }

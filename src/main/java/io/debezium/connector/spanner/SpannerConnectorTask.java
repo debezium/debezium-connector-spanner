@@ -15,8 +15,6 @@ import org.apache.kafka.connect.source.SourceRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.cloud.spanner.Dialect;
-
 import io.debezium.config.Configuration;
 import io.debezium.connector.base.ChangeEventQueue;
 import io.debezium.connector.spanner.config.SpannerTableFilter;
@@ -93,8 +91,6 @@ public class SpannerConnectorTask extends SpannerBaseSourceTask {
 
         final DaoFactory daoFactory = new DaoFactory(databaseClientFactory);
 
-        final Dialect dialect = databaseClientFactory.getDatabaseClient().getDialect();
-
         final SpannerSourceTaskContext taskContext = new SpannerSourceTaskContext(connectorConfig,
                 () -> spannerMeter.getCapturedTables());
 
@@ -145,7 +141,6 @@ public class SpannerConnectorTask extends SpannerBaseSourceTask {
                 daoFactory,
                 spannerMeter.getMetricsEventPublisher(),
                 connectorConfig.getConnectorName(),
-                dialect,
                 databaseClientFactory);
 
         this.changeStream = spannerChangeStreamFactory.getStream(

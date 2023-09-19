@@ -102,6 +102,7 @@ public class TaskStateChangeEventHandler {
     private void processEvent(PartitionStatusUpdateEvent event) throws InterruptedException {
         performOperation(
                 new PartitionStatusUpdateOperation(event.getToken(), event.getState()),
+                new ClearSharedPartitionOperation(),
                 new FindPartitionForStreamingOperation(),
                 new TakePartitionForStreamingOperation(changeStream, partitionFactory));
     }
@@ -109,8 +110,10 @@ public class TaskStateChangeEventHandler {
     private void processEvent(NewPartitionsEvent newPartitionsEvent) throws InterruptedException {
         performOperation(
                 new ChildPartitionOperation(newPartitionsEvent.getPartitions()),
+                new ClearSharedPartitionOperation(),
                 new FindPartitionForStreamingOperation(),
-                new TakePartitionForStreamingOperation(changeStream, partitionFactory));
+                new TakePartitionForStreamingOperation(changeStream, partitionFactory),
+                new RemoveFinishedPartitionOperation(spannerEventDispatcher, connectorConfig));
     }
 
     private void processSyncEvent() throws InterruptedException {

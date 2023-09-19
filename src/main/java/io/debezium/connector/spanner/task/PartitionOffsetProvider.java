@@ -106,16 +106,16 @@ public class PartitionOffsetProvider {
         }
         catch (TimeoutException ex) {
             // handle the timeout
-            LOGGER.error("Token {}, failed to retrieve offset in time {}", spannerPartition, ex);
+            LOGGER.error("Token {}, failed to retrieve offset in time", spannerPartition, ex);
         }
         catch (InterruptedException e) {
             // handle the interrupts
-            LOGGER.error("Token {},interrupting PartitionOffsetProvider {}", spannerPartition, e);
+            LOGGER.error("Token {},interrupting PartitionOffsetProvider", spannerPartition, e);
             Thread.currentThread().interrupt();
         }
         catch (ExecutionException e) {
             // handle other exceptions
-            LOGGER.error("Token {}, failed to retrieve offset {}", spannerPartition, e);
+            LOGGER.error("Token {}, failed to retrieve offset", spannerPartition, e);
         }
         finally {
             future.cancel(true); // may or may not desire this
@@ -140,7 +140,7 @@ public class PartitionOffsetProvider {
                 return this.offsetStorageReader.offset(spannerPartition);
             }
             catch (Exception e) {
-                LOGGER.error("Offsetstoragereader throwing exception {}", e);
+                LOGGER.error("Offsetstoragereader throwing exception", e);
                 throw e;
             }
         }

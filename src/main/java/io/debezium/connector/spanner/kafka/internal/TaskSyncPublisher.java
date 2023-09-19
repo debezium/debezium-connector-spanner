@@ -35,7 +35,6 @@ public class TaskSyncPublisher {
     private volatile Instant lastTime;
     private final BufferedPublisher<TaskSyncEvent> bufferedPublisher;
     private final Consumer<RuntimeException> errorHandler;
-    private final TaskSyncContextHolder taskSyncContextHolder;
 
     private final String taskUid;
 
@@ -46,13 +45,12 @@ public class TaskSyncPublisher {
         this.producer = producerFactory.createProducer();
         this.errorHandler = errorHandler;
         this.taskUid = taskUid;
-        this.taskSyncContextHolder = taskSyncContextHolder;
 
         if (syncEventPublisherWaitingTimeout > 0) {
             this.bufferedPublisher = new BufferedPublisher<>(
                     this.taskUid,
                     "Buffer-Pub",
-                    this.taskSyncContextHolder,
+                    taskSyncContextHolder,
                     syncEventPublisherWaitingTimeout,
                     this::publishImmediately,
                     this::publishSyncEvent);

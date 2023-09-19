@@ -17,6 +17,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import com.google.cloud.Timestamp;
+import com.google.cloud.spanner.DatabaseClient;
 import com.google.cloud.spanner.Dialect;
 import com.google.cloud.spanner.Struct;
 import com.google.cloud.spanner.Type;
@@ -85,10 +86,10 @@ public class ChangeStreamRecordMapper {
 
     private static final String SYSTEM_TRANSACTION = "is_system_transaction";
 
-    private final Dialect dialect;
+    private final DatabaseClient databaseClient;
 
-    public ChangeStreamRecordMapper(Dialect dialect) {
-        this.dialect = dialect;
+    public ChangeStreamRecordMapper(DatabaseClient databaseClient) {
+        this.databaseClient = databaseClient;
 
         this.printer = JsonFormat.printer().preservingProtoFieldNames()
                 .omittingInsignificantWhitespace();
@@ -482,7 +483,7 @@ public class ChangeStreamRecordMapper {
     }
 
     private boolean isPostgres() {
-        return this.dialect == Dialect.POSTGRESQL;
+        return this.databaseClient.getDialect() == Dialect.POSTGRESQL;
     }
 
 }

@@ -50,7 +50,7 @@ public class SpannerStreamingChangeEventSource implements CommittingRecordsStrea
 
     private static final StuckPartitionStrategy STUCK_PARTITION_STRATEGY = StuckPartitionStrategy.ESCALATE;
 
-    private static final Duration FINISHING_PARTITION_TIMEOUT = Duration.ofSeconds(60);
+    private static final Duration FINISHING_PARTITION_TIMEOUT = Duration.ofSeconds(300);
 
     private static final long INITIAL_TOKEN_BATCH_SIZE = 200;
 

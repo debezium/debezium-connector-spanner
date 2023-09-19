@@ -115,10 +115,9 @@ public class SpannerChangeStream implements ChangeStream {
             databaseClientFactory.closeSpanner();
 
             LOGGER.info("Task {}, Shutting down all partition streaming...", this.taskUid);
+            this.isRunning.set(false);
             this.partitionThreadPool.shutdown(this.taskUid);
             LOGGER.info("Task {}, Shutdown all partition streaming...", this.taskUid);
-
-            this.isRunning.set(false);
         }
     }
 
