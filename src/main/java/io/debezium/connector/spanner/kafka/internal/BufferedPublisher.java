@@ -15,7 +15,10 @@ import java.util.function.Predicate;
 
 import org.slf4j.Logger;
 
+import io.debezium.connector.spanner.kafka.internal.model.RebalanceState;
 import io.debezium.connector.spanner.kafka.internal.model.TaskSyncEvent;
+import io.debezium.connector.spanner.task.TaskSyncContext;
+import io.debezium.connector.spanner.task.TaskSyncContextHolder;
 import io.debezium.util.Clock;
 import io.debezium.util.Metronome;
 
@@ -36,12 +39,15 @@ public class BufferedPublisher<V> {
 
     private final Duration sleepInterval = Duration.ofMillis(100);
     private final Clock clock;
+    private final TaskSyncContextHolder taskSyncContextHolder;
 
-    public BufferedPublisher(String taskUid, String name, long timeout, Predicate<V> publishImmediately, Consumer<V> onPublish) {
+    public BufferedPublisher(String taskUid, String name, TaskSyncContextHolder taskSyncContextHolder, long timeout, Predicate<V> publishImmediately,
+                             Consumer<V> onPublish) {
         this.publishImmediately = publishImmediately;
         this.onPublish = onPublish;
         this.taskUid = taskUid;
         this.clock = Clock.system();
+        this.taskSyncContextHolder = taskSyncContextHolder;
 
         this.thread = new Thread(() -> {
             Instant lastUpdatedTime = Instant.now();
@@ -85,7 +91,11 @@ public class BufferedPublisher<V> {
         }
     }
 
-    private synchronized void publishBuffered() {
+    private void publishBuffered() {
+        TaskSyncContext context = taskSyncContextHolder.get();
+        if (context == null || context.getRebalanceState() != RebalanceState.NEW_EPOCH_STARTED) {
+            return;
+        }
         V item = this.value.getAndSet(null);
 
         if (item != null) {

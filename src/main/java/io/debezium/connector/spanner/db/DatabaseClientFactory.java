@@ -121,9 +121,11 @@ public class DatabaseClientFactory {
         if (spanner == null) {
             return null;
         }
-        if (databaseClient == null) {
-            databaseClient = spanner.getDatabaseClient(
-                    DatabaseId.of(this.projectId, this.instanceId, this.databaseId));
+        synchronized (this) {
+            if (databaseClient == null) {
+                databaseClient = spanner.getDatabaseClient(
+                        DatabaseId.of(this.projectId, this.instanceId, this.databaseId));
+            }
         }
         return databaseClient;
     }

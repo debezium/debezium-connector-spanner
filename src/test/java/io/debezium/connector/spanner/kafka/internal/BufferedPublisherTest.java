@@ -6,6 +6,7 @@
 package io.debezium.connector.spanner.kafka.internal;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -17,6 +18,11 @@ import java.util.function.Predicate;
 import org.junit.jupiter.api.Test;
 
 import com.google.common.collect.Ordering;
+
+import io.debezium.connector.spanner.kafka.internal.model.RebalanceState;
+import io.debezium.connector.spanner.metrics.MetricsEventPublisher;
+import io.debezium.connector.spanner.task.TaskSyncContext;
+import io.debezium.connector.spanner.task.TaskSyncContextHolder;
 
 class BufferedPublisherTest {
 
@@ -59,7 +65,13 @@ class BufferedPublisherTest {
     private void runAndCheck(Predicate<Integer> publishImmediately, Consumer<Integer> onPublish) throws InterruptedException {
         List<Integer> result = new CopyOnWriteArrayList<>();
 
-        BufferedPublisher<Integer> pub = new BufferedPublisher<>("test-task-1", "pub-1", 5,
+        MetricsEventPublisher metricsEventPublisher = mock(MetricsEventPublisher.class);
+        TaskSyncContextHolder taskSyncContextHolder = new TaskSyncContextHolder(metricsEventPublisher);
+        taskSyncContextHolder.init(TaskSyncContext.builder().taskUid("test-task-1")
+                .rebalanceState(RebalanceState.NEW_EPOCH_STARTED)
+                .build());
+
+        BufferedPublisher<Integer> pub = new BufferedPublisher<>("test-task-1", "pub-1", taskSyncContextHolder, 5,
                 publishImmediately,
                 onPublish
                         // .andThen(System.out::println)

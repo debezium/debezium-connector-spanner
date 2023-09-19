@@ -114,6 +114,7 @@ public class SynchronizationTaskContext {
         this.taskSyncContextHolder = new TaskSyncContextHolder(metricsEventPublisher);
 
         this.taskSyncPublisher = new TaskSyncPublisher(task.getTaskUid(), taskSyncTopic, connectorConfig.syncEventPublisherWaitingTimeout(), producerFactory,
+                taskSyncContextHolder,
                 this::onError);
 
         final KafkaConsumerAdminService kafkaAdminService = new KafkaConsumerAdminService(adminClientFactory.getAdminClient(), connectorName);
