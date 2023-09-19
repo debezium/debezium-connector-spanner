@@ -71,7 +71,7 @@ public class TaskStateChangeEventProcessor {
                     if (taskSyncContextHolder.get() == null) {
                         continue;
                     }
-                    LOGGER.info("Task {}, continuing Event Queueing Thread",
+                    LOGGER.debug("Task {}, continuing Event Queueing Thread",
                             taskSyncContextHolder.get().getTaskUid());
                     this.queue.put(new SyncEvent());
                     metronome.pause();
