@@ -76,6 +76,7 @@ public class RebalanceHandler {
                     // stream partitions until after the leader finishes rebalancing change
                     // stream partitions from the obsolete tasks to the new survived tasks.
                     .rebalanceState(RebalanceState.INITIAL_INCREMENTED_STATE_COMPLETED)
+                    .receivedRebalanceGenerationId(rebalanceGenerationId)
                     .build();
         });
 

@@ -257,6 +257,13 @@ public class SyncEventMerger {
                         inSync.getTaskStates().keySet().stream().collect(Collectors.toList()));
                 // throw new DebeziumException("Leader did not include task in new epoch message");
             }
+            else if (inSync.getRebalanceGenerationId() < currentContext.getReceivedRebalanceGenerationId()) {
+                LOGGER.warn(
+                        "Task {} - Received new epoch message from {} , but the new epoch message had rebalance generation ID {} while the latest rebalance generation ID is {}",
+                        currentContext.getTaskUid(), inSync.getTaskUid(), inSync.getRebalanceGenerationId(),
+                        currentContext.getReceivedRebalanceGenerationId());
+
+            }
             else {
                 LOGGER.info("Task {}, updating the rebalance state to NEW_EPOCH_STARTED {}: {}", currentContext.getTaskUid(), inSync.getTaskUid(),
                         inSync.getRebalanceGenerationId());
