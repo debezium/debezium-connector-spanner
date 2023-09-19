@@ -8,11 +8,16 @@ package io.debezium.connector.spanner.db;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import org.junit.jupiter.api.Test;
+import java.io.IOException;
 
+import org.junit.jupiter.api.Test;
+import org.mockito.MockedStatic;
+
+import com.google.auth.oauth2.GoogleCredentials;
 import com.google.cloud.spanner.DatabaseClient;
 
 import io.debezium.connector.spanner.SpannerConnectorConfig;
@@ -37,18 +42,21 @@ class DatabaseClientFactoryTest {
 
     @Test
     void testGetGoogleCredentials() {
-        assertNull(new DatabaseClientFactory("myproject", "42", "42", "Credentials Json",
-                "Credentials Path", null, "test-role")
-                .getGoogleCredentials("Credentials Json", "Credentials Path"));
-        assertNull(new DatabaseClientFactory("myproject", "42", "42", "Credentials Json",
-                "Credentials Path", null, "test-role")
-                .getGoogleCredentials(null, null));
-        assertNull(new DatabaseClientFactory("myproject", "42", "42", "Credentials Json",
-                "Credentials Path", null, "test-role")
-                .getGoogleCredentials(null, "Credentials Path"));
-        assertNull(new DatabaseClientFactory("myproject", "42", "42", null,
-                null, null, "test-role")
-                .getGoogleCredentials(null, null));
+        try (MockedStatic<GoogleCredentials> credentials = mockStatic(GoogleCredentials.class)) {
+            credentials.when(GoogleCredentials::getApplicationDefault).thenThrow(new IOException());
+            assertNull(new DatabaseClientFactory("myproject", "42", "42", "Credentials Json",
+                    "Credentials Path", null, "test-role")
+                    .getGoogleCredentials("Credentials Json", "Credentials Path"));
+            assertNull(new DatabaseClientFactory("myproject", "42", "42", "Credentials Json",
+                    "Credentials Path", null, "test-role")
+                    .getGoogleCredentials(null, null));
+            assertNull(new DatabaseClientFactory("myproject", "42", "42", "Credentials Json",
+                    "Credentials Path", null, "test-role")
+                    .getGoogleCredentials(null, "Credentials Path"));
+            assertNull(new DatabaseClientFactory("myproject", "42", "42", null,
+                    null, null, "test-role")
+                    .getGoogleCredentials(null, null));
+        }
     }
 
     @Test

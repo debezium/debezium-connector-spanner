@@ -14,9 +14,9 @@ import static org.slf4j.LoggerFactory.getLogger;
 
 import java.io.IOException;
 
-import com.google.auth.oauth2.ServiceAccountCredentials;
-
 import org.slf4j.Logger;
+
+import com.google.auth.oauth2.ServiceAccountCredentials;
 
 /**
  * Checks if the connection to database could be established by given configuration
