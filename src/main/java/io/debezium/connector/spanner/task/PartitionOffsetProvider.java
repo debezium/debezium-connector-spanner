@@ -57,7 +57,7 @@ public class PartitionOffsetProvider {
             LOGGER.warn("Token {} returning start timestamp because no offset was retrieved", token);
             return token.getStartTimestamp();
         }
-
+        LOGGER.info("Successfully retrieved offset {} for token {}", result, token);
         return PartitionOffset.extractOffset(result);
     }
 
@@ -115,7 +115,7 @@ public class PartitionOffsetProvider {
         }
         catch (ExecutionException e) {
             // handle other exceptions
-            LOGGER.error("Token {}, failed to retrieve offset", spannerPartition, e);
+            LOGGER.error("Token {}, failed to retrieve offset {}:{}", spannerPartition, e.toString(), e.getStackTrace());
         }
         finally {
             future.cancel(true); // may or may not desire this
@@ -130,8 +130,8 @@ public class PartitionOffsetProvider {
         private Map<String, String> spannerPartition;
 
         public ExecutorServiceCallable(OffsetStorageReader offsetStorageReader, Map<String, String> spannerPartition) {
-            offsetStorageReader = offsetStorageReader;
-            spannerPartition = spannerPartition;
+            this.offsetStorageReader = offsetStorageReader;
+            this.spannerPartition = spannerPartition;
         }
 
         @Override
@@ -140,7 +140,7 @@ public class PartitionOffsetProvider {
                 return this.offsetStorageReader.offset(spannerPartition);
             }
             catch (Exception e) {
-                LOGGER.error("Offsetstoragereader throwing exception", e);
+                LOGGER.error("Offsetstoragereader throwing exception {}, {}", e.toString(), e.getStackTrace());
                 throw e;
             }
         }
