@@ -40,6 +40,7 @@ public class TaskSyncContext {
     private final RebalanceState rebalanceState;
     private final String consumerId;
     private final long rebalanceGenerationId;
+    private final long receivedRebalanceGenerationId;
     private final EpochOffsetHolder epochOffsetHolder;
     private final long currentKafkaRecordOffset;
     private final boolean isLeader;
@@ -133,6 +134,7 @@ public class TaskSyncContext {
                 .consumerId("")
                 .databaseSchemaTimestamp(connectorConfig.startTime())
                 .rebalanceGenerationId(-2)
+                .receivedRebalanceGenerationId(-2)
                 .rebalanceState(RebalanceState.START_INITIAL_SYNC)
                 .createdTimestamp(now)
                 .currentTaskState(
@@ -166,6 +168,7 @@ public class TaskSyncContext {
                     final RebalanceState rebalanceState,
                     final String consumerId,
                     final long rebalanceGenerationId,
+                    final long receivedRebalanceGenerationId,
                     final EpochOffsetHolder epochOffsetHolder,
                     final long currentKafkaRecordOffset,
                     final boolean isLeader,
@@ -179,6 +182,7 @@ public class TaskSyncContext {
         this.rebalanceState = rebalanceState;
         this.consumerId = consumerId;
         this.rebalanceGenerationId = rebalanceGenerationId;
+        this.receivedRebalanceGenerationId = receivedRebalanceGenerationId;
         this.epochOffsetHolder = epochOffsetHolder;
         this.currentKafkaRecordOffset = currentKafkaRecordOffset;
         this.isLeader = isLeader;
@@ -195,6 +199,7 @@ public class TaskSyncContext {
         private RebalanceState rebalanceState;
         private String consumerId;
         private long rebalanceGenerationId;
+        private long receivedRebalanceGenerationId;
         private boolean epochOffsetHolderSet;
         private EpochOffsetHolder epochOffsetHolderValue;
         private long currentKafkaRecordOffset;
@@ -232,6 +237,11 @@ public class TaskSyncContext {
 
         public TaskSyncContext.TaskSyncContextBuilder rebalanceGenerationId(final long rebalanceGenerationId) {
             this.rebalanceGenerationId = rebalanceGenerationId;
+            return this;
+        }
+
+        public TaskSyncContext.TaskSyncContextBuilder receivedRebalanceGenerationId(final long receivedRebalanceGenerationId) {
+            this.receivedRebalanceGenerationId = receivedRebalanceGenerationId;
             return this;
         }
 
@@ -306,7 +316,7 @@ public class TaskSyncContext {
             }
 
             return new TaskSyncContext(this.taskUid, this.rebalanceState, this.consumerId,
-                    this.rebalanceGenerationId, epochOffsetHolderValue,
+                    this.rebalanceGenerationId, this.receivedRebalanceGenerationId, epochOffsetHolderValue,
                     this.currentKafkaRecordOffset, isLeaderValue, createdTimestampValue,
                     taskStatesValue, this.currentTaskState, databaseSchemaTimestamp, finished, initialized);
         }
@@ -336,6 +346,7 @@ public class TaskSyncContext {
                 .rebalanceState(this.rebalanceState)
                 .consumerId(this.consumerId)
                 .rebalanceGenerationId(this.rebalanceGenerationId)
+                .receivedRebalanceGenerationId(this.receivedRebalanceGenerationId)
                 .epochOffsetHolder(this.epochOffsetHolder)
                 .currentKafkaRecordOffset(this.currentKafkaRecordOffset)
                 .isLeader(this.isLeader)
@@ -361,6 +372,10 @@ public class TaskSyncContext {
 
     public long getRebalanceGenerationId() {
         return this.rebalanceGenerationId;
+    }
+
+    public long getReceivedRebalanceGenerationId() {
+        return this.receivedRebalanceGenerationId;
     }
 
     public EpochOffsetHolder getEpochOffsetHolder() {
