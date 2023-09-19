@@ -22,6 +22,7 @@ import io.debezium.connector.spanner.kafka.event.proto.SyncEventProtos;
 import io.debezium.connector.spanner.kafka.internal.model.MessageTypeEnum;
 import io.debezium.connector.spanner.kafka.internal.model.TaskSyncEvent;
 import io.debezium.connector.spanner.kafka.internal.proto.SyncEventToProtoMapper;
+import io.debezium.connector.spanner.task.TaskSyncContextHolder;
 
 /**
  * Sends Sync Events with task internal state updates to Kafka Sync topic
@@ -34,20 +35,24 @@ public class TaskSyncPublisher {
     private volatile Instant lastTime;
     private final BufferedPublisher<TaskSyncEvent> bufferedPublisher;
     private final Consumer<RuntimeException> errorHandler;
+    private final TaskSyncContextHolder taskSyncContextHolder;
 
     private final String taskUid;
 
     public TaskSyncPublisher(String taskUid, String topic, int syncEventPublisherWaitingTimeout, ProducerFactory<String, byte[]> producerFactory,
+                             TaskSyncContextHolder taskSyncContextHolder,
                              Consumer<RuntimeException> errorHandler) {
         this.topic = topic;
         this.producer = producerFactory.createProducer();
         this.errorHandler = errorHandler;
         this.taskUid = taskUid;
+        this.taskSyncContextHolder = taskSyncContextHolder;
 
         if (syncEventPublisherWaitingTimeout > 0) {
             this.bufferedPublisher = new BufferedPublisher<>(
                     this.taskUid,
                     "Buffer-Pub",
+                    this.taskSyncContextHolder,
                     syncEventPublisherWaitingTimeout,
                     this::publishImmediately,
                     this::publishSyncEvent);
