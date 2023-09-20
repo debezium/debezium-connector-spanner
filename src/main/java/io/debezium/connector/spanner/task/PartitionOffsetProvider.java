@@ -140,7 +140,7 @@ public class PartitionOffsetProvider {
                 return this.offsetStorageReader.offset(spannerPartition);
             }
             catch (Exception e) {
-                LOGGER.error("Offsetstoragereader throwing exception {}, {}", e.toString(), e.getStackTrace());
+                LOGGER.error("Offsetstoragereader throwing exception", e);
                 throw e;
             }
         }
