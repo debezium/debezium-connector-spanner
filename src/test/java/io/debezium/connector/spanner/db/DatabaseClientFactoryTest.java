@@ -12,8 +12,6 @@ import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import java.io.IOException;
-
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
 
@@ -43,31 +41,31 @@ class DatabaseClientFactoryTest {
 
     @Test
     void testGetGoogleCredentials() {
-         try (MockedStatic<GoogleCredentials> credentials = mockStatic(GoogleCredentials.class)) {
-        DatabaseClientFactory databaseClientFactory1 = new DatabaseClientFactory("myproject", "42", "42", "Credentials Json",
-                "Credentials Path", null, "test-role");
-        assertNull(databaseClientFactory1
-                .getGoogleCredentials("Credentials Json", "Credentials Path"));
-        databaseClientFactory1.closeSpanner();
+        try (MockedStatic<GoogleCredentials> credentials = mockStatic(GoogleCredentials.class)) {
+            DatabaseClientFactory databaseClientFactory1 = new DatabaseClientFactory("myproject", "42", "42", "Credentials Json",
+                    "Credentials Path", null, "test-role");
+            assertNull(databaseClientFactory1
+                    .getGoogleCredentials("Credentials Json", "Credentials Path"));
+            databaseClientFactory1.closeSpanner();
 
-        DatabaseClientFactory databaseClientFactory2 = new DatabaseClientFactory("myproject", "42", "42", "Credentials Json",
-                "Credentials Path", null, "test-role");
-        assertNull(databaseClientFactory2
-                .getGoogleCredentials(null, null));
-        databaseClientFactory2.closeSpanner();
+            DatabaseClientFactory databaseClientFactory2 = new DatabaseClientFactory("myproject", "42", "42", "Credentials Json",
+                    "Credentials Path", null, "test-role");
+            assertNull(databaseClientFactory2
+                    .getGoogleCredentials(null, null));
+            databaseClientFactory2.closeSpanner();
 
-        DatabaseClientFactory databaseClientFactory3 = new DatabaseClientFactory("myproject", "42", "42", "Credentials Json",
-                "Credentials Path", null, "test-role");
-        assertNull(databaseClientFactory3
-                .getGoogleCredentials(null, "Credentials Path"));
-        databaseClientFactory3.closeSpanner();
+            DatabaseClientFactory databaseClientFactory3 = new DatabaseClientFactory("myproject", "42", "42", "Credentials Json",
+                    "Credentials Path", null, "test-role");
+            assertNull(databaseClientFactory3
+                    .getGoogleCredentials(null, "Credentials Path"));
+            databaseClientFactory3.closeSpanner();
 
-         DatabaseClientFactory databaseClientFactory4 = new DatabaseClientFactory("myproject", "42", "42", "Credentials Json",
-                null, null, null);
-        assertNull(databaseClientFactory4
-                .getGoogleCredentials(null, null));
-        databaseClientFactory4.closeSpanner();
-         }
+            DatabaseClientFactory databaseClientFactory4 = new DatabaseClientFactory("myproject", "42", "42", "Credentials Json",
+                    null, null, null);
+            assertNull(databaseClientFactory4
+                    .getGoogleCredentials(null, null));
+            databaseClientFactory4.closeSpanner();
+        }
 
     }
 
