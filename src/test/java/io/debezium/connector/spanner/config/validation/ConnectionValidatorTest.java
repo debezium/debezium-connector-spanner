@@ -9,6 +9,7 @@ import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.spy;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Map;
 import java.util.stream.Stream;
 
@@ -93,5 +94,50 @@ class ConnectionValidatorTest {
             connectionValidator.validate();
             Assertions.assertFalse(connectionValidator.isSuccess());
         }
+    }
+
+    @Test
+    void validateSuccessAgainstEmulator() {
+        Configuration configuration = Configuration.from(Map.of(
+                "gcp.spanner.project.id", "boxwood-weaver-353315",
+                "gcp.spanner.instance.id", "kafka-connector",
+                "gcp.spanner.database.id", "kafkaspan",
+                "gcp.spanner.emulator.host", "http://localhost:9010"));
+        Map<String, ConfigValue> configValueMap = Map.of(
+                "gcp.spanner.project.id", new ConfigValue("gcp.spanner.project.id", "boxwood-weaver-353315", new ArrayList<>(), new ArrayList<>()),
+                "gcp.spanner.instance.id", new ConfigValue("gcp.spanner.instance.id", "kafka-connector", new ArrayList<>(), new ArrayList<>()),
+                "gcp.spanner.database.id", new ConfigValue("gcp.spanner.database.id", "kafkaspan", new ArrayList<>(), new ArrayList<>()),
+                "gcp.spanner.emulator.host", new ConfigValue("gcp.spanner.emulator.host", "http://localhost:9010", new ArrayList<>(), new ArrayList<>()));
+
+        ConfigurationValidator.ValidationContext validationContext = new ConfigurationValidator.ValidationContext(configuration, configValueMap);
+
+        ConnectionValidator connectionValidator = spy(ConnectionValidator.withContext(validationContext));
+        connectionValidator.validate();
+        Assertions.assertEquals(true, connectionValidator.isSuccess());
+    }
+
+    @Test
+    void validateFailForConflictingHosts() {
+        Configuration configuration = Configuration.from(Map.of(
+                "gcp.spanner.project.id", "boxwood-weaver-353315",
+                "gcp.spanner.instance.id", "kafka-connector",
+                "gcp.spanner.credentials.path", "no_path",
+                "gcp.spanner.database.id", "kafkaspan",
+                "gcp.spanner.host", "http://localhost:9010",
+                "gcp.spanner.emulator.host", "http://localhost:9010"));
+        Map<String, ConfigValue> configValueMap = Map.of(
+                "gcp.spanner.project.id", new ConfigValue("gcp.spanner.project.id", "boxwood-weaver-353315", new ArrayList<>(), new ArrayList<>()),
+                "gcp.spanner.instance.id", new ConfigValue("gcp.spanner.instance.id", "kafka-connector", new ArrayList<>(), new ArrayList<>()),
+                "gcp.spanner.database.id", new ConfigValue("gcp.spanner.database.id", "kafkaspan", new ArrayList<>(), new ArrayList<>()),
+                "gcp.spanner.credentials.path", new ConfigValue("gcp.spanner.credentials.json", "{}", new ArrayList<>(), new ArrayList<>()),
+                "gcp.spanner.credentials.json", new ConfigValue("gcp.spanner.credentials.json", "{}", new ArrayList<>(), new ArrayList<>()),
+                "gcp.spanner.host", new ConfigValue("gcp.spanner.host", "http://localhost:9010", new ArrayList<>(), new ArrayList<>()),
+                "gcp.spanner.emulator.host", new ConfigValue("gcp.spanner.emulator.host", "http://localhost:9010", new ArrayList<>(), new ArrayList<>()));
+
+        ConfigurationValidator.ValidationContext validationContext = new ConfigurationValidator.ValidationContext(configuration, configValueMap);
+
+        ConnectionValidator connectionValidator = spy(ConnectionValidator.withContext(validationContext));
+        connectionValidator.validate();
+        Assertions.assertEquals(false, connectionValidator.isSuccess());
     }
 }

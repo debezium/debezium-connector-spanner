@@ -121,6 +121,10 @@ public class SpannerConnectorConfig extends BaseSpannerConnectorConfig {
         return getConfig().getString(GCP_SPANNER_HOST_PROPERTY_NAME);
     }
 
+    public String spannerEmulatorHost() {
+        return getConfig().getString(GCP_SPANNER_EMULATOR_HOST_PROPERTY_NAME);
+    }
+
     public String changeStreamName() {
         return getConfig().getString(GCP_SPANNER_CHANGE_STREAM_PROPERTY_NAME);
     }
