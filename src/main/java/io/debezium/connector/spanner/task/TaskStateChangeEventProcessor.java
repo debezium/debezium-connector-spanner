@@ -82,7 +82,7 @@ public class TaskStateChangeEventProcessor {
                     return;
                 }
                 catch (Exception e) {
-                    LOGGER.error("Task caught exception from event queueing thread");
+                    LOGGER.error("Task caught exception from event queueing thread", e);
                 }
             }
         });
