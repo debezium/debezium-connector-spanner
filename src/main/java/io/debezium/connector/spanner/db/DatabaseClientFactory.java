@@ -15,6 +15,7 @@ import org.slf4j.LoggerFactory;
 import com.google.api.gax.rpc.FixedHeaderProvider;
 import com.google.auth.oauth2.GoogleCredentials;
 import com.google.auth.oauth2.ServiceAccountCredentials;
+import com.google.cloud.NoCredentials;
 import com.google.cloud.spanner.DatabaseClient;
 import com.google.cloud.spanner.DatabaseId;
 import com.google.cloud.spanner.Spanner;
@@ -44,7 +45,7 @@ public class DatabaseClientFactory {
 
     public DatabaseClientFactory(String projectId, String instanceId, String databaseId,
                                  String credentialsJson,
-                                 String credentialsPath, String host, String databaseRole) {
+                                 String credentialsPath, String host, String emulatorHost, String databaseRole) {
         this.projectId = projectId;
         this.instanceId = instanceId;
         this.databaseId = databaseId;
@@ -53,13 +54,20 @@ public class DatabaseClientFactory {
 
         GoogleCredentials googleCredentials = getGoogleCredentials(credentialsJson,
                 credentialsPath);
-        if (googleCredentials != null) {
-            builder.setCredentials(googleCredentials);
-        }
         builder.setProjectId(this.projectId);
         if (!Strings.isNullOrEmpty(host)) {
             builder.setHost(host);
         }
+        if (!Strings.isNullOrEmpty(emulatorHost)) {
+            builder.setEmulatorHost(emulatorHost);
+            builder.setCredentials(NoCredentials.getInstance());
+        }
+        else {
+            if (googleCredentials != null) {
+                builder.setCredentials(googleCredentials);
+            }
+        }
+
         if (!Strings.isNullOrEmpty(databaseRole)) {
             builder.setDatabaseRole(databaseRole);
         }
@@ -73,7 +81,7 @@ public class DatabaseClientFactory {
     public DatabaseClientFactory(SpannerConnectorConfig config) {
         this(config.projectId(), config.instanceId(), config.databaseId(),
                 config.gcpSpannerCredentialsJson(), config.gcpSpannerCredentialsPath(),
-                config.spannerHost(), config.databaseRole());
+                config.spannerHost(), config.spannerEmulatorHost(), config.databaseRole());
     }
 
     @VisibleForTesting

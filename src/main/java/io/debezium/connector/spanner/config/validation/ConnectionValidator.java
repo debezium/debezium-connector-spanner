@@ -10,6 +10,8 @@ import static io.debezium.connector.spanner.config.BaseSpannerConnectorConfig.IN
 import static io.debezium.connector.spanner.config.BaseSpannerConnectorConfig.PROJECT_ID;
 import static io.debezium.connector.spanner.config.BaseSpannerConnectorConfig.SPANNER_CREDENTIALS_JSON;
 import static io.debezium.connector.spanner.config.BaseSpannerConnectorConfig.SPANNER_CREDENTIALS_PATH;
+import static io.debezium.connector.spanner.config.BaseSpannerConnectorConfig.SPANNER_EMULATOR_HOST;
+import static io.debezium.connector.spanner.config.BaseSpannerConnectorConfig.SPANNER_HOST;
 import static org.slf4j.LoggerFactory.getLogger;
 
 import java.io.IOException;
@@ -32,6 +34,7 @@ public class ConnectionValidator implements ConfigurationValidator.Validator {
     private static final String INSTANCE_NOT_EXIST = "Instance %s does not exist";
     private static final String CONNECTOR_NOT_SUPPORT_POSTGRESQL_DIALECT = "Spanner connector doesn't support PostgreSql dialect";
     private static final String DATABASE_ID_NOT_EXIST = "Database %s does not exist";
+    private static final String HOST_CONFLICT = "Can`t specify configuration properties for both production cloud spanner host and cloud spanner emulator host.";
 
     private final ConfigurationValidator.ValidationContext context;
     private boolean result = true;
@@ -46,8 +49,10 @@ public class ConnectionValidator implements ConfigurationValidator.Validator {
 
     @Override
     public ConnectionValidator validate() {
-
-        if (!canValidate()) {
+        String host = context.getString(SPANNER_HOST);
+        String emulatorHost = context.getString(SPANNER_EMULATOR_HOST);
+        boolean isAgainstEmulator = FieldValidator.isSpecified(emulatorHost);
+        if (!canValidate(isAgainstEmulator)) {
             this.result = false;
             return this;
         }
@@ -57,7 +62,8 @@ public class ConnectionValidator implements ConfigurationValidator.Validator {
         String credentialPath = context.getString(SPANNER_CREDENTIALS_PATH);
         String credentialJson = context.getString(SPANNER_CREDENTIALS_JSON);
 
-        if (!FieldValidator.isSpecified(googleCredentials) && !FieldValidator.isSpecified(credentialPath) && !FieldValidator.isSpecified(credentialJson)) {
+        if (!isAgainstEmulator && !FieldValidator.isSpecified(googleCredentials) && !FieldValidator.isSpecified(credentialPath)
+                && !FieldValidator.isSpecified(credentialJson)) {
             try {
                 ServiceAccountCredentials.getApplicationDefault();
             }
@@ -70,6 +76,13 @@ public class ConnectionValidator implements ConfigurationValidator.Validator {
                     SPANNER_CREDENTIALS_JSON.name(), GOOGLE_APPLICATION_CREDENTIALS_ENV_VAR);
             LOGGER.info(message, SPANNER_CREDENTIALS_PATH, SPANNER_CREDENTIALS_JSON);
         }
+
+        if (FieldValidator.isSpecified(host) && isAgainstEmulator) {
+            LOGGER.error(HOST_CONFLICT);
+            context.error(HOST_CONFLICT, SPANNER_HOST, SPANNER_EMULATOR_HOST);
+            result = false;
+            return this;
+        }
         return this;
     }
 
@@ -78,12 +91,12 @@ public class ConnectionValidator implements ConfigurationValidator.Validator {
         return result;
     }
 
-    public boolean canValidate() {
+    public boolean canValidate(boolean isAgainstEmulator) {
+        // Skip checks for credentials against Emulator.
         return context.getErrors(PROJECT_ID).isEmpty() &&
                 context.getErrors(INSTANCE_ID).isEmpty() &&
-                context.getErrors(DATABASE_ID).isEmpty() &&
-                context.getErrors(SPANNER_CREDENTIALS_JSON).isEmpty() &&
-                context.getErrors(SPANNER_CREDENTIALS_PATH).isEmpty();
+                context.getErrors(DATABASE_ID).isEmpty() && (isAgainstEmulator || (context.getErrors(SPANNER_CREDENTIALS_JSON).isEmpty() &&
+                        context.getErrors(SPANNER_CREDENTIALS_PATH).isEmpty()));
     }
 
 }
