@@ -110,18 +110,26 @@ public class DatabaseClientFactory {
     }
 
     public void closeSpanner() {
-        if (spanner == null) {
-            return;
+        synchronized (this) {
+            if (spanner == null) {
+                return;
+            }
+            try {
+                spanner.close();
+            }
+            catch (Exception e) {
+                LOGGER.error("Exception during spanner.close()", e);
+
+            }
+            spanner = null;
         }
-        spanner.close();
-        spanner = null;
     }
 
     public DatabaseClient getDatabaseClient() {
-        if (spanner == null) {
-            return null;
-        }
         synchronized (this) {
+            if (spanner == null) {
+                return null;
+            }
             if (databaseClient == null) {
                 databaseClient = spanner.getDatabaseClient(
                         DatabaseId.of(this.projectId, this.instanceId, this.databaseId));
