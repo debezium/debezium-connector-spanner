@@ -68,6 +68,10 @@ public class PartitionThreadPool {
 
         while (!threadMap.isEmpty() && !threadMap.values().stream().allMatch(thread -> thread.getState().equals(Thread.State.TERMINATED))) {
             try {
+                clean();
+
+                LOGGER.info("Still trying to shut down partition thread poll for task {} and threads {}", taskUid, threadMap.keySet());
+                threadMap.values().forEach(Thread::interrupt);
                 // Sleep for sleepInterval.
                 metronome.pause();
             }
