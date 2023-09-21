@@ -177,11 +177,8 @@ public class SyncEventHandler {
             // For REGULAR type messages, we filter them out in SyncEventMerger if the preexisting
             // task states map does not contain them, and if the state timestamp is not greater.
 
-            if (inSync.getMessageType() == MessageTypeEnum.NEW_EPOCH) {
-                return inGeneration <= currentGeneration;
-            }
-
-            if (inSync.getMessageType() == MessageTypeEnum.REBALANCE_ANSWER
+            if (inSync.getMessageType() == MessageTypeEnum.NEW_EPOCH
+                    || inSync.getMessageType() == MessageTypeEnum.REBALANCE_ANSWER
                     || inSync.getMessageType() == MessageTypeEnum.UPDATE_EPOCH) {
                 return inGeneration < currentGeneration;
             }

@@ -141,6 +141,7 @@ public class RebalancingEventListener {
             }
             finally {
                 try {
+                    LOGGER.info("Task {} - unsubscribing rebalance handling consumer", task.getTaskUid());
                     consumer.unsubscribe();
                     consumer.close();
                 }
@@ -161,10 +162,6 @@ public class RebalancingEventListener {
     }
 
     public void shutdown() {
-        if (this.shutDownListener.get() == true) {
-            LOGGER.info("Task {} - Trying to shut down listener, already shut down listener", task.getTaskUid());
-            return;
-        }
         this.shutDownListener.set(true);
         this.resettableDelayedAction.clear();
 
