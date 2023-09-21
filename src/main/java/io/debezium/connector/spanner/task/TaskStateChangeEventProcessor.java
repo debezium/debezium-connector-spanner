@@ -63,7 +63,7 @@ public class TaskStateChangeEventProcessor {
 
     private Thread createEventQueueingThread() {
         Thread thread = new Thread(() -> {
-            LOGGER.info("Started Event Queueing Thread");
+            LOGGER.info("Task {}, Started Event Queueing Thread", taskSyncContextHolder.get().getTaskUid());
             Clock clock = Clock.system();
             final Metronome metronome = Metronome.sleeper(Duration.ofSeconds(5), clock);
             while (!Thread.currentThread().isInterrupted()) {
@@ -83,8 +83,10 @@ public class TaskStateChangeEventProcessor {
                 }
                 catch (Exception e) {
                     LOGGER.error("Task caught exception from event queueing thread", e);
+                    throw e;
                 }
             }
+            LOGGER.info("Task {}, Terminating Event Queueing Thread", taskSyncContextHolder.get().getTaskUid());
         });
         thread.setUncaughtExceptionHandler((t, e) -> errorHandler.accept(e));
         return thread;
@@ -142,12 +144,13 @@ public class TaskStateChangeEventProcessor {
             LOGGER.info("Task {}, stopping event queueing thread ", this.taskSyncContextHolder.get().getTaskUid());
             while (!this.eventQueueingThread.getState().equals(Thread.State.TERMINATED)) {
                 try {
-                    // Sleep for sleepInterval.
-                    metronome.pause();
-
-                    this.eventQueueingThread.interrupt();
 
                     LOGGER.info("Task {}, still waiting for event queueing thread to die", this.taskSyncContextHolder.get().getTaskUid());
+                   
+                    this.eventQueueingThread.interrupt();
+                  
+                    // Sleep for sleepInterval.
+                    metronome.pause();
                 }
                 catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
