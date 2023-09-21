@@ -146,9 +146,9 @@ public class TaskStateChangeEventProcessor {
                 try {
 
                     LOGGER.info("Task {}, still waiting for event queueing thread to die", this.taskSyncContextHolder.get().getTaskUid());
-                   
+
                     this.eventQueueingThread.interrupt();
-                  
+
                     // Sleep for sleepInterval.
                     metronome.pause();
                 }
