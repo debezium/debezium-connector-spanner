@@ -10,6 +10,7 @@ import static org.slf4j.LoggerFactory.getLogger;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Collection;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
 import org.apache.kafka.clients.consumer.Consumer;
@@ -53,6 +54,8 @@ public class RebalancingEventListener {
 
     private final SpannerConnectorTask task;
 
+    private final AtomicBoolean shutDownListener;
+
     public RebalancingEventListener(SpannerConnectorTask task, String consumerGroup, String topic,
                                     Duration rebalancingTaskWaitingTimeout,
                                     RebalancingConsumerFactory<?, ?> consumerFactory,
@@ -66,9 +69,14 @@ public class RebalancingEventListener {
         this.consumerFactory = consumerFactory;
         this.errorHandler = errorHandler;
         this.resettableDelayedAction = new ResettableDelayedAction("rebalance-delayed-action", rebalancingTaskWaitingTimeout);
+        this.shutDownListener = new AtomicBoolean(false);
     }
 
     public void listen(BlockingConsumer<RebalanceEventMetadata> action) {
+        if (this.shutDownListener.get() == true) {
+            LOGGER.info("Task {} - Already shut down listener", task.getTaskUid());
+            return;
+        }
         this.rebalancingAction = action;
         this.consumer = consumerFactory.createSubscribeConsumer(consumerGroup, topic, new ConsumerRebalanceListener() {
             @Override
@@ -153,6 +161,11 @@ public class RebalancingEventListener {
     }
 
     public void shutdown() {
+        if (this.shutDownListener.get() == true) {
+            LOGGER.info("Task {} - Trying to shut down listener, already shut down listener", task.getTaskUid());
+            return;
+        }
+        this.shutDownListener.set(true);
         this.resettableDelayedAction.clear();
 
         if (this.thread == null) {
@@ -162,6 +175,7 @@ public class RebalancingEventListener {
         this.thread.interrupt();
 
         while (!this.thread.getState().equals(Thread.State.TERMINATED)) {
+            this.thread.interrupt();
         }
         this.thread = null;
     }

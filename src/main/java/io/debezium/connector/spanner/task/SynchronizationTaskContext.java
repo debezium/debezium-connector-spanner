@@ -242,6 +242,11 @@ public class SynchronizationTaskContext {
     }
 
     private void onError(Throwable throwable) {
+        if (this.rebalancingEventListener != null) {
+            LOGGER.info("Task {}, shutting down rebalancing event listener due to error in task", this.taskSyncContextHolder.get().getTaskUid(), throwable);
+            this.rebalancingEventListener.shutdown();
+        }
+        LOGGER.info("Task {}, enqueueing error in task", this.taskSyncContextHolder.get().getTaskUid(), throwable);
         this.errorHandler.setProducerThrowable(throwable);
     }
 
