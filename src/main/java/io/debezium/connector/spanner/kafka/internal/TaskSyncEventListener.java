@@ -122,7 +122,7 @@ public class TaskSyncEventListener {
         catch (Exception ex) {
             LOGGER.info("Shutdown consumer {} for ex {}", consumerGroup, ex);
             shutdownConsumer(consumer);
-            throw ex;
+            errorHandler.accept(new RuntimeException(ex));
         }
 
         thread = new Thread(
