@@ -14,6 +14,9 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.google.common.annotations.VisibleForTesting;
 
 import io.debezium.connector.spanner.db.model.InitialPartition;
@@ -28,7 +31,8 @@ import io.debezium.function.BlockingConsumer;
  * Monitors partition querying. If maxMissedEvents is reached, onStuckPartitionConsumer is called.
  */
 public class PartitionQueryingMonitor {
-    private static final Duration CHECK_INTERVAL = Duration.of(500, ChronoUnit.MILLIS);
+    private static final Logger LOGGER = LoggerFactory.getLogger(PartitionThreadPool.class);
+    private static final Duration CHECK_INTERVAL = Duration.of(5000, ChronoUnit.MILLIS);
 
     private final PartitionThreadPool partitionThreadPool;
     private final long heartBeatIntervalMillis;
@@ -83,6 +87,7 @@ public class PartitionQueryingMonitor {
                     lastEventTimestampMap.put(token, Instant.now());
                     continue;
                 }
+                LOGGER.info("PartitionQueryingMonitor, token {} last received timestamp {}", token, lastEventTimestamp);
 
                 int stuckHeartbeatIntervals = stuckHeartbeatIntervals(lastEventTimestamp);
                 if (stuckHeartbeatIntervals > maxStuckHeartbeatIntervals) {

@@ -56,6 +56,13 @@ public class RebalanceHandler {
             return;
         }
 
+        // Stop the current leader thread if it exists.
+        this.leaderAction.stop(oldRebalanceGenerationId);
+
+        LOGGER.info("processRebalancingEvent: stopped leader thread, consumerId: {}, taskId{}, rebalanceGenerationId: {}, isLeader {}", consumerId,
+                taskSyncContextHolder.get().getTaskUid(),
+                rebalanceGenerationId, isLeader);
+
         // Do not update the rebalance generation ID here. Only update when:
         // 1. sending out the new Epoch
         // 2. processing the new epoch
@@ -83,12 +90,6 @@ public class RebalanceHandler {
         LOGGER.info("Task {} - RebalanceHandler finished updating task sync context for consumer ID {} and rebalance generation ID {}", context.getTaskUid(),
                 consumerId,
                 rebalanceGenerationId);
-        // Stop the current leader thread if it exists.
-        this.leaderAction.stop(oldRebalanceGenerationId);
-
-        LOGGER.info("processRebalancingEvent: stopped leader thread, consumerId: {}, taskId{}, rebalanceGenerationId: {}, isLeader {}", consumerId,
-                taskSyncContextHolder.get().getTaskUid(),
-                rebalanceGenerationId, isLeader);
 
         TaskSyncEvent taskSyncEvent = context.buildRebalanceAnswerTaskSyncEvent(rebalanceGenerationId);
 

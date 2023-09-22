@@ -165,16 +165,18 @@ public class RebalancingEventListener {
         this.shutDownListener.set(true);
         this.resettableDelayedAction.clear();
 
-        if (this.thread == null) {
-            return;
-        }
+        synchronized (this) {
+            if (this.thread == null) {
+                return;
+            }
 
-        this.thread.interrupt();
-
-        while (!this.thread.getState().equals(Thread.State.TERMINATED)) {
             this.thread.interrupt();
+
+            while (!this.thread.getState().equals(Thread.State.TERMINATED)) {
+                this.thread.interrupt();
+            }
+            this.thread = null;
         }
-        this.thread = null;
     }
 
 }
