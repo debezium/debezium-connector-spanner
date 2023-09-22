@@ -10,7 +10,6 @@ import static org.slf4j.LoggerFactory.getLogger;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Collection;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
 import org.apache.kafka.clients.consumer.Consumer;
@@ -54,8 +53,6 @@ public class RebalancingEventListener {
 
     private final SpannerConnectorTask task;
 
-    private final AtomicBoolean shutDownListener;
-
     public RebalancingEventListener(SpannerConnectorTask task, String consumerGroup, String topic,
                                     Duration rebalancingTaskWaitingTimeout,
                                     RebalancingConsumerFactory<?, ?> consumerFactory,
@@ -69,14 +66,9 @@ public class RebalancingEventListener {
         this.consumerFactory = consumerFactory;
         this.errorHandler = errorHandler;
         this.resettableDelayedAction = new ResettableDelayedAction("rebalance-delayed-action", rebalancingTaskWaitingTimeout);
-        this.shutDownListener = new AtomicBoolean(false);
     }
 
     public void listen(BlockingConsumer<RebalanceEventMetadata> action) {
-        if (this.shutDownListener.get() == true) {
-            LOGGER.info("Task {} - Already shut down listener", task.getTaskUid());
-            return;
-        }
         this.rebalancingAction = action;
         this.consumer = consumerFactory.createSubscribeConsumer(consumerGroup, topic, new ConsumerRebalanceListener() {
             @Override
@@ -134,6 +126,8 @@ public class RebalancingEventListener {
                         }
                     }
                     catch (org.apache.kafka.common.errors.InterruptException e) {
+                        LOGGER.error("Task Uid {} caught exception when interrupting RebalancingEventListener", e);
+                        Thread.currentThread().interrupt();
                         return;
                     }
                 }
@@ -146,6 +140,8 @@ public class RebalancingEventListener {
                     consumer.close();
                 }
                 catch (org.apache.kafka.common.errors.InterruptException e) {
+                    LOGGER.error("Task Uid {} caught exception when interrupting RebalancingEventListener", e);
+                    Thread.currentThread().interrupt();
                 }
             }
         }, "SpannerConnector-RebalancingEventListener");
@@ -153,7 +149,7 @@ public class RebalancingEventListener {
         thread.setUncaughtExceptionHandler((t, ex) -> {
             errorHandler.accept(new SpannerConnectorException("Error during poll from the Rebalance Topic", ex));
         });
-
+        LOGGER.info("Task {} - starting rebalancing event listener", task.getTaskUid());
         thread.start();
     }
 
@@ -162,21 +158,18 @@ public class RebalancingEventListener {
     }
 
     public void shutdown() {
-        this.shutDownListener.set(true);
         this.resettableDelayedAction.clear();
 
-        synchronized (this) {
-            if (this.thread == null) {
-                return;
-            }
-
-            this.thread.interrupt();
-
-            while (!this.thread.getState().equals(Thread.State.TERMINATED)) {
-                this.thread.interrupt();
-            }
-            this.thread = null;
+        if (this.thread == null) {
+            return;
         }
+
+        this.thread.interrupt();
+
+        while (!this.thread.getState().equals(Thread.State.TERMINATED)) {
+            this.thread.interrupt();
+        }
+        this.thread = null;
     }
 
 }
