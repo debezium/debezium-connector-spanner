@@ -45,6 +45,7 @@ public class FinishingPartitionManager {
     public String newRecord(String token) {
         String recordUid = lastEmittedRecord.get(token) == null ? "aaaaaaaa" : next(lastEmittedRecord.get(token));
         lastEmittedRecord.put(token, recordUid);
+        LOGGER.info("Token {} emitting record {}", token, recordUid);
         return recordUid;
     }
 
@@ -54,6 +55,7 @@ public class FinishingPartitionManager {
 
     public void commitRecord(String token, String recordUid) throws InterruptedException {
         Boolean pendingFinishFlag = partitionPendingFinish.get(token);
+        LOGGER.info("Token {} committed record {}", token, recordUid);
 
         if (pendingFinishFlag == null) {
             LOGGER.warn("Task: {}, Partition has not been registered to finish or already finished {} for task {}", taskUid, token);

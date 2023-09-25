@@ -242,12 +242,18 @@ public class SynchronizationTaskContext {
     }
 
     private void onError(Throwable throwable) {
-        if (this.rebalancingEventListener != null) {
-            LOGGER.info("Task {}, shutting down rebalancing event listener due to error in task", this.taskSyncContextHolder.get().getTaskUid(), throwable);
-            this.rebalancingEventListener.shutdown();
-        }
         LOGGER.info("Task {}, enqueueing error in task", this.taskSyncContextHolder.get().getTaskUid(), throwable);
         this.errorHandler.setProducerThrowable(throwable);
+        if (this.rebalancingEventListener != null) {
+            try {
+                LOGGER.info("Task {}, shutting down rebalancing event listener due to error in task", this.taskSyncContextHolder.get().getTaskUid(), throwable);
+                this.rebalancingEventListener.shutdown();
+            }
+            catch (Exception e) {
+                LOGGER.info("Task {}, caught exception when shutting down rebalancing event listener due to error in task", this.taskSyncContextHolder.get().getTaskUid(),
+                        e);
+            }
+        }
     }
 
     private void onFinish() {

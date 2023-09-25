@@ -228,20 +228,31 @@ public class SpannerConnectorTask extends SpannerBaseSourceTask {
             beganPolling = true;
             LOGGER.info("Task {}, began polling", taskUid);
         }
-        final List<DataChangeEvent> records = queue.poll();
+        try {
+            List<DataChangeEvent> records;
 
-        long pollAtTimestamp = Instant.now().toEpochMilli();
+            LOGGER.info("Task {}, polling records", taskUid);
+            records = queue.poll();
+            LOGGER.info("Task {}, polled {} records", taskUid, records.size());
 
-        List<SourceRecord> resultedRecords = records.stream()
-                .map(DataChangeEvent::getRecord)
-                .map(record -> SourceRecordUtils.addPollTimestamp(record, pollAtTimestamp))
-                .collect(Collectors.toList());
+            long pollAtTimestamp = Instant.now().toEpochMilli();
 
-        if (!resultedRecords.isEmpty()) {
-            LOGGER.debug("Records sent to Kafka: {}", resultedRecords);
+            List<SourceRecord> resultedRecords = records.stream()
+                    .map(DataChangeEvent::getRecord)
+                    .map(record -> SourceRecordUtils.addPollTimestamp(record, pollAtTimestamp))
+                    .collect(Collectors.toList());
+
+            if (!resultedRecords.isEmpty()) {
+                LOGGER.debug("Records sent to Kafka: {}", resultedRecords);
+            }
+
+            return resultedRecords;
+        }
+        catch (Exception e) {
+            LOGGER.error("Task {}, caught exception e", taskUid, e);
+            throw e;
         }
 
-        return resultedRecords;
     }
 
     @Override

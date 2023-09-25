@@ -92,6 +92,10 @@ public class SyncEventMerger {
         var builder = currentContext.toBuilder();
 
         if (!currentContext.isLeader() || !currentContext.getRebalanceState().equals(RebalanceState.INITIAL_INCREMENTED_STATE_COMPLETED)) {
+            LOGGER.warn(
+                    "Task {}, skipped processing rebalance answer from task {} for rebalance generation id {}",
+                    currentContext.getTaskUid(), newMessage.getTaskUid(),
+                    newMessage.getRebalanceGenerationId());
             return builder.build();
         }
 
