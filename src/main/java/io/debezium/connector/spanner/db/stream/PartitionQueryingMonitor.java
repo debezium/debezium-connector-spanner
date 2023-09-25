@@ -32,7 +32,7 @@ import io.debezium.function.BlockingConsumer;
  */
 public class PartitionQueryingMonitor {
     private static final Logger LOGGER = LoggerFactory.getLogger(PartitionThreadPool.class);
-    private static final Duration CHECK_INTERVAL = Duration.of(5000, ChronoUnit.MILLIS);
+    private static final Duration CHECK_INTERVAL = Duration.of(60000, ChronoUnit.MILLIS);
 
     private final PartitionThreadPool partitionThreadPool;
     private final long heartBeatIntervalMillis;

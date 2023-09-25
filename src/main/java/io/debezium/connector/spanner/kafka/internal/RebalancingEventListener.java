@@ -138,10 +138,13 @@ public class RebalancingEventListener {
                     LOGGER.info("Task {} - unsubscribing rebalance handling consumer", task.getTaskUid());
                     consumer.unsubscribe();
                     consumer.close();
+                    LOGGER.info("Task {} - unsubscribed rebalance handling consumer", task.getTaskUid());
+                    return;
                 }
                 catch (org.apache.kafka.common.errors.InterruptException e) {
                     LOGGER.error("Task Uid {} caught exception when interrupting RebalancingEventListener", e);
                     Thread.currentThread().interrupt();
+                    return;
                 }
             }
         }, "SpannerConnector-RebalancingEventListener");
@@ -158,6 +161,7 @@ public class RebalancingEventListener {
     }
 
     public void shutdown() {
+        LOGGER.info("Task {} - shutting down rebalancing event listener", task.getTaskUid());
         this.resettableDelayedAction.clear();
 
         if (this.thread == null) {
@@ -167,8 +171,10 @@ public class RebalancingEventListener {
         this.thread.interrupt();
 
         while (!this.thread.getState().equals(Thread.State.TERMINATED)) {
+            LOGGER.info("Task {} - shutting down rebalancing event listener with state {}", task.getTaskUid(), this.thread.getState());
             this.thread.interrupt();
         }
+        LOGGER.info("Task {} - finished shutting down rebalancing event listener", task.getTaskUid());
         this.thread = null;
     }
 
