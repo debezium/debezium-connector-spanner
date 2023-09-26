@@ -137,12 +137,13 @@ public class RebalancingEventListener {
                 try {
                     LOGGER.info("Task {} - unsubscribing rebalance handling consumer", task.getTaskUid());
                     consumer.unsubscribe();
+                    LOGGER.info("Task {} - closing rebalance handling consumer", task.getTaskUid());
                     consumer.close();
-                    LOGGER.info("Task {} - unsubscribed rebalance handling consumer", task.getTaskUid());
+                    LOGGER.info("Task {} - finished closing rebalance handling consumer", task.getTaskUid());
                     return;
                 }
                 catch (org.apache.kafka.common.errors.InterruptException e) {
-                    LOGGER.error("Task Uid {} caught exception when interrupting RebalancingEventListener", e);
+                    LOGGER.error("Task Uid {} caught exception when interrupting RebalancingEventListener", task.getTaskUid(), e);
                     Thread.currentThread().interrupt();
                     return;
                 }
