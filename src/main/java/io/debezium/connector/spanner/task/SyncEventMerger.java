@@ -91,10 +91,6 @@ public class SyncEventMerger {
 
         var builder = currentContext.toBuilder();
 
-        if (!currentContext.isLeader() || !currentContext.getRebalanceState().equals(RebalanceState.INITIAL_INCREMENTED_STATE_COMPLETED)) {
-            return builder.build();
-        }
-
         TaskState newTask = newMessage.getTaskStates().get(newMessage.getTaskUid());
         if (newTask == null) {
             LOGGER.warn("The rebalance answer {} did not contain the task's UID: {}", newMessage, newMessage.getTaskUid());
