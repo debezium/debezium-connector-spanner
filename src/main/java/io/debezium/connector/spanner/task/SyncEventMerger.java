@@ -93,7 +93,7 @@ public class SyncEventMerger {
 
         TaskState newTask = newMessage.getTaskStates().get(newMessage.getTaskUid());
         if (newTask == null) {
-            LOGGER.warn("The rebalance answer {} did not contain the task's UID: {}", newMessage, newMessage.getTaskUid());
+            LOGGER.warn("Task {}, The rebalance answer {} did not contain the task's UID: {}", currentContext.getTaskUid(), newMessage, newMessage.getTaskUid());
             return builder.build();
         }
 
@@ -123,6 +123,12 @@ public class SyncEventMerger {
                     result.getNumPartitions(), result.getNumSharedPartitions(), oldPartitions);
 
             return result;
+        }
+        else {
+            LOGGER.info(
+                    "Task {}, Skipping rebalance answer from task {} for rebalance generation id {}",
+                    currentContext.getTaskUid(), newMessage.getTaskUid(),
+                    newMessage.getRebalanceGenerationId());
         }
         LOGGER.debug("merge: final state is not changed");
 
