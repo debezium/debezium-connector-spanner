@@ -52,7 +52,7 @@ class SchemaRegistryTest {
         when(databaseClient.readOnlyTransaction(any())).thenReturn(readOnlyTransaction);
 
         SchemaRegistry schemaRegistry = new SchemaRegistry("Stream Name", new SchemaDao(databaseClient), mock(Runnable.class));
-        schemaRegistry.init();
+        schemaRegistry.init("taskUid");
 
         verify(databaseClient, atLeast(1)).readOnlyTransaction(any());
         verify(readOnlyTransaction, atLeast(1)).executeQuery(any(), any());

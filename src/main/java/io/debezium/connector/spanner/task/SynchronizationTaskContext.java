@@ -190,7 +190,13 @@ public class SynchronizationTaskContext {
             this.lowWatermarkCalculationJob.start();
 
             LOGGER.info("{}, Init Schema Registry", task.getTaskUid());
-            this.schemaRegistry.init();
+            try {
+                this.schemaRegistry.init(this.task.getTaskUid());
+            }
+            catch (Exception e) {
+                LOGGER.error("{}, Init Schema Registry failure", task.getTaskUid());
+                throw e;
+            }
 
             LOGGER.info("{}, Start Processing Task State Change Event Processor", task.getTaskUid());
             this.taskStateChangeEventProcessor.startProcessing();
@@ -201,7 +207,12 @@ public class SynchronizationTaskContext {
             LOGGER.info("{}, Finished updating TaskSyncContextHolder", task.getTaskUid());
 
         }
-        catch (Throwable ex) {
+        catch (InterruptedException ex) {
+            LOGGER.error("Interrupted exception during SynchronizationTaskContext starting", ex);
+            this.onError(ex);
+
+        }
+        catch (Exception ex) {
             LOGGER.error("Exception during SynchronizationTaskContext starting", ex);
             this.onError(ex);
         }

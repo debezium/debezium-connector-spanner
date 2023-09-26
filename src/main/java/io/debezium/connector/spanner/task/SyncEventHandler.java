@@ -63,11 +63,12 @@ public class SyncEventHandler {
             if (inSync != null) {
                 long inGeneration = inSync.getRebalanceGenerationId();
                 long currentGeneration = taskSyncContextHolder.get().getRebalanceGenerationId();
-                LOGGER.info("Task {}, skipFromMismatchingGeneration: currentGen: {}, inGen: {}, inTaskUid: {}, message type {}",
+                LOGGER.info("Task {}, skipFromMismatchingGeneration: currentGen: {}, inGen: {}, inTaskUid: {}, message type {}, received rebalance generation ID {}",
                         taskSyncContextHolder.get().getTaskUid(),
                         currentGeneration, inGeneration,
                         inSync.getTaskUid(),
-                        inSync.getMessageType());
+                        inSync.getMessageType(),
+                        taskSyncContextHolder.get().getRebalanceGenerationId());
             }
             if (metadata.isCanInitiateRebalancing()) {
                 LOGGER.info("task {}, finished processing all previous sync event messages with end offset {}, can initiate rebalancing with rebalance generation ID {}",
@@ -172,15 +173,19 @@ public class SyncEventHandler {
     private boolean skipFromMismatchingGeneration(TaskSyncEvent inSync) {
         if (inSync != null) {
             long inGeneration = inSync.getRebalanceGenerationId();
+            long lastReceivedGeneration = taskSyncContextHolder.get().getReceivedRebalanceGenerationId();
             long currentGeneration = taskSyncContextHolder.get().getRebalanceGenerationId();
 
             // For REGULAR type messages, we filter them out in SyncEventMerger if the preexisting
             // task states map does not contain them, and if the state timestamp is not greater.
 
             if (inSync.getMessageType() == MessageTypeEnum.NEW_EPOCH
-                    || inSync.getMessageType() == MessageTypeEnum.REBALANCE_ANSWER
                     || inSync.getMessageType() == MessageTypeEnum.UPDATE_EPOCH) {
                 return inGeneration < currentGeneration;
+            }
+
+            if (inSync.getMessageType() == MessageTypeEnum.REBALANCE_ANSWER) {
+                return inGeneration < currentGeneration || inGeneration < lastReceivedGeneration;
             }
         }
         return false;
@@ -192,9 +197,10 @@ public class SyncEventHandler {
         }
 
         if (skipFromMismatchingGeneration(inSync)) {
-            LOGGER.info("Task {}, skipping message from task {}, from prior generation {} and message type {} with current generation {}",
+            LOGGER.info(
+                    "Task {}, skipping message from task {}, from prior generation {} and message type {} with current generation {} and received rebalance generation {}",
                     taskSyncContextHolder.get().getTaskUid(), inSync.getTaskUid(), inSync.getRebalanceGenerationId(), inSync.getMessageType(),
-                    taskSyncContextHolder.get().getRebalanceGenerationId());
+                    taskSyncContextHolder.get().getRebalanceGenerationId(), taskSyncContextHolder.get().getReceivedRebalanceGenerationId());
             return;
         }
 

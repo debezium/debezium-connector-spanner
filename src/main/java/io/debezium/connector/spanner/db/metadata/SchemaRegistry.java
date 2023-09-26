@@ -51,11 +51,13 @@ public class SchemaRegistry {
         this.schemaResetTrigger = schemaResetTrigger;
     }
 
-    public void init() {
+    public void init(String taskUid) {
         // Always initialize the schema registry to current time so the connector can start
         // successfully even when the gcp.spanner.start.time from configuration is out of
         // the maximum retention window.
-        forceUpdateSchema(null, Timestamp.now(), null);
+        LOGGER.info("Task Uid, initializing schema registry", taskUid);
+        forceUpdateSchema(taskUid, null, Timestamp.now(), null);
+        LOGGER.info("Task Uid, done initializing schema registry", taskUid);
     }
 
     public synchronized TableSchema getWatchedTable(TableId tableId) {
@@ -104,7 +106,7 @@ public class SchemaRegistry {
         }
 
         LOGGER.info("Schema is outdated. Try to update schema registry...");
-        forceUpdateSchema(tableId, updatedTimestamp, rowType);
+        forceUpdateSchema("", tableId, updatedTimestamp, rowType);
         LOGGER.info("Schema registry has been updated to date {}", updatedTimestamp);
         return true;
     }
@@ -132,8 +134,9 @@ public class SchemaRegistry {
     }
 
     @VisibleForTesting
-    void forceUpdateSchema(@Nullable TableId tableId, Timestamp updatedTimestamp, @Nullable List<Column> rowTypes) {
+    void forceUpdateSchema(String taskUid, @Nullable TableId tableId, Timestamp updatedTimestamp, @Nullable List<Column> rowTypes) {
         try {
+            LOGGER.info("Task {}, started updating schema registry", taskUid);
             this.timestamp = updatedTimestamp;
             this.changeStream = schemaDao.getStream(timestamp, streamName);
 
@@ -154,18 +157,24 @@ public class SchemaRegistry {
                 return;
             }
             this.spannerSchema = SchemaMerger.merge(this.spannerSchema, newSchema);
+            LOGGER.info("Task {} merged schema ", taskUid);
         }
         catch (SpannerException e) {
             // To prevent potential data loss when schema is updated but connector tries to query old schema out of the maximum retention window,
             // we first catch the spanner exception and verify the cause. If it indicates a exceed maximum timestamp staleness message with an
             // error code of FAILED_PRECONDITION, perform a manual update to merge the out of retention schema with current schema. Otherwise the
             // exception not match this scenario is re-throwed.
+            LOGGER.error("Task {} received exception {} when initializing schema registry", taskUid, e);
             if (e.getMessage().contains("has exceeded the maximum timestamp staleness") && e.getErrorCode().equals(ErrorCode.FAILED_PRECONDITION)) {
                 updateSchemaFromStaleTimestamp(tableId, timestamp, rowTypes);
             }
             else {
                 throw e;
             }
+        }
+        catch (Exception e) {
+            LOGGER.error("Task {} received exception {} when initializing schema registry", taskUid, e);
+            throw e;
         }
     }
 
