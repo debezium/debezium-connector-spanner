@@ -160,8 +160,8 @@ public class SyncEventHandler {
 
     public void processRebalanceAnswer(TaskSyncEvent inSync, SyncEventMetadata metadata) {
 
-        LOGGER.debug("Task {} - process sync event - rebalance answer",
-                taskSyncContextHolder.get().getTaskUid());
+        LOGGER.info("Task {} - process sync event - rebalance answer from task {} with generation {}",
+                taskSyncContextHolder.get().getTaskUid(), inSync.getTaskUid(), inSync.getRebalanceGenerationId());
 
         taskSyncContextHolder.update(context -> SyncEventMerger.mergeRebalanceAnswer(context, inSync));
 
