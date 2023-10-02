@@ -221,7 +221,13 @@ public class SynchronizationTaskContext {
     public void destroy() {
 
         try {
-            this.rebalancingEventListener.shutdown();
+            try {
+                this.rebalancingEventListener.shutdown();
+            }
+            catch (Exception e) {
+                LOGGER.error("Task {}, exception during rebalancing event listener shutdown", e);
+                throw e;
+            }
             LOGGER.info("Task {}, Shut down rebalancingEventListener", this.taskSyncContextHolder.get().getTaskUid());
 
             this.taskSyncEventListener.shutdown();
@@ -240,8 +246,11 @@ public class SynchronizationTaskContext {
             LOGGER.info("Task {}, Shut down rebalance handler", this.taskSyncContextHolder.get().getTaskUid());
 
         }
-        catch (Throwable ex) {
+        catch (Exception ex) {
             LOGGER.warn("Task {}, Exception during sync context destroying", this.taskSyncContextHolder.get().getTaskUid(), ex);
+        }
+        finally {
+            LOGGER.info("Task {}, SynchronizationTaskContext end", this.taskSyncContextHolder.get().getTaskUid());
         }
 
     }
@@ -255,16 +264,16 @@ public class SynchronizationTaskContext {
     private void onError(Throwable throwable) {
         LOGGER.info("Task {}, enqueueing error in task", this.taskSyncContextHolder.get().getTaskUid(), throwable);
         this.errorHandler.setProducerThrowable(throwable);
-        if (this.rebalancingEventListener != null) {
-            try {
-                LOGGER.info("Task {}, shutting down rebalancing event listener due to error in task", this.taskSyncContextHolder.get().getTaskUid(), throwable);
-                this.rebalancingEventListener.shutdown();
-            }
-            catch (Exception e) {
-                LOGGER.info("Task {}, caught exception when shutting down rebalancing event listener due to error in task", this.taskSyncContextHolder.get().getTaskUid(),
-                        e);
-            }
-        }
+        // if (this.rebalancingEventListener != null) {
+        // try {
+        // LOGGER.info("Task {}, shutting down rebalancing event listener due to error in task", this.taskSyncContextHolder.get().getTaskUid(), throwable);
+        // this.rebalancingEventListener.shutdown();
+        // }
+        // catch (Exception e) {
+        // LOGGER.info("Task {}, caught exception when shutting down rebalancing event listener due to error in task", this.taskSyncContextHolder.get().getTaskUid(),
+        // e);
+        // }
+        // }
     }
 
     private void onFinish() {

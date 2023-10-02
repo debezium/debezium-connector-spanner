@@ -247,6 +247,8 @@ public class TaskSyncEventListener {
 
     private void shutdownConsumer(Consumer<String, byte[]> consumer) {
         try {
+            LOGGER.info("TaskSyncEventListener, Lost connectivity {}", consumerGroup);
+            errorHandler.accept(new SpannerConnectorException("Lost connectivity to the sync topic"));
             LOGGER.info("TaskSyncEventListener, Shutting down consumer {}", consumerGroup);
             consumer.unsubscribe();
             consumer.close();
