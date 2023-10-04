@@ -126,7 +126,7 @@ public class RebalancingEventListener {
                         }
                     }
                     catch (org.apache.kafka.common.errors.InterruptException e) {
-                        LOGGER.error("Task Uid {} caught exception when interrupting RebalancingEventListener", e);
+                        LOGGER.error("Task Uid {} caught exception when interrupting RebalancingEventListener", task, e);
                         Thread.currentThread().interrupt();
                         return;
                     }
@@ -134,12 +134,15 @@ public class RebalancingEventListener {
 
             }
             finally {
+                LOGGER.info("Task {} - lost connectivity to rebalance topic", task.getTaskUid());
+                errorHandler.accept(new SpannerConnectorException("Error during poll from the Rebalance Topic"));
                 try {
                     LOGGER.info("Task {} - unsubscribing rebalance handling consumer", task.getTaskUid());
                     consumer.unsubscribe();
                     LOGGER.info("Task {} - closing rebalance handling consumer", task.getTaskUid());
                     consumer.close();
                     LOGGER.info("Task {} - finished closing rebalance handling consumer", task.getTaskUid());
+
                     return;
                 }
                 catch (org.apache.kafka.common.errors.InterruptException e) {
@@ -169,14 +172,25 @@ public class RebalancingEventListener {
             return;
         }
 
-        this.thread.interrupt();
+        try {
 
-        while (!this.thread.getState().equals(Thread.State.TERMINATED)) {
-            LOGGER.info("Task {} - shutting down rebalancing event listener with state {}", task.getTaskUid(), this.thread.getState());
             this.thread.interrupt();
+
+            while (!this.thread.getState().equals(Thread.State.TERMINATED)) {
+                LOGGER.info("Task {} - shutting down rebalancing event listener with state {}", task.getTaskUid(), this.thread.getState());
+                this.thread.interrupt();
+            }
+            LOGGER.info("Task {} - finished shutting down rebalancing event listener", task.getTaskUid());
+            this.thread = null;
         }
-        LOGGER.info("Task {} - finished shutting down rebalancing event listener", task.getTaskUid());
-        this.thread = null;
+        catch (Exception e) {
+            LOGGER.info("Task {} - caught exception when shutting down rebalancing event listener", task.getTaskUid(), e);
+            throw e;
+        }
+        finally {
+            LOGGER.info("Task {} - finished shutting down rebalancing event listener", task.getTaskUid());
+
+        }
     }
 
 }
