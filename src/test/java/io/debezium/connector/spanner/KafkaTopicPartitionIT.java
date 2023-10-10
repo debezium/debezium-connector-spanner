@@ -68,6 +68,7 @@ public class KafkaTopicPartitionIT extends AbstractSpannerConnectorIT {
         assertThat(records).hasSize(4); // 2 * (insert + update)
         Map<Object, List<SourceRecord>> keyToRecords = records.stream()
                 .collect(Collectors.groupingBy(SourceRecord::key));
+        assertThat(keyToRecords).hasSize(2);
         keyToRecords.values().forEach(keyRecordsGroup -> {
             assertEquals(2, keyRecordsGroup.size());
             SourceRecord record1 = keyRecordsGroup.get(0);

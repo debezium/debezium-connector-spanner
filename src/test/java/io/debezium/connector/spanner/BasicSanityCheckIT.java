@@ -13,6 +13,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 
+import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -62,6 +63,7 @@ public class BasicSanityCheckIT extends AbstractSpannerConnectorIT {
                 .build();
         start(SpannerConnector.class, config, (success, msg, error) -> {
             assertThat(success).isFalse();
+            assertThat(msg.contains("ChangeStream 'fooBar' doesn't exist or you don't have sufficient permissions"));
         });
         assertConnectorNotRunning();
     }
@@ -83,7 +85,6 @@ public class BasicSanityCheckIT extends AbstractSpannerConnectorIT {
 
     @Test
     public void shouldStreamUpdatesToKafka() throws InterruptedException {
-        System.out.println("test hahahaha");
         final Configuration config = Configuration.copy(baseConfig)
                 .with("gcp.spanner.change.stream", changeStreamName)
                 .with("name", tableName + "_test")
@@ -99,7 +100,12 @@ public class BasicSanityCheckIT extends AbstractSpannerConnectorIT {
         waitForCDC();
         SourceRecords sourceRecords = consumeRecordsByTopic(10, false);
         List<SourceRecord> records = sourceRecords.recordsForTopic(getTopicName(config, tableName));
-        assertThat(records).hasSize(4); // insert + update + delete + TOMBSTONE
+        assertThat(records).hasSize(4);
+        // Verify that mod types are create + update + delete + TOMBSTONE in order.
+        assertThat((String) ((Struct) (records.get(0).value())).get("op")).isEqualTo("c");
+        assertThat((String) ((Struct) (records.get(1).value())).get("op")).isEqualTo("u");
+        assertThat((String) ((Struct) (records.get(2).value())).get("op")).isEqualTo("d");
+        assertThat(records.get(3).value()).isEqualTo(null);
         stopConnector();
         assertConnectorNotRunning();
     }
