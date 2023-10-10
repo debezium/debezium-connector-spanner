@@ -84,12 +84,6 @@ public class ConnectionValidator implements ConfigurationValidator.Validator {
             return this;
         }
 
-        if (FieldValidator.isSpecified(host) && isAgainstEmulator) {
-            LOGGER.error(HOST_CONFLICT);
-            context.error(HOST_CONFLICT, SPANNER_HOST, SPANNER_EMULATOR_HOST);
-            result = false;
-            return this;
-        }
         return this;
     }
 

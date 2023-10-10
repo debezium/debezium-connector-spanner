@@ -590,34 +590,6 @@
                     </execution>
                 </executions>
             </plugin>
-            <!-- <plugin>
-                <groupId>io.fabric8</groupId>
-                <artifactId>docker-maven-plugin</artifactId>
-                <executions>
-                    <execution>
-                        <id>build</id>
-                        <phase>package</phase>
-                        <goals>
-                            <goal>build</goal>
-                        </goals>
-                    </execution>
-                </executions>
-                <configuration>
-                    <repository>${docker.repository.name}</repository>
-                    <pushImage>true</pushImage>
-                    <skip>${docker.skip.push}</skip>
-                    <images>
-                        <image>
-                            <name>${docker.repository.name}:${docker.tag.name}</name>
-                            <build>
-                                <contextDir>${project.basedir}</contextDir>
-                                <dockerFile>${project.basedir}/src/test/docker/Dockerfile</dockerFile>
-                                <filter>@</filter>
-                            </build>
-                        </image>
-                    </images>
-                </configuration>
-            </plugin> -->
         </plugins>
         <resources>
             <!-- Apply the properties set in the POM to the resource files -->

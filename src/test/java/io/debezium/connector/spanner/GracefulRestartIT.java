@@ -12,6 +12,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 
+import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -53,14 +54,15 @@ public class GracefulRestartIT extends AbstractSpannerConnectorIT {
         databaseConnection.executeUpdate("insert into " + tableName + "(id, name) values (1, 'some name')");
         SourceRecords sourceRecords = consumeRecordsByTopic(5, false);
         List<SourceRecord> records = sourceRecords.recordsForTopic(getTopicName(config, tableName));
-        assertThat(records).hasSize(1); // insert
+        assertThat(records).hasSize(1); // create
         stopConnector();
         assertConnectorNotRunning();
         databaseConnection.executeUpdate("update " + tableName + " set name = 'test' where id = 1");
         start(SpannerConnector.class, config);
         SourceRecords sourceRecords2 = consumeRecordsByTopic(10, false);
         List<SourceRecord> records2 = sourceRecords2.recordsForTopic(getTopicName(config, tableName));
-        assertThat(records2).hasSizeGreaterThanOrEqualTo(1); // insert + update
+        assertThat(records2).hasSizeGreaterThanOrEqualTo(1); // create + update
+        assertThat((String) ((Struct) (records2.get(0).value())).get("op")).isEqualTo("c");
         stopConnector();
         assertConnectorNotRunning();
     }
