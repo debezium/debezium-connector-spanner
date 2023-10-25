@@ -14,6 +14,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import org.apache.kafka.connect.data.Struct;
@@ -23,6 +24,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import io.debezium.config.Configuration;
+import io.debezium.util.Testing;
 
 public class KafkaTopicPartitionIT extends AbstractSpannerConnectorIT {
 
@@ -38,7 +40,7 @@ public class KafkaTopicPartitionIT extends AbstractSpannerConnectorIT {
 
         databaseConnection.createChangeStream(changeStreamName, tableName);
 
-        System.out.println("KafkaTopicPartitionIT is ready...");
+        Testing.print("KafkaTopicPartitionIT is ready...");
     }
 
     @AfterAll
@@ -62,7 +64,7 @@ public class KafkaTopicPartitionIT extends AbstractSpannerConnectorIT {
         databaseConnection.executeUpdate("update " + tableName + " set name = 'test' where id = 1");
         databaseConnection.executeUpdate("insert into " + tableName + "(id, name) values (2, 'test name')");
         databaseConnection.executeUpdate("update " + tableName + " set bool = true where id = 2");
-        waitForCDC();
+        waitForAvailableRecords(waitTimeForRecords(), TimeUnit.SECONDS);
         SourceRecords sourceRecords = consumeRecordsByTopic(10, false);
         List<SourceRecord> records = sourceRecords.recordsForTopic(getTopicName(config, tableName));
         assertThat(records).hasSize(4); // 2 * (insert + update)

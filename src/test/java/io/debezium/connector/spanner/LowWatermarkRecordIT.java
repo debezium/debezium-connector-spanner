@@ -15,6 +15,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import org.apache.kafka.connect.data.Struct;
@@ -24,6 +25,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import io.debezium.config.Configuration;
+import io.debezium.util.Testing;
 
 public class LowWatermarkRecordIT extends AbstractSpannerConnectorIT {
 
@@ -35,7 +37,7 @@ public class LowWatermarkRecordIT extends AbstractSpannerConnectorIT {
         databaseConnection.createTable(tableName + "(id int64, name string(100)) primary key(id)");
         databaseConnection.createChangeStream(changeStreamName, tableName);
 
-        System.out.println("LowWatermarkRecordIT is ready...");
+        Testing.print("LowWatermarkRecordIT is ready...");
     }
 
     @AfterAll
@@ -59,7 +61,7 @@ public class LowWatermarkRecordIT extends AbstractSpannerConnectorIT {
         assertConnectorIsRunning();
         databaseConnection.executeUpdate("insert into " + tableName + "(id, name) values (1, 'some name')");
         databaseConnection.executeUpdate("update " + tableName + " set name = 'test' where id = 1");
-        waitForCDC();
+        waitForAvailableRecords(waitTimeForRecords(), TimeUnit.SECONDS);
         SourceRecords sourceRecords = consumeRecordsByTopic(10, false);
         List<SourceRecord> records = sourceRecords.recordsForTopic(getTopicName(config, tableName));
         List<Long> lowWatermarks = records.stream()

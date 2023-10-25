@@ -13,23 +13,18 @@ import java.util.Set;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.ListTopicsResult;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.ContainerState;
 import org.testcontainers.containers.DockerComposeContainer;
 import org.testcontainers.containers.wait.strategy.Wait;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
-public class KafkaEnvironment {
+import io.debezium.util.Testing;
 
-    private static final Logger LOG = LoggerFactory.getLogger(KafkaEnvironment.class);
+public class KafkaEnvironment {
 
     private static final String KAFKA_BROKER_SERVICE_NAME = "broker_1";
     private static final int KAFKA_BROKER_SERVICE_API_PORT = 9092;
-
-    private static final String SCHEMA_REGISTRY_NAME = "schema-registry_1";
-    private static final int SCHEMA_REGISTRY_API_PORT = 8081;
 
     public static final Duration STARTUP_TIMEOUT = Duration.ofSeconds(200L);
     public static final Duration STARTUP_CONNECTOR_TIMEOUT = Duration.ofSeconds(600L);
@@ -47,33 +42,27 @@ public class KafkaEnvironment {
     private KafkaBrokerApi<GenericRecord, GenericRecord> brokerApiGr;
 
     public KafkaEnvironment(String dockerComposeFilePath) {
-        System.out.println("Initializing kafka environment for IT test...");
+        Testing.Print.enable();
+        Testing.print("Initializing kafka environment for IT test...");
         this.composeContainer = new DockerComposeContainer(new File(dockerComposeFilePath))
                 .withExposedService(KAFKA_BROKER_SERVICE_NAME, KAFKA_BROKER_SERVICE_API_PORT,
-                        Wait.forListeningPort().withStartupTimeout(STARTUP_TIMEOUT))
-                .withExposedService(SCHEMA_REGISTRY_NAME, SCHEMA_REGISTRY_API_PORT,
                         Wait.forListeningPort().withStartupTimeout(STARTUP_TIMEOUT));
-        System.out.println("Finished initializing kafka environment.");
+        Testing.print("Finished initializing kafka environment.");
     }
 
     public void start() {
 
-        System.out.println("Starting Kafka environment");
+        Testing.print("Starting Kafka environment");
         this.composeContainer.start();
         ContainerState brokerState = (ContainerState) composeContainer
                 .getContainerByServiceName(KAFKA_BROKER_SERVICE_NAME)
                 .orElseThrow();
 
         this.brokerApiOn = KafkaBrokerApi.createKafkaBrokerApiObjectNode(brokerState, KAFKA_BROKER_SERVICE_API_PORT);
-        this.brokerApiGr = KafkaBrokerApi.createKafkaBrokerApiGenericRecord(brokerState, KAFKA_BROKER_SERVICE_API_PORT);
     }
 
     public KafkaBrokerApi<ObjectNode, ObjectNode> kafkaBrokerApiOn() {
         return brokerApiOn;
-    }
-
-    public KafkaBrokerApi<GenericRecord, GenericRecord> kafkaBrokerApiGr() {
-        return brokerApiGr;
     }
 
     public boolean isStarted() {
@@ -103,7 +92,7 @@ public class KafkaEnvironment {
             adminClient.deleteTopics(topics);
         }
         catch (Exception e) {
-            System.out.println(e.getMessage());
+            Testing.print(e.getMessage());
         }
     }
 }
