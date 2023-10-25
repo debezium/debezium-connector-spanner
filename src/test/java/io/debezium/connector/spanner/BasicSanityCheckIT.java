@@ -12,6 +12,7 @@ import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
@@ -97,7 +98,7 @@ public class BasicSanityCheckIT extends AbstractSpannerConnectorIT {
         databaseConnection.executeUpdate("insert into " + tableName + "(id, name) values (1, 'some name')");
         databaseConnection.executeUpdate("update " + tableName + " set name = 'test' where id = 1");
         databaseConnection.executeUpdate("delete from " + tableName + " where id = 1");
-        waitForCDC();
+        waitForAvailableRecords(waitTimeForRecords(), TimeUnit.SECONDS);
         SourceRecords sourceRecords = consumeRecordsByTopic(10, false);
         List<SourceRecord> records = sourceRecords.recordsForTopic(getTopicName(config, tableName));
         assertThat(records).hasSize(4);

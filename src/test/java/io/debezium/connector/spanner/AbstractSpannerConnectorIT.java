@@ -6,12 +6,14 @@
 package io.debezium.connector.spanner;
 
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 
 import io.debezium.config.Configuration;
 import io.debezium.connector.spanner.util.Connection;
 import io.debezium.connector.spanner.util.Database;
 import io.debezium.connector.spanner.util.KafkaEnvironment;
 import io.debezium.embedded.AbstractConnectorTest;
+import io.debezium.util.Testing;
 
 public class AbstractSpannerConnectorIT extends AbstractConnectorTest {
 
@@ -19,10 +21,11 @@ public class AbstractSpannerConnectorIT extends AbstractConnectorTest {
             KafkaEnvironment.DOCKER_COMPOSE_FILE);
     protected static final Database database = Database.TEST_DATABASE;
     protected static final Connection databaseConnection = database.getConnection();
-    protected static final int WAIT_FOR_CDC = 1000;
+    private static final String TEST_PROPERTY_PREFIX = "debezium.test.";
 
     static {
         if (!KAFKA_ENVIRONMENT.isStarted()) {
+            Testing.Print.enable();
             KAFKA_ENVIRONMENT.start();
             KAFKA_ENVIRONMENT.setStarted();
         }
@@ -42,20 +45,20 @@ public class AbstractSpannerConnectorIT extends AbstractConnectorTest {
             .with("gcp.spanner.low-watermark.enabled", false)
             .build();
 
-    @AfterAll
-    public static void after() throws InterruptedException {
-        System.out.println("Cleaning up kafka...");
-        KAFKA_ENVIRONMENT.clearTopics();
-        System.out.println("Cleaning complete!");
+    @BeforeAll
+    public static void before() throws InterruptedException {
+        Testing.Print.enable();
     }
 
-    protected static void waitForCDC() {
-        try {
-            Thread.sleep(WAIT_FOR_CDC);
-        }
-        catch (Exception e) {
+    @AfterAll
+    public static void after() throws InterruptedException {
+        Testing.print("Cleaning up kafka...");
+        KAFKA_ENVIRONMENT.clearTopics();
+        Testing.print("Cleaning complete!");
+    }
 
-        }
+    public static int waitTimeForRecords() {
+        return Integer.parseInt(System.getProperty(TEST_PROPERTY_PREFIX + "records.waittime", "3"));
     }
 
     protected String getTopicName(Configuration config, String tableName) {
