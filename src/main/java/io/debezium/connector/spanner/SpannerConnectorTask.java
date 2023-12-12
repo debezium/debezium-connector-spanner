@@ -196,6 +196,9 @@ public class SpannerConnectorTask extends SpannerBaseSourceTask {
         NotificationService<SpannerPartition, SpannerOffsetContext> notificationService = new NotificationService<>(getNotificationChannels(),
                 connectorConfig, SchemaFactory.get(), dispatcher::enqueueNotification);
 
+        // Service providers
+        registerServiceProviders(connectorConfig.getServiceRegistry());
+
         this.coordinator = new SpannerChangeEventSourceCoordinator(
                 getInitialOffsets(),
                 errorHandler,
