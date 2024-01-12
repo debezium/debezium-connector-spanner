@@ -270,6 +270,131 @@ class ChangeStreamRecordMapperTest {
                 changeStreamRecordMapper.toChangeStreamEvents(partition, resultSet, resultSetMetadata));
     }
 
+    /*
+     * Change streams with NEW_ROW_AND_OLD_VALUES value capture type do not track
+     * non-changed old values.
+     */
+    @Test
+    public void testMappingUpdateJsonRowNewRowAndOldValuesToDataChangeRecord() {
+        final DataChangeEvent dataChangeRecord = new DataChangeEvent(
+                "partitionToken",
+                Timestamp.ofTimeSecondsAndNanos(10L, 20),
+                "serverTransactionId",
+                true,
+                "1",
+                "tableName",
+                Arrays.asList(
+                        new Column("column1", ColumnTypeParser.parse("{\"code\":\"INT64\"}"), true,
+                                1L, false),
+                        new Column("column2", ColumnTypeParser.parse("{\"code\":\"BYTES\"}"), false,
+                                2L, true),
+                        new Column("column3", ColumnTypeParser.parse("{\"code\":\"STRING\"}"),
+                                false,
+                                3L, true)),
+                Collections.singletonList(
+                        new Mod(1, MapperUtils.getJsonNode("{\"column1\":\"value1\"}"),
+                                MapperUtils.getJsonNode("{\"column3\":\"oldValue3\"}"),
+                                MapperUtils.getJsonNode(
+                                        "{\"column2\":\"newValue2\",\"column3\":\"newValue3\"}"))),
+                ModType.UPDATE,
+                ValueCaptureType.NEW_ROW_AND_OLD_VALUES,
+                10L,
+                2L,
+                "transactionTag",
+                true,
+                changeStreamRecordMapper.streamEventMetadataFrom(partition,
+                        Timestamp.ofTimeSecondsAndNanos(10L, 20), resultSetMetadata));
+        final String jsonString = TestJsonMapper.recordToJson(dataChangeRecord, false, false);
+
+        assertNotNull(jsonString);
+        ChangeStreamResultSet resultSet = mock(ChangeStreamResultSet.class);
+        when(resultSet.getPgJsonb(0)).thenReturn(jsonString);
+        assertEquals(
+                Collections.singletonList(dataChangeRecord),
+                changeStreamRecordMapper.toChangeStreamEvents(partition, resultSet, resultSetMetadata));
+    }
+
+    @Test
+    public void testMappingInsertJsonRowNewRowAndOldValuesToDataChangeRecord() {
+        final DataChangeEvent dataChangeRecord = new DataChangeEvent(
+                "partitionToken",
+                Timestamp.ofTimeSecondsAndNanos(10L, 20),
+                "serverTransactionId",
+                true,
+                "1",
+                "tableName",
+                Arrays.asList(
+                        new Column("column1", ColumnTypeParser.parse("{\"code\":\"INT64\"}"), true,
+                                1L, false),
+                        new Column("column2", ColumnTypeParser.parse("{\"code\":\"BYTES\"}"), false,
+                                2L, true),
+                        new Column("column3", ColumnTypeParser.parse("{\"code\":\"STRING\"}"),
+                                false,
+                                3L, true)),
+                Collections.singletonList(
+                        new Mod(1, MapperUtils.getJsonNode("{\"column1\":\"value1\"}"),
+                                MapperUtils.getJsonNode("{}"),
+                                MapperUtils.getJsonNode(
+                                        "{\"column2\":\"newValue2\",\"column3\":\"newValue3\"}"))),
+                ModType.INSERT,
+                ValueCaptureType.NEW_ROW_AND_OLD_VALUES,
+                10L,
+                2L,
+                "transactionTag",
+                true,
+                changeStreamRecordMapper.streamEventMetadataFrom(partition,
+                        Timestamp.ofTimeSecondsAndNanos(10L, 20), resultSetMetadata));
+        final String jsonString = TestJsonMapper.recordToJson(dataChangeRecord, false, false);
+
+        assertNotNull(jsonString);
+        ChangeStreamResultSet resultSet = mock(ChangeStreamResultSet.class);
+        when(resultSet.getPgJsonb(0)).thenReturn(jsonString);
+        assertEquals(
+                Collections.singletonList(dataChangeRecord),
+                changeStreamRecordMapper.toChangeStreamEvents(partition, resultSet, resultSetMetadata));
+    }
+
+    @Test
+    public void testMappingDeletesonRowNewRowAndOldValuesToDataChangeRecord() {
+        final DataChangeEvent dataChangeRecord = new DataChangeEvent(
+                "partitionToken",
+                Timestamp.ofTimeSecondsAndNanos(10L, 20),
+                "serverTransactionId",
+                true,
+                "1",
+                "tableName",
+                Arrays.asList(
+                        new Column("column1", ColumnTypeParser.parse("{\"code\":\"INT64\"}"), true,
+                                1L, false),
+                        new Column("column2", ColumnTypeParser.parse("{\"code\":\"BYTES\"}"), false,
+                                2L, true),
+                        new Column("column3", ColumnTypeParser.parse("{\"code\":\"STRING\"}"),
+                                false,
+                                3L, true)),
+                Collections.singletonList(
+                        new Mod(1, MapperUtils.getJsonNode("{\"column1\":\"value1\"}"),
+                                MapperUtils.getJsonNode(
+                                        "{\"column2\":\"newValue2\",\"column3\":\"newValue3\"}"),
+                                MapperUtils.getJsonNode(
+                                        "{}"))),
+                ModType.DELETE,
+                ValueCaptureType.NEW_ROW_AND_OLD_VALUES,
+                10L,
+                2L,
+                "transactionTag",
+                true,
+                changeStreamRecordMapper.streamEventMetadataFrom(partition,
+                        Timestamp.ofTimeSecondsAndNanos(10L, 20), resultSetMetadata));
+        final String jsonString = TestJsonMapper.recordToJson(dataChangeRecord, false, false);
+
+        assertNotNull(jsonString);
+        ChangeStreamResultSet resultSet = mock(ChangeStreamResultSet.class);
+        when(resultSet.getPgJsonb(0)).thenReturn(jsonString);
+        assertEquals(
+                Collections.singletonList(dataChangeRecord),
+                changeStreamRecordMapper.toChangeStreamEvents(partition, resultSet, resultSetMetadata));
+    }
+
     @Test
     public void testMappingJsonRowWithUnknownModTypeAndValueCaptureTypeToDataChangeRecord() {
         final DataChangeEvent dataChangeRecord = new DataChangeEvent(

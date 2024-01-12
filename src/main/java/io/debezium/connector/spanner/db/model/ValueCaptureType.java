@@ -13,5 +13,6 @@ public enum ValueCaptureType {
     OLD_AND_NEW_VALUES,
     NEW_ROW,
     NEW_VALUES,
+    NEW_ROW_AND_OLD_VALUES,
     UNKNOWN
 }
