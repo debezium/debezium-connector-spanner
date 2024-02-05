@@ -68,6 +68,7 @@ import io.debezium.pipeline.spi.OffsetContext;
 import io.debezium.pipeline.spi.Partition;
 import io.debezium.schema.DatabaseSchema;
 import io.debezium.schema.SchemaNameAdjuster;
+import io.debezium.snapshot.SnapshotterService;
 import io.debezium.spi.topic.TopicNamingStrategy;
 
 class SpannerStreamingChangeEventSourceTest {
@@ -155,7 +156,8 @@ class SpannerStreamingChangeEventSourceTest {
         ChangeEventSourceCoordinator<Partition, OffsetContext>.ChangeEventSourceContextImpl context = (new ChangeEventSourceCoordinator<>(
                 null, errorHandler1, connectorType, connectorConfig4, changeEventSourceFactory,
                 new DefaultChangeEventSourceMetricsFactory<>(), (EventDispatcher<Partition, ?>) mock(EventDispatcher.class),
-                (DatabaseSchema<?>) mock(DatabaseSchema.class), null, mock(NotificationService.class))).new ChangeEventSourceContextImpl();
+                (DatabaseSchema<?>) mock(DatabaseSchema.class), null, mock(NotificationService.class),
+                mock(SnapshotterService.class))).new ChangeEventSourceContextImpl();
         SpannerPartition partition = SpannerPartition.getInitialSpannerPartition();
         Configuration configuration7 = mock(Configuration.class);
         when(configuration7.getString((Field) any())).thenReturn("String");

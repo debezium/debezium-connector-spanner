@@ -19,6 +19,7 @@ import io.debezium.pipeline.notification.NotificationService;
 import io.debezium.pipeline.source.spi.ChangeEventSourceFactory;
 import io.debezium.pipeline.spi.Offsets;
 import io.debezium.schema.DatabaseSchema;
+import io.debezium.snapshot.SnapshotterService;
 
 /**
  * Coordinates Spanner ChangeEventSource to execute them in order
@@ -32,9 +33,9 @@ public class SpannerChangeEventSourceCoordinator extends ChangeEventSourceCoordi
                                                ChangeEventSourceFactory changeEventSourceFactory,
                                                ChangeEventSourceMetricsFactory changeEventSourceMetricsFactory,
                                                EventDispatcher eventDispatcher,
-                                               DatabaseSchema schema, NotificationService notificationService) {
+                                               DatabaseSchema schema, NotificationService notificationService, SnapshotterService snapshotterService) {
         super(previousOffsets, errorHandler, connectorType, connectorConfig, changeEventSourceFactory,
-                changeEventSourceMetricsFactory, eventDispatcher, schema, null, notificationService);
+                changeEventSourceMetricsFactory, eventDispatcher, schema, null, notificationService, snapshotterService);
     }
 
     public void commitRecords(List<SourceRecord> recordList) throws InterruptedException {
