@@ -15,6 +15,7 @@ import org.apache.kafka.connect.source.SourceRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import io.debezium.bean.StandardBeanNames;
 import io.debezium.config.Configuration;
 import io.debezium.connector.base.ChangeEventQueue;
 import io.debezium.connector.spanner.config.SpannerTableFilter;
@@ -49,6 +50,7 @@ import io.debezium.schema.DataCollectionFilters;
 import io.debezium.schema.DefaultTopicNamingStrategy;
 import io.debezium.schema.SchemaFactory;
 import io.debezium.schema.SchemaNameAdjuster;
+import io.debezium.snapshot.SnapshotterService;
 import io.debezium.spi.topic.TopicNamingStrategy;
 
 /** Spanner implementation for Debezium's CDC SourceTask */
@@ -196,8 +198,15 @@ public class SpannerConnectorTask extends SpannerBaseSourceTask {
         NotificationService<SpannerPartition, SpannerOffsetContext> notificationService = new NotificationService<>(getNotificationChannels(),
                 connectorConfig, SchemaFactory.get(), dispatcher::enqueueNotification);
 
+        // Manual Bean Registration
+        connectorConfig.getBeanRegistry().add(StandardBeanNames.CONFIGURATION, configuration);
+        connectorConfig.getBeanRegistry().add(StandardBeanNames.CONNECTOR_CONFIG, connectorConfig);
+        connectorConfig.getBeanRegistry().add(StandardBeanNames.DATABASE_SCHEMA, schema);
+
         // Service providers
         registerServiceProviders(connectorConfig.getServiceRegistry());
+
+        final SnapshotterService snapshotterService = connectorConfig.getServiceRegistry().tryGetService(SnapshotterService.class);
 
         this.coordinator = new SpannerChangeEventSourceCoordinator(
                 getInitialOffsets(),
@@ -208,7 +217,8 @@ public class SpannerConnectorTask extends SpannerBaseSourceTask {
                 new SpannerChangeEventSourceMetricsFactory(spannerMeter),
                 dispatcher,
                 schema,
-                notificationService);
+                notificationService,
+                snapshotterService);
 
         this.spannerMeter.start();
 
