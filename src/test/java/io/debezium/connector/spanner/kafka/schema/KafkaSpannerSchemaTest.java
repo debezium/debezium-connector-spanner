@@ -49,7 +49,7 @@ class KafkaSpannerSchemaTest {
         Assertions.assertEquals("adjust_test.Value.Envelope", tableSchema.getEnvelopeSchema().schema().name());
         Assertions.assertEquals(Schema.Type.STRUCT, tableSchema.getEnvelopeSchema().schema().type());
         Assertions.assertLinesMatch(
-                List.of("before", "after", "source", "op", "ts_ms", "transaction"),
+                List.of("before", "after", "source", "op", "ts_ms", "ts_us", "ts_ns", "transaction"),
                 tableSchema.getEnvelopeSchema().schema().fields().stream().map(Field::name).collect(Collectors.toList()));
         Assertions.assertEquals(testTableId, tableSchema.id());
         Assertions.assertNull(tableSchema.keySchema());
