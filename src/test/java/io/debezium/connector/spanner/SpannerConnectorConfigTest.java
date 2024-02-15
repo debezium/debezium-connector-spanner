@@ -63,22 +63,23 @@ class SpannerConnectorConfigTest {
         assertEquals("com.google.spanner.connector.Source", schemaResult.name());
         assertFalse(schemaResult.isOptional());
         List<org.apache.kafka.connect.data.Field> fieldsResult = schemaResult.fields();
-        assertEquals(23, fieldsResult.size());
+        assertEquals(25, fieldsResult.size());
         assertNull(schemaResult.doc());
+        fieldsResult.forEach(System.out::println);
         org.apache.kafka.connect.data.Field getResult = fieldsResult.get(0);
         assertTrue(getResult.schema() instanceof ConnectSchema);
         org.apache.kafka.connect.data.Field getResult1 = fieldsResult.get(1);
         assertTrue(getResult1.schema() instanceof ConnectSchema);
-        org.apache.kafka.connect.data.Field getResult2 = fieldsResult.get(17);
+        org.apache.kafka.connect.data.Field getResult2 = fieldsResult.get(19);
         assertTrue(getResult2.schema() instanceof ConnectSchema);
-        assertEquals(17, getResult2.index());
+        assertEquals(19, getResult2.index());
         assertEquals(0, getResult.index());
         assertEquals("version", getResult.name());
         assertEquals("system_transaction", getResult2.name());
         assertEquals(1, getResult1.index());
         assertEquals("connector", getResult1.name());
-        org.apache.kafka.connect.data.Field getResult3 = fieldsResult.get(Short.SIZE);
-        assertEquals(Short.SIZE, getResult3.index());
+        org.apache.kafka.connect.data.Field getResult3 = fieldsResult.get(18);
+        assertEquals(18, getResult3.index());
         assertEquals("transaction_tag", getResult3.name());
     }
 
