@@ -5,19 +5,15 @@
  */
 package io.debezium.connector.spanner;
 
-import java.util.Properties;
-
-import io.debezium.util.IoUtil;
+import io.debezium.util.VersionParser;
 
 public final class Module {
-
-    private static final Properties INFO = IoUtil.loadProperties(Module.class, "io/debezium/connector/spanner/build.properties");
 
     private Module() {
     }
 
     public static String version() {
-        return INFO.getProperty("version");
+        return VersionParser.getVersion();
     }
 
     /**
