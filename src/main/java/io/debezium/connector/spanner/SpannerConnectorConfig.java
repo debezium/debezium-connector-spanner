@@ -8,7 +8,10 @@ package io.debezium.connector.spanner;
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Properties;
+
+import javax.naming.OperationNotSupportedException;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.kafka.clients.CommonClientConfigs;
@@ -18,6 +21,7 @@ import org.slf4j.LoggerFactory;
 import com.google.cloud.Timestamp;
 
 import io.debezium.config.Configuration;
+import io.debezium.config.EnumeratedValue;
 import io.debezium.connector.SourceInfoStructMaker;
 import io.debezium.connector.spanner.config.BaseSpannerConnectorConfig;
 import io.debezium.connector.spanner.context.source.SourceInfo;
@@ -41,6 +45,16 @@ public class SpannerConnectorConfig extends BaseSpannerConnectorConfig {
     @Override
     public String getConnectorName() {
         return getConfig().getString(CONNECTOR_NAME_PROPERTY_NAME);
+    }
+
+    @Override
+    public EnumeratedValue getSnapshotMode() {
+        throw new RuntimeException(new OperationNotSupportedException("Snapshot is not supported by this connector"));
+    }
+
+    @Override
+    public Optional<? extends EnumeratedValue> getSnapshotLockingMode() {
+        throw new RuntimeException(new OperationNotSupportedException("Snapshot is not supported by this connector"));
     }
 
     @Override

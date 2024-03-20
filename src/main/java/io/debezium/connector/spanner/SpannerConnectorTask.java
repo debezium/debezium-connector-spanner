@@ -46,10 +46,12 @@ import io.debezium.connector.spanner.task.TaskUid;
 import io.debezium.pipeline.DataChangeEvent;
 import io.debezium.pipeline.notification.NotificationService;
 import io.debezium.pipeline.source.spi.EventMetadataProvider;
+import io.debezium.processors.PostProcessorRegistryServiceProvider;
 import io.debezium.schema.DataCollectionFilters;
 import io.debezium.schema.DefaultTopicNamingStrategy;
 import io.debezium.schema.SchemaFactory;
 import io.debezium.schema.SchemaNameAdjuster;
+import io.debezium.service.spi.ServiceRegistry;
 import io.debezium.snapshot.SnapshotterService;
 import io.debezium.spi.topic.TopicNamingStrategy;
 
@@ -298,5 +300,12 @@ public class SpannerConnectorTask extends SpannerBaseSourceTask {
 
     public String getTaskUid() {
         return taskUid;
+    }
+
+    // Remove when support for SPI snapshotter will be supported by this connector
+    @Override
+    protected void registerServiceProviders(ServiceRegistry serviceRegistry) {
+
+        serviceRegistry.registerServiceProvider(new PostProcessorRegistryServiceProvider());
     }
 }
