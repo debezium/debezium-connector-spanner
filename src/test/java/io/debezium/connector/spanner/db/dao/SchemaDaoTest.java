@@ -72,7 +72,7 @@ class SchemaDaoTest {
         when(asyncResultSet.next()).thenReturn(true).thenReturn(true).thenReturn(false);
 
         ReadOnlyTransaction readOnlyTransaction = mock(ReadOnlyTransaction.class);
-        when(readOnlyTransaction.executeQuery(any(), any()))
+        when(readOnlyTransaction.executeQuery(any()))
                 .thenReturn(new ForwardingAsyncResultSet(new ForwardingAsyncResultSet(new ForwardingAsyncResultSet(
                         new ForwardingAsyncResultSet(new ForwardingAsyncResultSet(asyncResultSet))))));
         doNothing().when(readOnlyTransaction).close();
@@ -86,7 +86,7 @@ class SchemaDaoTest {
         assertEquals("Stream Name", actualStream.getName());
         assertTrue(actualStream.isWatchedAllTables());
         verify(databaseClient).readOnlyTransaction(any());
-        verify(readOnlyTransaction).executeQuery(any(), any());
+        verify(readOnlyTransaction).executeQuery(any());
         verify(readOnlyTransaction).close();
         verify(asyncResultSet, atLeast(1)).next();
         verify(asyncResultSet, atLeast(1)).getBoolean(anyInt());
