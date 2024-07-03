@@ -22,7 +22,7 @@
         <version.joda>2.10.14</version.joda>
         <version.commons-lang3>3.12.0</version.commons-lang3>
         <version.junit>5.8.2</version.junit>
-        <version.mockito>4.6.1</version.mockito>
+        <version.mockito>5.12.0</version.mockito>
         <version.testcontainers>1.17.3</version.testcontainers>
         <version.assertj>3.23.1</version.assertj>
         <jacoco.version>0.8.6</jacoco.version>
@@ -342,11 +342,6 @@
         </dependency>
         <dependency>
             <groupId>org.mockito</groupId>
-            <artifactId>mockito-inline</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.mockito</groupId>
             <artifactId>mockito-junit-jupiter</artifactId>
             <scope>test</scope>
         </dependency>
@@ -442,36 +437,6 @@
                             <goal>compile</goal>
                             <goal>test-compile</goal>
                         </goals>
-                    </execution>
-                </executions>
-            </plugin>
-            <plugin>
-                <groupId>io.confluent</groupId>
-                <artifactId>kafka-connect-maven-plugin</artifactId>
-                <executions>
-                    <execution>
-                        <goals>
-                            <goal>kafka-connect</goal>
-                        </goals>
-                        <configuration>
-                            <title>Debezium Spanner Connector</title>
-                            <documentationUrl>https://doc.spanner.io/connector/index.html</documentationUrl>
-                            <description>
-                                Debezium Connector for Google Cloud Spanner
-                            </description>
-                            <logo>logos/spanner.png</logo>
-                            <ownerUsername>google</ownerUsername>
-                            <ownerType>organization</ownerType>
-                            <ownerName>Google, Inc.</ownerName>
-                            <componentTypes>
-                                <componentType>source</componentType>
-                            </componentTypes>
-                            <deliveryGuarantee>
-                                <deliveryGuarantee>exactlyOnce</deliveryGuarantee>
-                            </deliveryGuarantee>
-
-                            <confluentControlCenterIntegration>true</confluentControlCenterIntegration>
-                        </configuration>
                     </execution>
                 </executions>
             </plugin>
