@@ -43,7 +43,7 @@ class SchemaRegistryTest {
         when(asyncResultSet.next()).thenReturn(true).thenReturn(true).thenReturn(false);
 
         ReadOnlyTransaction readOnlyTransaction = mock(ReadOnlyTransaction.class);
-        when(readOnlyTransaction.executeQuery(any(), any()))
+        when(readOnlyTransaction.executeQuery(any()))
                 .thenReturn(new ForwardingAsyncResultSet(new ForwardingAsyncResultSet(new ForwardingAsyncResultSet(
                         new ForwardingAsyncResultSet(new ForwardingAsyncResultSet(asyncResultSet))))));
         doNothing().when(readOnlyTransaction).close();
@@ -55,7 +55,7 @@ class SchemaRegistryTest {
         schemaRegistry.init("taskUid");
 
         verify(databaseClient, atLeast(1)).readOnlyTransaction(any());
-        verify(readOnlyTransaction, atLeast(1)).executeQuery(any(), any());
+        verify(readOnlyTransaction, atLeast(1)).executeQuery(any());
         verify(readOnlyTransaction, atLeast(1)).close();
         verify(asyncResultSet, atLeast(1)).next();
         verify(asyncResultSet, atLeast(1)).getBoolean(anyInt());
@@ -92,7 +92,7 @@ class SchemaRegistryTest {
         when(asyncResultSet.next()).thenReturn(true).thenReturn(true).thenReturn(false);
 
         ReadOnlyTransaction readOnlyTransaction = mock(ReadOnlyTransaction.class);
-        when(readOnlyTransaction.executeQuery(any(), any()))
+        when(readOnlyTransaction.executeQuery(any()))
                 .thenReturn(new ForwardingAsyncResultSet(new ForwardingAsyncResultSet(new ForwardingAsyncResultSet(
                         new ForwardingAsyncResultSet(new ForwardingAsyncResultSet(asyncResultSet))))));
         doNothing().when(readOnlyTransaction).close();
@@ -105,7 +105,7 @@ class SchemaRegistryTest {
         schemaRegistry.updateSchema(TableId.getTableId("Name"), Timestamp.ofTimeMicroseconds(1L), new ArrayList<>());
 
         verify(databaseClient, atLeast(1)).readOnlyTransaction(any());
-        verify(readOnlyTransaction, atLeast(1)).executeQuery(any(), any());
+        verify(readOnlyTransaction, atLeast(1)).executeQuery(any());
         verify(readOnlyTransaction, atLeast(1)).close();
         verify(asyncResultSet, atLeast(1)).next();
         verify(asyncResultSet, atLeast(1)).getBoolean(anyInt());
@@ -121,7 +121,7 @@ class SchemaRegistryTest {
         when(asyncResultSet.next()).thenReturn(true).thenReturn(true).thenReturn(false);
 
         ReadOnlyTransaction readOnlyTransaction = mock(ReadOnlyTransaction.class);
-        when(readOnlyTransaction.executeQuery(any(), any()))
+        when(readOnlyTransaction.executeQuery(any()))
                 .thenReturn(new ForwardingAsyncResultSet(new ForwardingAsyncResultSet(new ForwardingAsyncResultSet(
                         new ForwardingAsyncResultSet(new ForwardingAsyncResultSet(asyncResultSet))))));
         doNothing().when(readOnlyTransaction).close();
@@ -133,7 +133,7 @@ class SchemaRegistryTest {
         assertTrue(schemaRegistry.updateSchema(TableId.getTableId("Name"), Timestamp.ofTimeMicroseconds(1L), new ArrayList<>()));
 
         verify(databaseClient, atLeast(1)).readOnlyTransaction(any());
-        verify(readOnlyTransaction, atLeast(1)).executeQuery(any(), any());
+        verify(readOnlyTransaction, atLeast(1)).executeQuery(any());
         verify(readOnlyTransaction, atLeast(1)).close();
         verify(asyncResultSet, atLeast(1)).next();
         verify(asyncResultSet, atLeast(1)).getBoolean(anyInt());

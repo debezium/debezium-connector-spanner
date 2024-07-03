@@ -25,7 +25,7 @@ class ChangeStreamDaoTest {
     @Test
     void testStreamQuery() {
         ReadContext readContext = mock(ReadContext.class);
-        when(readContext.executeQuery(any(), any()))
+        when(readContext.executeQuery(any(), any(), any()))
                 .thenReturn(new ForwardingAsyncResultSet(new ForwardingAsyncResultSet(new ForwardingAsyncResultSet(
                         new ForwardingAsyncResultSet(new ForwardingAsyncResultSet(mock(AsyncResultSet.class)))))));
 
@@ -39,6 +39,6 @@ class ChangeStreamDaoTest {
                 .getCurrentRowAsStruct());
 
         verify(databaseClient).singleUse();
-        verify(readContext).executeQuery(any(), any());
+        verify(readContext).executeQuery(any(), any(), any());
     }
 }
