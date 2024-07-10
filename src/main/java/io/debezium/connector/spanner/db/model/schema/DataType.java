@@ -11,6 +11,7 @@ package io.debezium.connector.spanner.db.model.schema;
 public enum DataType {
     BOOL,
     INT64,
+    FLOAT32,
     FLOAT64,
     TIMESTAMP,
     DATE,

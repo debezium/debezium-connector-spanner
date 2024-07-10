@@ -30,6 +30,8 @@ public class ColumnTypeSchemaMapper {
                 return optional ? Schema.OPTIONAL_INT64_SCHEMA : Schema.INT64_SCHEMA;
             case BOOL:
                 return optional ? Schema.OPTIONAL_BOOLEAN_SCHEMA : Schema.BOOLEAN_SCHEMA;
+            case FLOAT32:
+                return optional ? Schema.OPTIONAL_FLOAT32_SCHEMA : Schema.FLOAT32_SCHEMA;
             case FLOAT64:
                 return optional ? Schema.OPTIONAL_FLOAT64_SCHEMA : Schema.FLOAT64_SCHEMA;
             case ARRAY:
@@ -60,6 +62,8 @@ public class ColumnTypeSchemaMapper {
                 return optional ? Schema.OPTIONAL_INT64_SCHEMA : Schema.INT64_SCHEMA;
             case BOOL:
                 return optional ? Schema.OPTIONAL_BOOLEAN_SCHEMA : Schema.BOOLEAN_SCHEMA;
+            case FLOAT32:
+                return optional ? Schema.OPTIONAL_FLOAT32_SCHEMA : Schema.FLOAT32_SCHEMA;
             case FLOAT64:
                 return optional ? Schema.OPTIONAL_FLOAT64_SCHEMA : Schema.FLOAT64_SCHEMA;
             case BYTES:

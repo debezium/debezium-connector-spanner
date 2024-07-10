@@ -63,6 +63,9 @@ public class Column {
                 if ("INT64".equals(spannerType)) {
                     return new ColumnType(DataType.INT64);
                 }
+                if ("FLOAT32".equals(spannerType)) {
+                    return new ColumnType(DataType.FLOAT32);
+                }
                 if ("FLOAT64".equals(spannerType)) {
                     return new ColumnType(DataType.FLOAT64);
                 }
@@ -104,6 +107,9 @@ public class Column {
                 }
                 if ("BIGINT".equals(spannerType)) {
                     return new ColumnType(DataType.INT64);
+                }
+                if ("REAL".equals(spannerType)) {
+                    return new ColumnType(DataType.FLOAT32);
                 }
                 if ("DOUBLE PRECISION".equals(spannerType)) {
                     return new ColumnType(DataType.FLOAT64);
