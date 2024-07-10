@@ -506,6 +506,9 @@
                         <configuration>
                             <repository>${docker.repository.name}</repository>
                             <skip>${docker.skip.push}</skip>
+                            <buildArgs>
+                                <projectVersion>${project.version}</projectVersion>
+                            </buildArgs>
                             <images>
                                 <image>
                                     <name>${docker.repository.name}:${docker.tag.name}</name>
@@ -616,6 +619,37 @@
                                     <descriptorRefs>
                                         <descriptorRef>${assembly.descriptor}</descriptorRef>
                                     </descriptorRefs>
+                                    <tarLongFileMode>posix</tarLongFileMode>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+        <profile>
+            <id>pack-local-changes</id>
+            <activation>
+                <activeByDefault>false</activeByDefault>
+            </activation>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-assembly-plugin</artifactId>
+                        <version>${version.assembly.plugin}</version>
+                        <executions>
+                            <execution>
+                                <id>pack-local-changes</id>
+                                <phase>package</phase>
+                                <goals>
+                                    <goal>single</goal>
+                                </goals>
+                                <configuration>
+                                    <finalName>${project.artifactId}-${project.version}</finalName>
+                                    <descriptors>
+                                        <descriptor>src/test/docker/distribution.xml</descriptor>
+                                    </descriptors>
                                     <tarLongFileMode>posix</tarLongFileMode>
                                 </configuration>
                             </execution>
