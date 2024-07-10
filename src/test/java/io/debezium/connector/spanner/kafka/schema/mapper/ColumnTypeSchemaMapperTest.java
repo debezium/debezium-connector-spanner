@@ -51,6 +51,10 @@ class ColumnTypeSchemaMapperTest {
                         Schema.OPTIONAL_BOOLEAN_SCHEMA),
 
                 Arguments.of(
+                        ColumnTypeSchemaMapper.getSchema(ColumnTypeParser.parse("{\"code\":\"FLOAT32\"}"), true),
+                        Schema.OPTIONAL_FLOAT32_SCHEMA),
+
+                Arguments.of(
                         ColumnTypeSchemaMapper.getSchema(ColumnTypeParser.parse("{\"code\":\"FLOAT64\"}"), true),
                         Schema.OPTIONAL_FLOAT64_SCHEMA),
 
