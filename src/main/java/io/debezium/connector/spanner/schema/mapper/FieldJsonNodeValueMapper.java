@@ -21,6 +21,8 @@ public class FieldJsonNodeValueMapper {
     public static Object getValue(Field field, JsonNode node) {
         Schema.Type type = field.schema().type();
         switch (type) {
+            case FLOAT32:
+                return JsonNodeStructValueConvertor.getFloat(node);
             case FLOAT64:
                 return JsonNodeStructValueConvertor.getDouble(node);
             case STRING:

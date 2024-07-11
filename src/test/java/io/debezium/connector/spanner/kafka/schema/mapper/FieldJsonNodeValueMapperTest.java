@@ -37,6 +37,11 @@ class FieldJsonNodeValueMapperTest {
                         OBJECT_MAPPER.readTree("{\"value\": [1.1, 2, 3.4] }").get("value"),
                         List.of(1.1, 2.0, 3.4)),
                 Arguments.of(
+                        ColumnTypeSchemaMapper.getSchema(ColumnTypeParser
+                                .parse("{\"array_element_type\":{\"code\":\"FLOAT32\"},\"code\":\"ARRAY\"}"), true),
+                        OBJECT_MAPPER.readTree("{\"value\": [1.1, 2, 3.4] }").get("value"),
+                        List.of(1.1f, 2.0f, 3.4f)),
+                Arguments.of(
                         ColumnTypeSchemaMapper.getSchema(ColumnTypeParser.parse("{\"code\":\"STRING\"}"), true),
                         OBJECT_MAPPER.readTree("{\"value\": \"test_string\" }").get("value"),
                         "test_string"),
@@ -52,6 +57,10 @@ class FieldJsonNodeValueMapperTest {
                         ColumnTypeSchemaMapper.getSchema(ColumnTypeParser.parse("{\"code\":\"FLOAT64\"}"), true),
                         OBJECT_MAPPER.readTree("{\"value\": 1.123 }").get("value"),
                         1.123),
+                Arguments.of(
+                        ColumnTypeSchemaMapper.getSchema(ColumnTypeParser.parse("{\"code\":\"FLOAT32\"}"), true),
+                        OBJECT_MAPPER.readTree("{\"value\": 1.123 }").get("value"),
+                        1.123f),
                 Arguments.of(
                         ColumnTypeSchemaMapper.getSchema(ColumnTypeParser.parse("{\"code\":\"BYTES\"}"), true),
                         OBJECT_MAPPER.readTree("{\"value\": \"test\" }").get("value"),
