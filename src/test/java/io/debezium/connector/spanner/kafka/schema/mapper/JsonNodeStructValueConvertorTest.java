@@ -43,6 +43,12 @@ class JsonNodeStructValueConvertorTest {
     }
 
     @Test
+    void getFloat() throws JsonProcessingException {
+        Assertions.assertEquals(1.123f,
+                JsonNodeStructValueConvertor.getFloat(OBJECT_MAPPER.readTree("{\"value\": 1.123 }").get("value")));
+    }
+
+    @Test
     void getBoolean() throws JsonProcessingException {
         Assertions.assertEquals(true,
                 JsonNodeStructValueConvertor.getBoolean(OBJECT_MAPPER.readTree("{\"value\": true }").get("value")));
@@ -60,5 +66,12 @@ class JsonNodeStructValueConvertorTest {
         Assertions.assertEquals(List.of(1.1, 2.0, 3.4),
                 JsonNodeStructValueConvertor.getList(OBJECT_MAPPER
                         .readTree("{\"value\": [1.1, 2, 3.4] }").get("value"), Schema.Type.FLOAT64));
+    }
+
+    @Test
+    void getFloatList() throws JsonProcessingException {
+        Assertions.assertEquals(List.of(1.1f, 2.0f, 3.4f),
+                JsonNodeStructValueConvertor.getList(OBJECT_MAPPER
+                        .readTree("{\"value\": [1.1, 2, 3.4] }").get("value"), Schema.Type.FLOAT32));
     }
 }

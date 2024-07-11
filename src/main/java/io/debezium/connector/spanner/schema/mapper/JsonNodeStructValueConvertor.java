@@ -39,6 +39,15 @@ public class JsonNodeStructValueConvertor {
         return node.asLong();
     }
 
+    public static Float getFloat(JsonNode node) {
+        if (node.isNull()) {
+            return null;
+        }
+        // It is safe to down cast here. Spanner has up casted the float32
+        // values to float64 while sending the response.
+        return (float) node.asDouble();
+    }
+
     public static Double getDouble(JsonNode node) {
         if (node.isNull()) {
             return null;
@@ -76,6 +85,8 @@ public class JsonNodeStructValueConvertor {
 
     private static Object getValueFromNode(JsonNode node, Schema.Type type) {
         switch (type) {
+            case FLOAT32:
+                return getFloat(node);
             case FLOAT64:
                 return getDouble(node);
             case STRING:
