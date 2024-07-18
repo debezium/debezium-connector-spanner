@@ -28,6 +28,11 @@ public class Database {
             .generateDatabaseId()
             .build();
 
+    public static final Database TEST_PG_DATABASE = Database.builder()
+            .generateDatabaseId()
+            .dialect(Dialect.POSTGRESQL)
+            .build();
+
     public String getProjectId() {
         return projectId;
     }
