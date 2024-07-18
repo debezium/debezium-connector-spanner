@@ -21,6 +21,8 @@ public class AbstractSpannerConnectorIT extends AbstractConnectorTest {
             KafkaEnvironment.DOCKER_COMPOSE_FILE);
     protected static final Database database = Database.TEST_DATABASE;
     protected static final Connection databaseConnection = database.getConnection();
+    protected static final Database pgDatabase = Database.TEST_PG_DATABASE;
+    protected static final Connection pgDatabaseConnection = pgDatabase.getConnection();
     private static final String TEST_PROPERTY_PREFIX = "debezium.test.";
 
     static {
@@ -43,6 +45,12 @@ public class AbstractSpannerConnectorIT extends AbstractConnectorTest {
             .with("bootstrap.servers", KAFKA_ENVIRONMENT.kafkaBrokerApiOn().getAddress())
             .with("heartbeat.interval.ms", "300000")
             .with("gcp.spanner.low-watermark.enabled", false)
+            .build();
+
+    protected static final Configuration basePgConfig = Configuration.copy(baseConfig)
+            .with("gcp.spanner.instance.id", pgDatabase.getInstanceId())
+            .with("gcp.spanner.project.id", pgDatabase.getProjectId())
+            .with("gcp.spanner.database.id", pgDatabase.getDatabaseId())
             .build();
 
     @BeforeAll
