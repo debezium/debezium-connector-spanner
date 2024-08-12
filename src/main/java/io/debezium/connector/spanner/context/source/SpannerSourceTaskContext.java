@@ -20,6 +20,6 @@ import io.debezium.spi.schema.DataCollectionId;
  */
 public class SpannerSourceTaskContext extends CdcSourceTaskContext {
     public SpannerSourceTaskContext(SpannerConnectorConfig config, Supplier<Collection<? extends DataCollectionId>> supplier) {
-        super(config.getContextName(), config.getConnectorName(), config.getTaskId(), config.getCustomMetricTags(), supplier);
+        super(config, config.getTaskId(), config.getCustomMetricTags(), supplier);
     }
 }
