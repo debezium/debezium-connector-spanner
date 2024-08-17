@@ -5,6 +5,8 @@
  */
 package io.debezium.connector.spanner.metrics.jmx;
 
+import java.time.Duration;
+
 import javax.management.MXBean;
 
 import io.debezium.pipeline.metrics.StreamingChangeEventSourceMetricsMXBean;
@@ -67,7 +69,7 @@ public interface SpannerMetricsMXBean extends StreamingChangeEventSourceMetricsM
      * The delay which Spanner connector waits for
      * the next Change Stream Event
      */
-    Long getDelayChangeStreamEventsLastMilliSeconds();
+    Duration getDelayChangeStreamEventsLastMilliSeconds();
 
     Double getDelayChangeStreamEventsP50MilliSeconds();
 
