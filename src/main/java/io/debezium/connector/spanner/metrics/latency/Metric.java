@@ -6,10 +6,9 @@
 package io.debezium.connector.spanner.metrics.latency;
 
 import java.time.Duration;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
-
 
 public abstract class Metric {
 
@@ -66,8 +65,7 @@ public abstract class Metric {
                 average.get()
                         .multipliedBy(count.get() - 1)
                         .plus(lastDuration)
-                        .dividedBy(count.get())
-        );
+                        .dividedBy(count.get()));
 
         last.set(lastDuration);
 
