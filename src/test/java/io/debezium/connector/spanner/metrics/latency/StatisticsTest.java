@@ -11,9 +11,14 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 class StatisticsTest {
+    Double durationToFloat(Duration duration) {
+        return duration.getSeconds() + (double) duration.getNano() / 1_000_000_000;
+    }
 
     @Test
     void updateAndReset() {
+        double epsilon = 0.000000001;
+
         Statistics statistics = new Statistics(Duration.ofSeconds(10), null);
         statistics.update(148);
         statistics.update(197);
@@ -23,13 +28,13 @@ class StatisticsTest {
         statistics.update(10);
         statistics.update(298);
 
-        Assertions.assertEquals(170.71428571428572, statistics.getAverageValue());
+        Assertions.assertEquals(170.71428571428572, durationToFloat(statistics.getAverageValue()), epsilon);
 
-        Assertions.assertEquals(298, statistics.getLastValue());
+        Assertions.assertEquals(298, durationToFloat(statistics.getLastValue()));
 
-        Assertions.assertEquals(397, statistics.getMaxValue());
+        Assertions.assertEquals(397, durationToFloat(statistics.getMaxValue()));
 
-        Assertions.assertEquals(10, statistics.getMinValue());
+        Assertions.assertEquals(10, durationToFloat(statistics.getMinValue()));
 
         statistics.reset();
 

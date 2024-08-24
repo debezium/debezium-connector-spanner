@@ -12,7 +12,7 @@ import java.util.function.Consumer;
 
 public abstract class Metric {
 
-    private final AtomicReference<Duration> minimum = new AtomicReference<>(Duration.ZERO);
+    private final AtomicReference<Duration> minimum = new AtomicReference<>(Duration.ofSeconds(Long.MAX_VALUE));
     private final AtomicReference<Duration> maximum = new AtomicReference<>(Duration.ZERO);
     private final AtomicReference<Duration> last = new AtomicReference<>(Duration.ZERO);
     private final AtomicReference<Duration> total = new AtomicReference<>(Duration.ZERO);
@@ -28,7 +28,7 @@ public abstract class Metric {
      * Resets the duration metric
      */
     public void reset() {
-        minimum.set(Duration.ZERO);
+        minimum.set(Duration.ofSeconds(Long.MAX_VALUE));
         maximum.set(Duration.ZERO);
         last.set(Duration.ZERO);
         total.set(Duration.ZERO);
@@ -60,20 +60,20 @@ public abstract class Metric {
         }
 
         total.accumulateAndGet(lastDuration, Duration::plus);
+        count.incrementAndGet();
 
         average.set(
-                average.get()
-                        .multipliedBy(count.get() - 1)
-                        .plus(lastDuration)
-                        .dividedBy(count.get()));
+                total.get()
+                        .dividedBy(count.get())
+        );
 
         last.set(lastDuration);
 
-        quantileMeter.addValue((double) lastDuration.toMillis());
+        quantileMeter.addValue((double) lastDuration.toSeconds());
     }
 
     public synchronized void update(long value) {
-        set(Duration.ofMillis(value));
+        set(Duration.ofSeconds(value));
     }
 
     public Duration getMinValue() {
