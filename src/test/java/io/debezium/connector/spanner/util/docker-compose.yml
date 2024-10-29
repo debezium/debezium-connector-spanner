@@ -1,7 +1,7 @@
 version: "2"
 services:
   zookeeper:
-    image: debezium/zookeeper:latest
+    image: quay.io/debezium/zookeeper:latest
     hostname: zookeeper
     ports:
       - "2181:2181"
@@ -10,7 +10,7 @@ services:
       ZOOKEEPER_TICK_TIME: 2000
 
   broker:
-    image: debezium/kafka:latest
+    image: quay.io/debezium/kafka:latest
     hostname: broker
     depends_on:
       - zookeeper
