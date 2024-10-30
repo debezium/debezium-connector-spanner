@@ -8,6 +8,7 @@ package io.debezium.connector.spanner.metrics.latency;
 import java.time.Duration;
 import java.util.function.Consumer;
 
+
 /**
  * This class provides functionality to calculate statistics:
  * min, max, avg values, percentiles.
