@@ -5,8 +5,6 @@
  */
 package io.debezium.connector.spanner.metrics.jmx;
 
-import java.time.Duration;
-
 import org.apache.kafka.connect.data.Struct;
 
 import com.google.cloud.Timestamp;
@@ -98,7 +96,7 @@ public class SpannerStreamingChangeEventSourceMetrics
     }
 
     @Override
-    public Duration getDelayChangeStreamEventsLastMilliSeconds() {
+    public Long getDelayChangeStreamEventsLastMilliSeconds() {
         return spannerMeter.getDelayChangeStreamEvents().getLastValue();
     }
 
@@ -136,17 +134,17 @@ public class SpannerStreamingChangeEventSourceMetrics
 
     @Override
     public Long getLatencyLowWatermarkLagMinMilliSeconds() {
-        return spannerMeter.getLowWatermarkLagLatency().getMinValue().toMillis();
+        return spannerMeter.getLowWatermarkLagLatency().getMinValue();
     }
 
     @Override
     public Long getLatencyLowWatermarkLagMaxMilliSeconds() {
-        return spannerMeter.getLowWatermarkLagLatency().getMaxValue().toMillis();
+        return spannerMeter.getLowWatermarkLagLatency().getMaxValue();
     }
 
     @Override
     public Double getLatencyLowWatermarkLagAvgMilliSeconds() {
-        return Double.valueOf(spannerMeter.getLowWatermarkLagLatency().getAverageValue().toMillis());
+        return spannerMeter.getLowWatermarkLagLatency().getAverageValue();
     }
 
     @Override
@@ -167,17 +165,17 @@ public class SpannerStreamingChangeEventSourceMetrics
     // Total latency
     @Override
     public Long getLatencyTotalMinMilliSeconds() {
-        return spannerMeter.getTotalLatency().getMinValue().toMillis();
+        return spannerMeter.getTotalLatency().getMinValue();
     }
 
     @Override
     public Long getLatencyTotalMaxMilliSeconds() {
-        return spannerMeter.getTotalLatency().getMaxValue().toMillis();
+        return spannerMeter.getTotalLatency().getMaxValue();
     }
 
     @Override
     public Double getLatencyTotalAvgMilliSeconds() {
-        return Double.valueOf(spannerMeter.getTotalLatency().getAverageValue().toMillis());
+        return spannerMeter.getTotalLatency().getAverageValue();
     }
 
     @Override
@@ -198,17 +196,17 @@ public class SpannerStreamingChangeEventSourceMetrics
     // Spanner latency
     @Override
     public Long getLatencySpannerMinMilliSeconds() {
-        return spannerMeter.getSpannerLatency().getMinValue().toMillis();
+        return spannerMeter.getSpannerLatency().getMinValue();
     }
 
     @Override
     public Long getLatencySpannerMaxMilliSeconds() {
-        return spannerMeter.getSpannerLatency().getMaxValue().toMillis();
+        return spannerMeter.getSpannerLatency().getMaxValue();
     }
 
     @Override
     public Double getLatencySpannerAvgMilliSeconds() {
-        return Double.valueOf(spannerMeter.getSpannerLatency().getAverageValue().toMillis());
+        return spannerMeter.getSpannerLatency().getAverageValue();
     }
 
     @Override
@@ -229,17 +227,17 @@ public class SpannerStreamingChangeEventSourceMetrics
     // ReadToEmit latency
     @Override
     public Long getLatencyReadToEmitMinMilliSeconds() {
-        return spannerMeter.getConnectorLatency().getMinValue().toMillis();
+        return spannerMeter.getConnectorLatency().getMinValue();
     }
 
     @Override
     public Long getLatencyReadToEmitMaxMilliSeconds() {
-        return spannerMeter.getConnectorLatency().getMaxValue().toMillis();
+        return spannerMeter.getConnectorLatency().getMaxValue();
     }
 
     @Override
     public Double getLatencyReadToEmitAvgMilliSeconds() {
-        return Double.valueOf(spannerMeter.getConnectorLatency().getAverageValue().toMillis());
+        return spannerMeter.getConnectorLatency().getAverageValue();
     }
 
     @Override
@@ -260,17 +258,17 @@ public class SpannerStreamingChangeEventSourceMetrics
     // CommitToEmit latency
     @Override
     public Long getLatencyCommitToEmitMinMilliSeconds() {
-        return spannerMeter.getCommitToEmitLatency().getMinValue().toMillis();
+        return spannerMeter.getCommitToEmitLatency().getMinValue();
     }
 
     @Override
     public Long getLatencyCommitToEmitMaxMilliSeconds() {
-        return spannerMeter.getCommitToEmitLatency().getMaxValue().toMillis();
+        return spannerMeter.getCommitToEmitLatency().getMaxValue();
     }
 
     @Override
     public Double getLatencyCommitToEmitAvgMilliSeconds() {
-        return Double.valueOf(spannerMeter.getCommitToEmitLatency().getAverageValue().toMillis());
+        return spannerMeter.getCommitToEmitLatency().getAverageValue();
     }
 
     @Override
@@ -291,17 +289,17 @@ public class SpannerStreamingChangeEventSourceMetrics
     // CommitToPublish Latency
     @Override
     public Long getLatencyCommitToPublishMinMilliSeconds() {
-        return spannerMeter.getCommitToPublishLatency().getMinValue().toMillis();
+        return spannerMeter.getCommitToPublishLatency().getMinValue();
     }
 
     @Override
     public Long getLatencyCommitToPublishMaxMilliSeconds() {
-        return spannerMeter.getCommitToPublishLatency().getMaxValue().toMillis();
+        return spannerMeter.getCommitToPublishLatency().getMaxValue();
     }
 
     @Override
     public Double getLatencyCommitToPublishAvgMilliSeconds() {
-        return Double.valueOf(spannerMeter.getCommitToPublishLatency().getAverageValue().toMillis());
+        return spannerMeter.getCommitToPublishLatency().getAverageValue();
     }
 
     @Override
@@ -322,17 +320,17 @@ public class SpannerStreamingChangeEventSourceMetrics
     // EmitToPublish Latency
     @Override
     public Long getLatencyEmitToPublishMinMilliSeconds() {
-        return spannerMeter.getEmitToPublishLatency().getMinValue().toMillis();
+        return spannerMeter.getEmitToPublishLatency().getMinValue();
     }
 
     @Override
     public Long getLatencyEmitToPublishMaxMilliSeconds() {
-        return spannerMeter.getEmitToPublishLatency().getMaxValue().toMillis();
+        return spannerMeter.getEmitToPublishLatency().getMaxValue();
     }
 
     @Override
     public Double getLatencyEmitToPublishAvgMilliSeconds() {
-        return Double.valueOf(spannerMeter.getEmitToPublishLatency().getAverageValue().toMillis());
+        return spannerMeter.getEmitToPublishLatency().getAverageValue();
     }
 
     @Override
@@ -353,22 +351,22 @@ public class SpannerStreamingChangeEventSourceMetrics
     // debug OwnConnector Latency
     @Override
     public Long getDebugLatencyOwnConnectorMinMilliSeconds() {
-        return spannerMeter.getOwnConnectorLatency().getMinValue().toMillis();
+        return spannerMeter.getOwnConnectorLatency().getMinValue();
     }
 
     @Override
     public Long getDebugLatencyOwnConnectorMaxMilliSeconds() {
-        return spannerMeter.getOwnConnectorLatency().getMaxValue().toMillis();
+        return spannerMeter.getOwnConnectorLatency().getMaxValue();
     }
 
     @Override
     public Double getDebugLatencyOwnConnectorAvgMilliSeconds() {
-        return Double.valueOf(spannerMeter.getOwnConnectorLatency().getAverageValue().toMillis());
+        return spannerMeter.getOwnConnectorLatency().getAverageValue();
     }
 
     @Override
     public Long getDebugLatencyOwnConnectorLastMilliSeconds() {
-        return spannerMeter.getOwnConnectorLatency().getLastValue().toMillis();
+        return spannerMeter.getOwnConnectorLatency().getLastValue();
     }
 
     @Override
@@ -390,17 +388,17 @@ public class SpannerStreamingChangeEventSourceMetrics
 
     @Override
     public Long getPartitionOffsetLagMinMilliSeconds() {
-        return spannerMeter.getPartitionOffsetLagStatistics().getMinValue().toMillis();
+        return spannerMeter.getPartitionOffsetLagStatistics().getMinValue();
     }
 
     @Override
     public Long getPartitionOffsetLagMaxMilliSeconds() {
-        return spannerMeter.getPartitionOffsetLagStatistics().getMaxValue().toMillis();
+        return spannerMeter.getPartitionOffsetLagStatistics().getMaxValue();
     }
 
     @Override
     public Double getPartitionOffsetLagAvgMilliSeconds() {
-        return Double.valueOf(spannerMeter.getPartitionOffsetLagStatistics().getAverageValue().toMillis());
+        return spannerMeter.getPartitionOffsetLagStatistics().getAverageValue();
     }
 
     @Override
@@ -420,23 +418,23 @@ public class SpannerStreamingChangeEventSourceMetrics
 
     @Override
     public Long getPartitionOffsetLagLastMilliSeconds() {
-        return spannerMeter.getPartitionOffsetLagStatistics().getLastValue().toMillis();
+        return spannerMeter.getPartitionOffsetLagStatistics().getLastValue();
     }
 
     // offset receiving time statistics
     @Override
     public Long getOffsetReceivingTimeMinMilliSeconds() {
-        return spannerMeter.getOffsetReceivingTimeStatistics().getMinValue().toMillis();
+        return spannerMeter.getOffsetReceivingTimeStatistics().getMinValue();
     }
 
     @Override
     public Long getOffsetReceivingTimeMaxMilliSeconds() {
-        return spannerMeter.getOffsetReceivingTimeStatistics().getMaxValue().toMillis();
+        return spannerMeter.getOffsetReceivingTimeStatistics().getMaxValue();
     }
 
     @Override
     public Double getOffsetReceivingTimeAvgMilliSeconds() {
-        return Double.valueOf(spannerMeter.getOffsetReceivingTimeStatistics().getAverageValue().toMillis());
+        return spannerMeter.getOffsetReceivingTimeStatistics().getAverageValue();
     }
 
     @Override
@@ -456,7 +454,7 @@ public class SpannerStreamingChangeEventSourceMetrics
 
     @Override
     public Long getOffsetReceivingTimeLastMilliSeconds() {
-        return spannerMeter.getOffsetReceivingTimeStatistics().getLastValue().toMillis();
+        return spannerMeter.getOffsetReceivingTimeStatistics().getLastValue();
     }
 
     @Override
