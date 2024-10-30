@@ -44,8 +44,8 @@ public class Statistics {
         quantileMeter.shutdown();
     }
 
-    void set(Duration lastDuration) {
-        long value = lastDuration.toMillis();
+    public synchronized void update(long value) {
+
         if (minValue.get() > value) {
             minValue.set(value);
         }
@@ -61,10 +61,6 @@ public class Statistics {
         lastValue.set(value);
 
         quantileMeter.addValue((double) value);
-    }
-
-    public synchronized void update(long value) {
-        set(Duration.ofMillis(value));
     }
 
     public Long getMinValue() {
