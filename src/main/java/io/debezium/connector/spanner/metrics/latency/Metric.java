@@ -62,7 +62,10 @@ public abstract class Metric {
         total.accumulateAndGet(lastDuration, Duration::plus);
         count.incrementAndGet();
 
-        average.set(total.get().dividedBy(count.get()));
+        average.set(
+                total.get()
+                        .dividedBy(count.get())
+        );
 
         last.set(lastDuration);
 
