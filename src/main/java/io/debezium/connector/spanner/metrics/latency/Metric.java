@@ -21,14 +21,14 @@ public abstract class Metric {
     private final QuantileMeter quantileMeter;
     private final AtomicLong count = new AtomicLong();
 
-    public Metric(Duration percentageMetricsClearInterval, Consumer<Throwable> errorConsumer) {
+    protected Metric(Duration percentageMetricsClearInterval, Consumer<Throwable> errorConsumer) {
         this.quantileMeter = new QuantileMeter(percentageMetricsClearInterval, errorConsumer);
     }
 
     /**
      * Resets the duration metric
      */
-    public void reset() {
+    void reset() {
         minimum.set(Duration.ZERO);
         maximum.set(Duration.ZERO);
         last.set(Duration.ZERO);
@@ -38,11 +38,11 @@ public abstract class Metric {
         count.set(0);
     }
 
-    public void start() {
+    protected void start() {
         quantileMeter.start();
     }
 
-    public void shutdown() {
+    protected void shutdown() {
         quantileMeter.shutdown();
     }
 
@@ -74,35 +74,35 @@ public abstract class Metric {
         quantileMeter.addValue((double) lastDuration.toMillis());
     }
 
-    public synchronized void update(long value) {
+    protected synchronized void update(long value) {
         set(Duration.ofMillis(value));
     }
 
-    public Duration getMinValue() {
+    protected Duration getMinValue() {
         return count.get() == 0 ? null : minimum.get();
     }
 
-    public Duration getMaxValue() {
+    protected Duration getMaxValue() {
         return count.get() == 0 ? null : maximum.get();
     }
 
-    public Duration getAverageValue() {
+    protected Duration getAverageValue() {
         return count.get() == 0 ? null : average.get();
     }
 
-    public Duration getLastValue() {
+    protected Duration getLastValue() {
         return count.get() == 0 ? null : last.get();
     }
 
-    public Double getValueAtP50() {
+    protected Double getValueAtP50() {
         return quantileMeter.getValueAtQuantile(0.5);
     }
 
-    public Double getValueAtP95() {
+    protected Double getValueAtP95() {
         return quantileMeter.getValueAtQuantile(0.95);
     }
 
-    public Double getValueAtP99() {
+    protected Double getValueAtP99() {
         return quantileMeter.getValueAtQuantile(0.99);
     }
 }
