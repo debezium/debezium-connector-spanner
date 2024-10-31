@@ -52,7 +52,7 @@ public class SpannerOffsetContext implements OffsetContext {
     }
 
     @Override
-    public boolean isSnapshotRunning() {
+    public boolean isInitialSnapshotRunning() {
         return false;
     }
 
