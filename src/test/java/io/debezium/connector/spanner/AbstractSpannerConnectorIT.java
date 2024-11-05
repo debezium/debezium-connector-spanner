@@ -12,10 +12,10 @@ import io.debezium.config.Configuration;
 import io.debezium.connector.spanner.util.Connection;
 import io.debezium.connector.spanner.util.Database;
 import io.debezium.connector.spanner.util.KafkaEnvironment;
-import io.debezium.embedded.AbstractConnectorTest;
+import io.debezium.embedded.async.AbstractAsyncEngineConnectorTest;
 import io.debezium.util.Testing;
 
-public class AbstractSpannerConnectorIT extends AbstractConnectorTest {
+public class AbstractSpannerConnectorIT extends AbstractAsyncEngineConnectorTest {
 
     private static final KafkaEnvironment KAFKA_ENVIRONMENT = new KafkaEnvironment(
             KafkaEnvironment.DOCKER_COMPOSE_FILE);
