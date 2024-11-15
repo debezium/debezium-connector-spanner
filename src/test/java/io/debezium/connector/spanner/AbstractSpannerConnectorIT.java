@@ -66,7 +66,7 @@ public class AbstractSpannerConnectorIT extends AbstractConnectorTest {
     }
 
     public static int waitTimeForRecords() {
-        return Integer.parseInt(System.getProperty(TEST_PROPERTY_PREFIX + "records.waittime", "3"));
+        return Integer.parseInt(System.getProperty(TEST_PROPERTY_PREFIX + "records.waittime", "10"));
     }
 
     protected String getTopicName(Configuration config, String tableName) {
