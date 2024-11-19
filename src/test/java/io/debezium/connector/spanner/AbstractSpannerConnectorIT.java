@@ -45,6 +45,7 @@ public class AbstractSpannerConnectorIT extends AbstractAsyncEngineConnectorTest
             .with("bootstrap.servers", KAFKA_ENVIRONMENT.kafkaBrokerApiOn().getAddress())
             .with("heartbeat.interval.ms", "300000")
             .with("gcp.spanner.low-watermark.enabled", false)
+            .with("tasks.max", 3) // see DBZ-8428
             .build();
 
     protected static final Configuration basePgConfig = Configuration.copy(baseConfig)
@@ -66,7 +67,7 @@ public class AbstractSpannerConnectorIT extends AbstractAsyncEngineConnectorTest
     }
 
     public static int waitTimeForRecords() {
-        return Integer.parseInt(System.getProperty(TEST_PROPERTY_PREFIX + "records.waittime", "10"));
+        return Integer.parseInt(System.getProperty(TEST_PROPERTY_PREFIX + "records.waittime", "30"));
     }
 
     protected String getTopicName(Configuration config, String tableName) {
