@@ -57,7 +57,7 @@ class SpannerConnectorConfigTest {
                 .schema();
         assertTrue(schemaResult instanceof ConnectSchema);
         assertNull(schemaResult.defaultValue());
-        assertNull(schemaResult.version());
+        assertEquals(1, schemaResult.version());
         assertEquals(Schema.Type.STRUCT, schemaResult.type());
         assertNull(schemaResult.parameters());
         assertEquals("com.google.spanner.connector.Source", schemaResult.name());
