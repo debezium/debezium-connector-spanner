@@ -1,4 +1,4 @@
-FROM confluentinc/cp-kafka-connect-base:latest
+FROM mirror.gcr.io/confluentinc/cp-kafka-connect-base
 ARG projectVersion
 USER root
 RUN yum remove -y zulu11-ca-jdk-headless && yum remove -y zulu11-ca-jre-headless
