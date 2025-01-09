@@ -1,4 +1,4 @@
-FROM confluentinc/cp-kafka-connect-base:7.2.2
+FROM mirror.gcr.io/confluentinc/cp-kafka-connect-base:7.2.2
 COPY target/components/packages/google-debezium-connector-spanner-*.zip /usr/share/confluent-hub-components/google-debezium-connector-spanner.zip
 COPY src/test/docker/jmx_prometheus_javaagent-0.16.1.jar /usr/share/prometheus/jmx_prometheus_javaagent.jar
 COPY src/test/docker/metrics-config.yml /usr/share/prometheus/metrics-config.yml
