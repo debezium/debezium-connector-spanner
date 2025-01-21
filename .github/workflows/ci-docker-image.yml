@@ -27,7 +27,7 @@ jobs:
       - name: Maven build debezium core 
         run: mvn clean install -f core/pom.xml -pl debezium-bom,debezium-core,debezium-embedded,debezium-storage -am -DskipTests -DskipITs -Dformat.formatter.goal=validate -Dformat.imports.goal=check -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false -Dmaven.wagon.httpconnectionManager.ttlSeconds=120
       - name: Maven build connector core
-        run: TESTCONTAINERS_HUB_IMAGE_NAME_PREFIX=mirror.gcr.io/ mvn -B clean install
+        run: mvn -B clean install
 ## Add your DockerHub credantials to Aithub Actions        
         ##  secrets.DOCKER_USERNAME = username
         ##  secrets.DOCKER_PASSWORD = usertoken
