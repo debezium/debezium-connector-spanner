@@ -41,7 +41,7 @@ jobs:
         run: mvn -B clean install
 ## Tests report
       - name: Report
-        uses: dorny/test-reporter@v1
+        uses: dorny/test-reporter@v2
         if: always()
         with:
           name: Maven Tests Report
