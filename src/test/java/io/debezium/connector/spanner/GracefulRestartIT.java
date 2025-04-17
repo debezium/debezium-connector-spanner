@@ -65,8 +65,8 @@ public class GracefulRestartIT extends AbstractSpannerConnectorIT {
         waitForAvailableRecords(waitTimeForRecords(), TimeUnit.SECONDS);
         SourceRecords sourceRecords2 = consumeRecordsByTopic(10, false);
         List<SourceRecord> records2 = sourceRecords2.recordsForTopic(getTopicName(config, tableName));
-        assertThat(records2).hasSizeGreaterThanOrEqualTo(1); // create + update
-        assertThat((String) ((Struct) (records2.get(0).value())).get("op")).isEqualTo("c");
+        assertThat(records2).hasSize(1); // update
+        assertThat((String) ((Struct) (records2.get(0).value())).get("op")).isEqualTo("u");
         stopConnector();
         assertConnectorNotRunning();
     }
