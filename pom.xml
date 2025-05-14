@@ -42,6 +42,8 @@
         <docker.filter>${docker.db},${docker.repository.name}:${docker.tag.name}</docker.filter>
         <docker.skip>false</docker.skip>
         <docker.showLogs>true</docker.showLogs>
+
+        <publish.descriptorset>false</publish.descriptorset>
     </properties>
 
     <repositories>
@@ -426,11 +428,11 @@
                 <groupId>org.xolstice.maven.plugins</groupId>
                 <artifactId>protobuf-maven-plugin</artifactId>
                 <configuration>
-                    <writeDescriptorSet>true</writeDescriptorSet>
+                    <writeDescriptorSet>${publish.descriptorset}</writeDescriptorSet>
                     <includeDependenciesInDescriptorSet>true</includeDependenciesInDescriptorSet>
                     <descriptorSetFileName>sync_event_generated.desc</descriptorSetFileName>
-                    <descriptorSetOutputDirectory>target/generated-proto-descriptors</descriptorSetOutputDirectory>
-                    <attachDescriptorSet>true</attachDescriptorSet>
+                    <descriptorSetOutputDirectory>${project.basedir}/generated-sources</descriptorSetOutputDirectory>
+                    <attachDescriptorSet>${publish.descriptorset}</attachDescriptorSet>
                     <includeSourceInfoInDescriptorSet>true</includeSourceInfoInDescriptorSet>
                     <protocArtifact>
                         com.google.protobuf:protoc:${version.com.google.protobuf}:exe:${os.detected.classifier}
