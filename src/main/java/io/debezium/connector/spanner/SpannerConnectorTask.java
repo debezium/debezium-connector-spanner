@@ -7,6 +7,7 @@ package io.debezium.connector.spanner;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 import org.apache.kafka.connect.errors.ConnectException;
@@ -44,6 +45,7 @@ import io.debezium.connector.spanner.task.SynchronizationTaskContext;
 import io.debezium.connector.spanner.task.SynchronizedPartitionManager;
 import io.debezium.connector.spanner.task.TaskUid;
 import io.debezium.pipeline.DataChangeEvent;
+import io.debezium.pipeline.ErrorHandler;
 import io.debezium.pipeline.notification.NotificationService;
 import io.debezium.pipeline.source.spi.EventMetadataProvider;
 import io.debezium.processors.PostProcessorRegistryServiceProvider;
@@ -79,6 +81,7 @@ public class SpannerConnectorTask extends SpannerBaseSourceTask {
     private volatile KafkaSpannerSchema schema;
 
     private volatile boolean beganPolling = false;
+    private SpannerErrorHandler errorHandler;
 
     @Override
     protected SpannerChangeEventSourceCoordinator start(Configuration configuration) {
@@ -106,7 +109,7 @@ public class SpannerConnectorTask extends SpannerBaseSourceTask {
                 .loggingContextSupplier(() -> taskContext.configureLoggingContext(CONTEXT_NAME))
                 .build();
 
-        final SpannerErrorHandler errorHandler = new SpannerErrorHandler(this, queue);
+        errorHandler = new SpannerErrorHandler(this, queue);
 
         this.spannerMeter = new SpannerMeter(
                 this, connectorConfig, errorHandler, () -> lowWatermarkHolder.getLowWatermark());
@@ -233,6 +236,11 @@ public class SpannerConnectorTask extends SpannerBaseSourceTask {
         return coordinator;
     }
 
+    @Override
+    protected String connectorName() {
+        return Module.name();
+    }
+
     DatabaseClientFactory getDatabaseClientFactory(SpannerConnectorConfig connectorConfig) {
         return new DatabaseClientFactory(connectorConfig);
     }
@@ -257,6 +265,11 @@ public class SpannerConnectorTask extends SpannerBaseSourceTask {
         }
 
         return resultedRecords;
+    }
+
+    @Override
+    protected Optional<ErrorHandler> getErrorHandler() {
+        return Optional.of(errorHandler);
     }
 
     @Override
