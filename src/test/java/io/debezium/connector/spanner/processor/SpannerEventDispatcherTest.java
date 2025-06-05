@@ -96,7 +96,7 @@ class SpannerEventDispatcherTest {
 
         SpannerEventDispatcher actualSpannerEventDispatcher = new SpannerEventDispatcher(connectorConfig,
                 topicNamingStrategy, kafkaSpannerSchema, queue, filter, changeEventCreator, metadataProvider,
-                heartbeatFactory, schemaNameAdjuster2, schemaRegistry1, sourceInfoFactory, new KafkaPartitionInfoProvider(null));
+                heartbeatFactory, schemaNameAdjuster2, schemaRegistry1, sourceInfoFactory, new KafkaPartitionInfoProvider(null), null);
 
         assertNull(actualSpannerEventDispatcher.getHistorizedSchema());
         assertSame(kafkaSpannerSchema, actualSpannerEventDispatcher.getSchema());
@@ -154,7 +154,7 @@ class SpannerEventDispatcherTest {
         assertThrows(SpannerConnectorException.class,
                 () -> (new SpannerEventDispatcher(connectorConfig, topicNamingStrategy, schema, queue, filter,
                         changeEventCreator, metadataProvider, heartbeatFactory, schemaNameAdjuster1, schemaRegistry1,
-                        sourceInfoFactory, new KafkaPartitionInfoProvider(null))).publishLowWatermarkStampEvent());
+                        sourceInfoFactory, new KafkaPartitionInfoProvider(null), null)).publishLowWatermarkStampEvent());
 
         verify(topicNamingStrategy).transactionTopic();
         verify(topicNamingStrategy1).heartbeatTopic();
@@ -203,7 +203,7 @@ class SpannerEventDispatcherTest {
 
         SpannerEventDispatcher spannerEventDispatcher = spy(new SpannerEventDispatcher(
                 connectorConfig, topicNamingStrategy, schema, queue, filter, changeEventCreator, metadataProvider,
-                heartbeatFactory, schemaNameAdjuster, schemaRegistry, sourceInfoFactory, kafkaPartitionInfoProvider));
+                heartbeatFactory, schemaNameAdjuster, schemaRegistry, sourceInfoFactory, kafkaPartitionInfoProvider, null));
 
         SourceRecord sourceRecord = mock(SourceRecord.class);
         doReturn(sourceRecord).when(spannerEventDispatcher).emitSourceRecord(anyString(), any(), anyInt(), any());

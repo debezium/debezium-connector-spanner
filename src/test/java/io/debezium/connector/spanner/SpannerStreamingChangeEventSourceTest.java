@@ -128,7 +128,7 @@ class SpannerStreamingChangeEventSourceTest {
 
         SpannerEventDispatcher spannerEventDispatcher = new SpannerEventDispatcher(connectorConfig1, topicNamingStrategy,
                 schema, queue, filter, changeEventCreator, metadataProvider, heartbeatFactory, schemaNameAdjuster1,
-                schemaRegistry1, sourceInfoFactory, new KafkaPartitionInfoProvider(null));
+                schemaRegistry1, sourceInfoFactory, new KafkaPartitionInfoProvider(null), null);
 
         StreamEventQueue eventQueue = new StreamEventQueue(3, new MetricsEventPublisher());
 
@@ -240,7 +240,7 @@ class SpannerStreamingChangeEventSourceTest {
 
         SpannerEventDispatcher spannerEventDispatcher = new SpannerEventDispatcher(connectorConfig1, topicNamingStrategy,
                 schema, queue, filter, changeEventCreator, metadataProvider, heartbeatFactory, schemaNameAdjuster1,
-                schemaRegistryDatabaseClient, sourceInfoFactory, new KafkaPartitionInfoProvider(null));
+                schemaRegistryDatabaseClient, sourceInfoFactory, new KafkaPartitionInfoProvider(null), null);
 
         Configuration configuration5 = mock(Configuration.class);
         when(configuration5.getString((String) any())).thenReturn("String");
