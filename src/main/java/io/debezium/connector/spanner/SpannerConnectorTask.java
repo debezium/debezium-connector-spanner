@@ -19,6 +19,7 @@ import org.slf4j.LoggerFactory;
 import io.debezium.bean.StandardBeanNames;
 import io.debezium.config.Configuration;
 import io.debezium.connector.base.ChangeEventQueue;
+import io.debezium.connector.common.DebeziumHeaderProducer;
 import io.debezium.connector.spanner.config.SpannerTableFilter;
 import io.debezium.connector.spanner.context.offset.SpannerOffsetContext;
 import io.debezium.connector.spanner.context.source.SourceInfoFactory;
@@ -163,6 +164,15 @@ public class SpannerConnectorTask extends SpannerBaseSourceTask {
 
         final KafkaPartitionInfoProvider kafkaPartitionInfoProvider = new KafkaPartitionInfoProvider(adminClientFactory.getAdminClient());
 
+        // Manual Bean Registration
+        connectorConfig.getBeanRegistry().add(StandardBeanNames.CONFIGURATION, configuration);
+        connectorConfig.getBeanRegistry().add(StandardBeanNames.CONNECTOR_CONFIG, connectorConfig);
+        connectorConfig.getBeanRegistry().add(StandardBeanNames.DATABASE_SCHEMA, schema);
+        connectorConfig.getBeanRegistry().add(StandardBeanNames.CDC_SOURCE_TASK_CONTEXT, taskContext);
+
+        // Service providers
+        registerServiceProviders(connectorConfig.getServiceRegistry());
+
         this.dispatcher = new SpannerEventDispatcher(
                 connectorConfig,
                 topicNamingStrategy,
@@ -175,7 +185,8 @@ public class SpannerConnectorTask extends SpannerBaseSourceTask {
                 schemaNameAdjuster,
                 schemaRegistry,
                 sourceInfoFactory,
-                kafkaPartitionInfoProvider);
+                kafkaPartitionInfoProvider,
+                connectorConfig.getServiceRegistry().tryGetService(DebeziumHeaderProducer.class));
 
         this.synchronizationTaskContext = new SynchronizationTaskContext(
                 this,
@@ -202,14 +213,6 @@ public class SpannerConnectorTask extends SpannerBaseSourceTask {
 
         NotificationService<SpannerPartition, SpannerOffsetContext> notificationService = new NotificationService<>(getNotificationChannels(),
                 connectorConfig, SchemaFactory.get(), dispatcher::enqueueNotification);
-
-        // Manual Bean Registration
-        connectorConfig.getBeanRegistry().add(StandardBeanNames.CONFIGURATION, configuration);
-        connectorConfig.getBeanRegistry().add(StandardBeanNames.CONNECTOR_CONFIG, connectorConfig);
-        connectorConfig.getBeanRegistry().add(StandardBeanNames.DATABASE_SCHEMA, schema);
-
-        // Service providers
-        registerServiceProviders(connectorConfig.getServiceRegistry());
 
         final SnapshotterService snapshotterService = connectorConfig.getServiceRegistry().tryGetService(SnapshotterService.class);
 

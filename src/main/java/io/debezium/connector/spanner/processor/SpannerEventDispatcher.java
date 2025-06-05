@@ -19,6 +19,7 @@ import com.google.common.annotations.VisibleForTesting;
 
 import io.debezium.config.CommonConnectorConfig;
 import io.debezium.connector.base.ChangeEventQueue;
+import io.debezium.connector.common.DebeziumHeaderProducer;
 import io.debezium.connector.spanner.SpannerConnectorConfig;
 import io.debezium.connector.spanner.SpannerPartition;
 import io.debezium.connector.spanner.context.source.SourceInfoFactory;
@@ -67,9 +68,10 @@ public class SpannerEventDispatcher extends EventDispatcher<SpannerPartition, Ta
                                   SchemaNameAdjuster schemaNameAdjuster,
                                   SchemaRegistry schemaRegistry,
                                   SourceInfoFactory sourceInfoFactory,
-                                  KafkaPartitionInfoProvider kafkaPartitionInfoProvider) {
+                                  KafkaPartitionInfoProvider kafkaPartitionInfoProvider,
+                                  DebeziumHeaderProducer debeziumHeaderProducer) {
         super(connectorConfig, topicNamingStrategy, schema, queue, filter, changeEventCreator, metadataProvider,
-                heartbeatFactory.createHeartbeat(), schemaNameAdjuster);
+                heartbeatFactory.createHeartbeat(), schemaNameAdjuster, debeziumHeaderProducer);
         this.connectorConfig = connectorConfig;
         this.queue = queue;
         this.topicNamingStrategy = topicNamingStrategy;
