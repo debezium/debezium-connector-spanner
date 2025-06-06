@@ -39,7 +39,7 @@ public class SpannerStreamingChangeEventSourceMetrics
                                                     EventMetadataProvider metadataProvider,
                                                     SpannerMeter spannerMeter) {
         super(taskContext, changeEventQueueMetrics, metadataProvider,
-                Collect.linkMapOf(CONNECTOR_NAME_TAG, taskContext.getConnectorName(),
+                Collect.linkMapOf(CONNECTOR_NAME_TAG, taskContext.getConnectorLogicalName(),
                         TASK_ID_TAG, TASK_ID_TAG + "-" + taskContext.getTaskId()));
         this.spannerMeter = spannerMeter;
         this.jsonSerializer = new JsonSerializer();
