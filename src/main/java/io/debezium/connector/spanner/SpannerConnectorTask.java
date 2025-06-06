@@ -20,6 +20,7 @@ import io.debezium.bean.StandardBeanNames;
 import io.debezium.config.Configuration;
 import io.debezium.connector.base.ChangeEventQueue;
 import io.debezium.connector.common.DebeziumHeaderProducer;
+import io.debezium.connector.common.DebeziumHeaderProducerProvider;
 import io.debezium.connector.spanner.config.SpannerTableFilter;
 import io.debezium.connector.spanner.context.offset.SpannerOffsetContext;
 import io.debezium.connector.spanner.context.source.SourceInfoFactory;
@@ -323,5 +324,6 @@ public class SpannerConnectorTask extends SpannerBaseSourceTask {
     protected void registerServiceProviders(ServiceRegistry serviceRegistry) {
 
         serviceRegistry.registerServiceProvider(new PostProcessorRegistryServiceProvider());
+        serviceRegistry.registerServiceProvider(new DebeziumHeaderProducerProvider());
     }
 }
