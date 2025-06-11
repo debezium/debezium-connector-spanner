@@ -20,8 +20,8 @@ import org.slf4j.LoggerFactory;
 
 import com.google.common.annotations.VisibleForTesting;
 
-import io.debezium.config.CommonConnectorConfig;
 import io.debezium.config.Configuration;
+import io.debezium.config.ConfigurationNames;
 import io.debezium.connector.spanner.config.validation.ConfigurationValidator;
 import io.debezium.connector.spanner.kafka.KafkaAdminClientFactory;
 import io.debezium.connector.spanner.kafka.internal.KafkaInternalTopicAdminService;
@@ -110,7 +110,7 @@ public class SpannerConnector extends SourceConnector {
     @VisibleForTesting
     Map<String, String> getProps(int taskId) {
         Map<String, String> taskProps = new HashMap<>(props);
-        taskProps.put(CommonConnectorConfig.TASK_ID, String.valueOf(taskId));
+        taskProps.put(ConfigurationNames.TASK_ID_PROPERTY_NAME, String.valueOf(taskId));
         return taskProps;
     }
 
