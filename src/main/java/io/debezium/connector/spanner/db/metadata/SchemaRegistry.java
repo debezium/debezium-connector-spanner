@@ -19,7 +19,7 @@ import com.google.cloud.spanner.Dialect;
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.SpannerException;
 
-import io.debezium.annotation.VisibleForTesting;
+import io.debezium.common.annotation.VisibleForTesting;
 import io.debezium.connector.spanner.db.dao.SchemaDao;
 import io.debezium.connector.spanner.db.model.schema.ChangeStreamSchema;
 import io.debezium.connector.spanner.db.model.schema.Column;
