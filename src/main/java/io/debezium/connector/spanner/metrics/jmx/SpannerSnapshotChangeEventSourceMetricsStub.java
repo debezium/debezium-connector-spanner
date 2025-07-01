@@ -93,6 +93,11 @@ public class SpannerSnapshotChangeEventSourceMetricsStub implements SnapshotChan
     }
 
     @Override
+    public void snapshotSkipped(SpannerPartition partition) {
+        // spanner connector doesn't support snapshots
+    }
+
+    @Override
     public void dataCollectionSnapshotCompleted(SpannerPartition partition, DataCollectionId dataCollectionId, long numRows) {
         // spanner connector doesn't support snapshots
     }
