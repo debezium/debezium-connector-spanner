@@ -19,6 +19,7 @@ import org.slf4j.LoggerFactory;
 import io.debezium.bean.StandardBeanNames;
 import io.debezium.config.Configuration;
 import io.debezium.connector.base.ChangeEventQueue;
+import io.debezium.connector.base.DefaultQueueProvider;
 import io.debezium.connector.common.DebeziumHeaderProducer;
 import io.debezium.connector.common.DebeziumHeaderProducerProvider;
 import io.debezium.connector.spanner.config.SpannerTableFilter;
@@ -104,10 +105,11 @@ public class SpannerConnectorTask extends SpannerBaseSourceTask {
         final SpannerSourceTaskContext taskContext = new SpannerSourceTaskContext(connectorConfig,
                 () -> spannerMeter.getCapturedTables());
 
-        queue = new ChangeEventQueue.Builder<DataChangeEvent>()
+        this.queue = new ChangeEventQueue.Builder<DataChangeEvent>()
                 .pollInterval(connectorConfig.getPollInterval())
                 .maxBatchSize(connectorConfig.getMaxBatchSize())
                 .maxQueueSize(connectorConfig.getMaxQueueSize())
+                .queueProvider(new DefaultQueueProvider<>(connectorConfig.getMaxQueueSize()))
                 .maxQueueSizeInBytes(connectorConfig.getMaxQueueSizeInBytes())
                 .loggingContextSupplier(() -> taskContext.configureLoggingContext(CONTEXT_NAME))
                 .build();
