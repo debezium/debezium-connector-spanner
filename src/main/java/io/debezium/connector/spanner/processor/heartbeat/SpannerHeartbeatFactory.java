@@ -5,6 +5,10 @@
  */
 package io.debezium.connector.spanner.processor.heartbeat;
 
+import static io.debezium.config.CommonConnectorConfig.TOPIC_NAMING_STRATEGY;
+
+import java.time.Clock;
+
 import io.debezium.config.CommonConnectorConfig;
 import io.debezium.connector.base.ChangeEventQueue;
 import io.debezium.heartbeat.DebeziumHeartbeatFactory;
@@ -12,10 +16,6 @@ import io.debezium.heartbeat.Heartbeat;
 import io.debezium.heartbeat.HeartbeatConnectionProvider;
 import io.debezium.heartbeat.HeartbeatErrorHandler;
 import io.debezium.pipeline.DataChangeEvent;
-
-import java.time.Clock;
-
-import static io.debezium.config.CommonConnectorConfig.TOPIC_NAMING_STRATEGY;
 
 /**
  * Creates {@link SpannerHeartbeat} based on configured properties
