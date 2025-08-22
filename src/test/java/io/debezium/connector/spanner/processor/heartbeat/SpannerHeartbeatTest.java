@@ -5,158 +5,166 @@
  */
 package io.debezium.connector.spanner.processor.heartbeat;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.atLeast;
-import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import java.util.HashMap;
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.util.Collections;
 import java.util.Map;
 
+import io.debezium.connector.SnapshotRecord;
+import io.debezium.connector.base.ChangeEventQueue;
+import io.debezium.connector.base.DefaultQueueProvider;
+import io.debezium.pipeline.DataChangeEvent;
+import io.debezium.pipeline.spi.OffsetContext;
+import io.debezium.pipeline.txmetadata.TransactionContext;
+import io.debezium.spi.schema.DataCollectionId;
+import io.debezium.util.LoggingContext;
+import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.Struct;
-import org.apache.kafka.connect.source.SourceRecord;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import io.debezium.function.BlockingConsumer;
 import io.debezium.schema.SchemaNameAdjuster;
 
 class SpannerHeartbeatTest {
 
-    @Test
-    void testConstructor() {
-        SchemaNameAdjuster schemaNameAdjuster = mock(SchemaNameAdjuster.class);
+    private final SchemaNameAdjuster schemaNameAdjuster = mock(SchemaNameAdjuster.class);
+    private final ChangeEventQueue<DataChangeEvent> changeEventQueue = new ChangeEventQueue.Builder<DataChangeEvent>()
+            .pollInterval(Duration.ofMillis(1))
+            .maxBatchSize(10)
+            .maxQueueSize(10)
+            .queueProvider(new DefaultQueueProvider<>(10))
+            .loggingContextSupplier(() -> LoggingContext.forConnector("test", "test", "test"))
+            .build();
+
+    private final Map<String, String> partition = Map.of("partitionToken", "v1");
+
+    private final SpannerHeartbeat underTest = new SpannerHeartbeat("Topic Name",
+            schemaNameAdjuster,
+            changeEventQueue, Clock.fixed(Instant.parse("2025-08-22T10:15:30.00Z"), ZoneOffset.UTC));
+
+    @BeforeEach
+    void setUp() {
         when(schemaNameAdjuster.adjust(any())).thenReturn("Adjust");
-        try (SpannerHeartbeat spannerHeartbeat = new SpannerHeartbeat("Topic Name", schemaNameAdjuster)) {
-            assertTrue(spannerHeartbeat.isEnabled());
-        }
-
-        verify(schemaNameAdjuster, atLeast(1)).adjust(any());
-    }
-
-    @Test
-    void testConstructorThrows() {
-        SchemaNameAdjuster schemaNameAdjuster = mock(SchemaNameAdjuster.class);
-        when(schemaNameAdjuster.adjust(any())).thenThrow(new IllegalStateException());
-        assertThrows(IllegalStateException.class, () -> new SpannerHeartbeat("Topic Name", schemaNameAdjuster));
-
-        verify(schemaNameAdjuster).adjust(any());
     }
 
     @Test
     void testHeartbeatWithNullOffset() throws InterruptedException {
-        SchemaNameAdjuster schemaNameAdjuster = mock(SchemaNameAdjuster.class);
-        when(schemaNameAdjuster.adjust(any())).thenReturn("Adjust");
-        try (SpannerHeartbeat spannerHeartbeat = spy(new SpannerHeartbeat("Topic Name", schemaNameAdjuster))) {
-            HashMap<String, Object> partition = new HashMap<>();
-            partition.put("partitionToken", "v1");
-            BlockingConsumer<SourceRecord> consumer = mock(BlockingConsumer.class);
-            doNothing().when(consumer).accept(any());
-            Map<String, Object> nullOffset = null;
-            spannerHeartbeat.heartbeat(partition, nullOffset, consumer);
-            verify(consumer).accept(any());
-            verify(spannerHeartbeat).forcedBeat(any(), any(), any());
-        }
+
+        underTest.emitWithDelay(partition, generateOffset(null));
+
+        assertThat(changeEventQueue.remainingCapacity()).isEqualTo(9);
+        changeEventQueue.poll();
         verify(schemaNameAdjuster, atLeast(1)).adjust(any());
     }
 
     @Test
     void testHeartbeatWithEmptyOffset() throws InterruptedException {
-        SchemaNameAdjuster schemaNameAdjuster = mock(SchemaNameAdjuster.class);
-        when(schemaNameAdjuster.adjust(any())).thenReturn("Adjust");
-        try (SpannerHeartbeat spannerHeartbeat = spy(new SpannerHeartbeat("Topic Name", schemaNameAdjuster))) {
-            HashMap<String, Object> partition = new HashMap<>();
-            partition.put("partitionToken", "v1");
-            BlockingConsumer<SourceRecord> consumer = mock(BlockingConsumer.class);
-            doNothing().when(consumer).accept(any());
-            spannerHeartbeat.heartbeat(partition, new HashMap<>(), consumer);
-            verify(consumer).accept(any());
-            verify(spannerHeartbeat).forcedBeat(any(), any(), any());
-        }
+
+        underTest.emitWithDelay(partition, generateOffset(Collections.emptyMap()));
+
+        assertThat(changeEventQueue.remainingCapacity()).isEqualTo(9);
+        changeEventQueue.poll();
         verify(schemaNameAdjuster, atLeast(1)).adjust(any());
     }
 
     @Test
-    void testForcedBeat() throws InterruptedException {
-        SchemaNameAdjuster schemaNameAdjuster = mock(SchemaNameAdjuster.class);
-        when(schemaNameAdjuster.adjust(any())).thenReturn("Adjust");
-        try (SpannerHeartbeat spannerHeartbeat = spy(new SpannerHeartbeat("Topic Name", schemaNameAdjuster))) {
-            Map<String, Object> partition = new HashMap<>();
-            partition.put("partitionToken", "v1");
-            Map<String, Object> offset = new HashMap<>();
-            offset.put("partitionToken", "v1");
-            BlockingConsumer<SourceRecord> consumer = mock(BlockingConsumer.class);
-            doNothing().when(consumer).accept(any());
-            spannerHeartbeat.heartbeat(partition, offset, consumer);
-            verify(consumer).accept(any());
-            verify(spannerHeartbeat).forcedBeat(any(), any(), any());
-        }
+    void testEmit() throws InterruptedException {
+
+        underTest.emit(partition, generateOffset(Collections.emptyMap()));
+
+        assertThat(changeEventQueue.remainingCapacity()).isEqualTo(9);
+        changeEventQueue.poll();
         verify(schemaNameAdjuster, atLeast(1)).adjust(any());
     }
 
     @Test
-    void testForcedBeatWithEmptyOffset() throws InterruptedException {
-        SchemaNameAdjuster schemaNameAdjuster = mock(SchemaNameAdjuster.class);
-        when(schemaNameAdjuster.adjust(any())).thenReturn("Adjust");
-        try (SpannerHeartbeat spannerHeartbeat = spy(new SpannerHeartbeat("Topic Name", schemaNameAdjuster))) {
-            Map<String, Object> partition = new HashMap<>();
-            partition.put("partitionToken", "v1");
-            BlockingConsumer<SourceRecord> consumer = mock(BlockingConsumer.class);
-            doNothing().when(consumer).accept(any());
-            spannerHeartbeat.heartbeat(partition, new HashMap<>(), consumer);
-            verify(consumer).accept(any());
-            verify(spannerHeartbeat).forcedBeat(any(), any(), any());
-        }
+    void testPartitionTokenKey() throws InterruptedException {
+
+        underTest.emit(partition, generateOffset(Collections.emptyMap()));
+
+        Struct key = (Struct) changeEventQueue.poll().get(0)
+                .getRecord()
+                .key();
+
+        assertThat(key.get("partitionToken")).isEqualTo("v1");
         verify(schemaNameAdjuster, atLeast(1)).adjust(any());
     }
 
     @Test
-    void testForcedBeatWithNullOffset() throws InterruptedException {
-        SchemaNameAdjuster schemaNameAdjuster = mock(SchemaNameAdjuster.class);
-        when(schemaNameAdjuster.adjust(any())).thenReturn("Adjust");
-        try (SpannerHeartbeat spannerHeartbeat = spy(new SpannerHeartbeat("Topic Name", schemaNameAdjuster))) {
-            Map<String, Object> partition = new HashMap<>();
-            partition.put("partitionToken", "v1");
-            BlockingConsumer<SourceRecord> consumer = mock(BlockingConsumer.class);
-            doNothing().when(consumer).accept(any());
-            Map<String, Object> nullOffset = null;
-            spannerHeartbeat.heartbeat(partition, nullOffset, consumer);
-            verify(consumer).accept(any());
-            verify(spannerHeartbeat).forcedBeat(any(), any(), any());
-        }
+    void testMessageValue() throws InterruptedException {
+
+        underTest.emit(partition, generateOffset(Collections.emptyMap()));
+
+        Struct value = (Struct) changeEventQueue.poll()
+                .get(0)
+                .getRecord()
+                .value();
+
+        assertThat(value.get("ts_ms")).isEqualTo(1755857730000L);
         verify(schemaNameAdjuster, atLeast(1)).adjust(any());
     }
 
-    @Test
-    void testPartitionTokenKey() {
-        SchemaNameAdjuster schemaNameAdjuster = mock(SchemaNameAdjuster.class);
-        when(schemaNameAdjuster.adjust(any())).thenReturn("Adjust");
-        SpannerHeartbeat spannerHeartbeat = new SpannerHeartbeat("Topic Name", schemaNameAdjuster);
-        String value = "value";
-        Struct struct = spannerHeartbeat.partitionTokenKey(value);
-        assertEquals(value, struct.get("partitionToken"));
+    private OffsetContext generateOffset(final Map<String, ?> offset) {
+        return new OffsetContext() {
+            @Override
+            public Map<String, ?> getOffset() {
+                return offset;
+            }
+
+            @Override
+            public Schema getSourceInfoSchema() {
+                return null;
+            }
+
+            @Override
+            public Struct getSourceInfo() {
+                return null;
+            }
+
+            @Override
+            public boolean isInitialSnapshotRunning() {
+                return false;
+            }
+
+            @Override
+            public void markSnapshotRecord(SnapshotRecord record) {
+
+            }
+
+            @Override
+            public void preSnapshotStart(boolean onDemand) {
+
+            }
+
+            @Override
+            public void preSnapshotCompletion() {
+
+            }
+
+            @Override
+            public void postSnapshotCompletion() {
+
+            }
+
+            @Override
+            public void event(DataCollectionId collectionId, Instant timestamp) {
+
+            }
+
+            @Override
+            public TransactionContext getTransactionContext() {
+                return null;
+            }
+        };
     }
 
-    @Test
-    void testMessageValue() {
-        SchemaNameAdjuster schemaNameAdjuster = mock(SchemaNameAdjuster.class);
-        when(schemaNameAdjuster.adjust(any())).thenReturn("Adjust");
-        SpannerHeartbeat spannerHeartbeat = new SpannerHeartbeat("Topic Name", schemaNameAdjuster);
-        Struct struct = spannerHeartbeat.messageValue();
-        assertNotNull(struct.get("ts_ms"));
-    }
-
-    @Test
-    void testHeartbeatRecord() {
-        SchemaNameAdjuster schemaNameAdjuster = mock(SchemaNameAdjuster.class);
-        when(schemaNameAdjuster.adjust(any())).thenReturn("Adjust");
-        SpannerHeartbeat spannerHeartbeat = new SpannerHeartbeat("Topic Name", schemaNameAdjuster);
-        assertNotNull(spannerHeartbeat.heartbeatRecord(Map.of("partitionToken", "v"), Map.of("partitionToken", "v")));
-    }
 }
