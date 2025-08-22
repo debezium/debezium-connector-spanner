@@ -11,6 +11,7 @@ import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 
+import io.debezium.heartbeat.DebeziumHeartbeatFactory;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.slf4j.Logger;
@@ -28,7 +29,6 @@ import io.debezium.connector.spanner.db.metadata.TableId;
 import io.debezium.connector.spanner.exception.SpannerConnectorException;
 import io.debezium.connector.spanner.kafka.KafkaPartitionInfoProvider;
 import io.debezium.data.Envelope;
-import io.debezium.heartbeat.HeartbeatFactory;
 import io.debezium.pipeline.DataChangeEvent;
 import io.debezium.pipeline.EventDispatcher;
 import io.debezium.pipeline.source.spi.EventMetadataProvider;
@@ -64,14 +64,18 @@ public class SpannerEventDispatcher extends EventDispatcher<SpannerPartition, Ta
                                   DataCollectionFilters.DataCollectionFilter<TableId> filter,
                                   ChangeEventCreator changeEventCreator,
                                   EventMetadataProvider metadataProvider,
-                                  HeartbeatFactory<TableId> heartbeatFactory,
+                                  DebeziumHeartbeatFactory heartbeatFactory,
                                   SchemaNameAdjuster schemaNameAdjuster,
                                   SchemaRegistry schemaRegistry,
                                   SourceInfoFactory sourceInfoFactory,
                                   KafkaPartitionInfoProvider kafkaPartitionInfoProvider,
                                   DebeziumHeaderProducer debeziumHeaderProducer) {
         super(connectorConfig, topicNamingStrategy, schema, queue, filter, changeEventCreator, metadataProvider,
-                heartbeatFactory.createHeartbeat(), schemaNameAdjuster, debeziumHeaderProducer);
+                heartbeatFactory.getScheduledHeartbeat(
+                        connectorConfig,
+                        () -> null,
+                        null,
+                        queue), schemaNameAdjuster, debeziumHeaderProducer);
         this.connectorConfig = connectorConfig;
         this.queue = queue;
         this.topicNamingStrategy = topicNamingStrategy;

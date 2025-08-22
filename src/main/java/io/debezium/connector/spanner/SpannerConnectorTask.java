@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+import io.debezium.heartbeat.DebeziumHeartbeatFactory;
 import org.apache.kafka.connect.errors.ConnectException;
 import org.apache.kafka.connect.errors.RetriableException;
 import org.apache.kafka.connect.source.SourceRecord;
@@ -137,7 +138,7 @@ public class SpannerConnectorTask extends SpannerBaseSourceTask {
 
         schema = new KafkaSpannerSchema(tableSchemaFactory);
 
-        final SpannerHeartbeatFactory spannerHeartbeatFactory = new SpannerHeartbeatFactory(connectorConfig, topicNamingStrategy, schemaNameAdjuster);
+        final DebeziumHeartbeatFactory spannerHeartbeatFactory = new SpannerHeartbeatFactory();
 
         final PartitionOffsetProvider partitionOffsetProvider = new PartitionOffsetProvider(
                 this.context.offsetStorageReader(), spannerMeter.getMetricsEventPublisher());

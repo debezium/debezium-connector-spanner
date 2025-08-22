@@ -6,30 +6,31 @@
 package io.debezium.connector.spanner.processor.heartbeat;
 
 import io.debezium.config.CommonConnectorConfig;
-import io.debezium.connector.spanner.db.metadata.TableId;
+import io.debezium.connector.base.ChangeEventQueue;
+import io.debezium.heartbeat.DebeziumHeartbeatFactory;
 import io.debezium.heartbeat.Heartbeat;
-import io.debezium.heartbeat.HeartbeatFactory;
-import io.debezium.schema.SchemaNameAdjuster;
-import io.debezium.spi.topic.TopicNamingStrategy;
+import io.debezium.heartbeat.HeartbeatConnectionProvider;
+import io.debezium.heartbeat.HeartbeatErrorHandler;
+import io.debezium.pipeline.DataChangeEvent;
+
+import java.time.Clock;
+
+import static io.debezium.config.CommonConnectorConfig.TOPIC_NAMING_STRATEGY;
 
 /**
  * Creates {@link SpannerHeartbeat} based on configured properties
  *
  */
-public class SpannerHeartbeatFactory extends HeartbeatFactory<TableId> {
+public class SpannerHeartbeatFactory implements DebeziumHeartbeatFactory {
 
-    private final TopicNamingStrategy topicNamingStrategy;
-    private final SchemaNameAdjuster schemaNameAdjuster;
-
-    public SpannerHeartbeatFactory(CommonConnectorConfig connectorConfig, TopicNamingStrategy topicNamingStrategy, SchemaNameAdjuster schemaNameAdjuster) {
-        super(connectorConfig, topicNamingStrategy, schemaNameAdjuster);
-
-        this.topicNamingStrategy = topicNamingStrategy;
-        this.schemaNameAdjuster = schemaNameAdjuster;
+    @Override
+    public Heartbeat.ScheduledHeartbeat getScheduledHeartbeat(CommonConnectorConfig connectorConfig,
+                                                              HeartbeatConnectionProvider connectionProvider,
+                                                              HeartbeatErrorHandler errorHandler,
+                                                              ChangeEventQueue<DataChangeEvent> queue) {
+        return new SpannerHeartbeat(
+                connectorConfig.getTopicNamingStrategy(TOPIC_NAMING_STRATEGY).heartbeatTopic(),
+                connectorConfig.schemaNameAdjuster(),
+                queue, Clock.systemUTC());
     }
-
-    public Heartbeat createHeartbeat() {
-        return new SpannerHeartbeat(topicNamingStrategy.heartbeatTopic(), schemaNameAdjuster);
-    }
-
 }
