@@ -19,20 +19,20 @@ import java.time.ZoneOffset;
 import java.util.Collections;
 import java.util.Map;
 
+import org.apache.kafka.connect.data.Schema;
+import org.apache.kafka.connect.data.Struct;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
 import io.debezium.connector.SnapshotRecord;
 import io.debezium.connector.base.ChangeEventQueue;
 import io.debezium.connector.base.DefaultQueueProvider;
 import io.debezium.pipeline.DataChangeEvent;
 import io.debezium.pipeline.spi.OffsetContext;
 import io.debezium.pipeline.txmetadata.TransactionContext;
+import io.debezium.schema.SchemaNameAdjuster;
 import io.debezium.spi.schema.DataCollectionId;
 import io.debezium.util.LoggingContext;
-import org.apache.kafka.connect.data.Schema;
-import org.apache.kafka.connect.data.Struct;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-
-import io.debezium.schema.SchemaNameAdjuster;
 
 class SpannerHeartbeatTest {
 

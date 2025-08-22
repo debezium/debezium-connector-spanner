@@ -9,10 +9,6 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.Map;
 
-import io.debezium.connector.base.ChangeEventQueue;
-import io.debezium.heartbeat.Heartbeat.ScheduledHeartbeat;
-import io.debezium.pipeline.DataChangeEvent;
-import io.debezium.pipeline.spi.OffsetContext;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.SchemaBuilder;
 import org.apache.kafka.connect.data.Struct;
@@ -21,7 +17,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import io.debezium.connector.AbstractSourceInfo;
+import io.debezium.connector.base.ChangeEventQueue;
 import io.debezium.connector.spanner.SpannerPartition;
+import io.debezium.heartbeat.Heartbeat.ScheduledHeartbeat;
+import io.debezium.pipeline.DataChangeEvent;
+import io.debezium.pipeline.spi.OffsetContext;
 import io.debezium.schema.SchemaNameAdjuster;
 
 /**
