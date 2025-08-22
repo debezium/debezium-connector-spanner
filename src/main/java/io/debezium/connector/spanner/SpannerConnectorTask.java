@@ -46,6 +46,7 @@ import io.debezium.connector.spanner.task.PartitionOffsetProvider;
 import io.debezium.connector.spanner.task.SynchronizationTaskContext;
 import io.debezium.connector.spanner.task.SynchronizedPartitionManager;
 import io.debezium.connector.spanner.task.TaskUid;
+import io.debezium.heartbeat.DebeziumHeartbeatFactory;
 import io.debezium.pipeline.DataChangeEvent;
 import io.debezium.pipeline.ErrorHandler;
 import io.debezium.pipeline.notification.NotificationService;
@@ -137,7 +138,7 @@ public class SpannerConnectorTask extends SpannerBaseSourceTask {
 
         schema = new KafkaSpannerSchema(tableSchemaFactory);
 
-        final SpannerHeartbeatFactory spannerHeartbeatFactory = new SpannerHeartbeatFactory(connectorConfig, topicNamingStrategy, schemaNameAdjuster);
+        final DebeziumHeartbeatFactory spannerHeartbeatFactory = new SpannerHeartbeatFactory();
 
         final PartitionOffsetProvider partitionOffsetProvider = new PartitionOffsetProvider(
                 this.context.offsetStorageReader(), spannerMeter.getMetricsEventPublisher());
