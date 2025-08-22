@@ -79,13 +79,10 @@ class SpannerEventDispatcherTest {
         ChangeEventCreator changeEventCreator = mock(ChangeEventCreator.class);
         SpannerEventMetadataProvider metadataProvider = new SpannerEventMetadataProvider();
 
-        SpannerConnectorConfig connectorConfig1 = new SpannerConnectorConfig(configuration);
         TopicNamingStrategy<TableId> topicNamingStrategy2 = (TopicNamingStrategy<TableId>) mock(TopicNamingStrategy.class);
         when(topicNamingStrategy2.heartbeatTopic()).thenReturn("Heartbeat Topic");
-        SchemaNameAdjuster schemaNameAdjuster1 = mock(SchemaNameAdjuster.class);
-        when(schemaNameAdjuster1.adjust(any())).thenReturn("Adjust");
 
-        HeartbeatFactory<TableId> heartbeatFactory = new HeartbeatFactory<>(connectorConfig1, topicNamingStrategy2, schemaNameAdjuster1);
+        HeartbeatFactory<TableId> heartbeatFactory = new HeartbeatFactory<>();
 
         SchemaNameAdjuster schemaNameAdjuster2 = mock(SchemaNameAdjuster.class);
         when(schemaNameAdjuster2.adjust(any())).thenReturn("Adjust");
@@ -101,8 +98,6 @@ class SpannerEventDispatcherTest {
         assertNull(actualSpannerEventDispatcher.getHistorizedSchema());
         assertSame(kafkaSpannerSchema, actualSpannerEventDispatcher.getSchema());
         verify(topicNamingStrategy).transactionTopic();
-        verify(topicNamingStrategy2).heartbeatTopic();
-        verify(schemaNameAdjuster1, atLeast(1)).adjust(any());
         verify(schemaNameAdjuster2, atLeast(1)).adjust(any());
     }
 
@@ -124,12 +119,11 @@ class SpannerEventDispatcherTest {
         when(configuration2.getString((Field) any())).thenReturn("String");
         when(configuration2.getString(anyString())).thenReturn("String");
         when(configuration2.asProperties()).thenReturn(new Properties());
-        SpannerConnectorConfig connectorConfig1 = new SpannerConnectorConfig(configuration2);
         TopicNamingStrategy<TableId> topicNamingStrategy1 = (TopicNamingStrategy<TableId>) mock(TopicNamingStrategy.class);
         when(topicNamingStrategy1.heartbeatTopic()).thenReturn("Heartbeat Topic");
         SchemaNameAdjuster schemaNameAdjuster = mock(SchemaNameAdjuster.class);
         when(schemaNameAdjuster.adjust(any())).thenReturn("Adjust");
-        HeartbeatFactory<TableId> heartbeatFactory = new HeartbeatFactory<>(connectorConfig1, topicNamingStrategy1, schemaNameAdjuster);
+        HeartbeatFactory<TableId> heartbeatFactory = new HeartbeatFactory<>();
 
         SchemaNameAdjuster schemaNameAdjuster1 = mock(SchemaNameAdjuster.class);
         when(schemaNameAdjuster1.adjust(any())).thenReturn("Adjust");
@@ -157,8 +151,6 @@ class SpannerEventDispatcherTest {
                         sourceInfoFactory, new KafkaPartitionInfoProvider(null), null)).publishLowWatermarkStampEvent());
 
         verify(topicNamingStrategy).transactionTopic();
-        verify(topicNamingStrategy1).heartbeatTopic();
-        verify(schemaNameAdjuster, atLeast(1)).adjust(any());
         verify(schemaNameAdjuster1, atLeast(1)).adjust(any());
     }
 
