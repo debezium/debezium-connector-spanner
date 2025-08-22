@@ -10,7 +10,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
-import io.debezium.heartbeat.DebeziumHeartbeatFactory;
 import org.apache.kafka.connect.errors.ConnectException;
 import org.apache.kafka.connect.errors.RetriableException;
 import org.apache.kafka.connect.source.SourceRecord;
@@ -47,6 +46,7 @@ import io.debezium.connector.spanner.task.PartitionOffsetProvider;
 import io.debezium.connector.spanner.task.SynchronizationTaskContext;
 import io.debezium.connector.spanner.task.SynchronizedPartitionManager;
 import io.debezium.connector.spanner.task.TaskUid;
+import io.debezium.heartbeat.DebeziumHeartbeatFactory;
 import io.debezium.pipeline.DataChangeEvent;
 import io.debezium.pipeline.ErrorHandler;
 import io.debezium.pipeline.notification.NotificationService;
