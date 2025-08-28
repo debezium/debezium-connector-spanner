@@ -41,7 +41,7 @@ public class AbstractSpannerConnectorIT extends AbstractAsyncEngineConnectorTest
                     "http://localhost:9010")
             .with("offset.storage", "org.apache.kafka.connect.storage.MemoryOffsetBackingStore")
             .with("connector.spanner.sync.kafka.bootstrap.servers", KAFKA_ENVIRONMENT.kafkaBrokerApiOn().getAddress())
-            .with("database.history.kafka.bootstrap.servers", KAFKA_ENVIRONMENT.kafkaBrokerApiOn().getAddress())
+            .with("internal.schema.history.kafka.bootstrap.servers", KAFKA_ENVIRONMENT.kafkaBrokerApiOn().getAddress())
             .with("bootstrap.servers", KAFKA_ENVIRONMENT.kafkaBrokerApiOn().getAddress())
             .with("heartbeat.interval.ms", "300000")
             .with("gcp.spanner.low-watermark.enabled", false)
