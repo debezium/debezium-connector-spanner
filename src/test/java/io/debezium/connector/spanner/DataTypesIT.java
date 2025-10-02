@@ -44,6 +44,7 @@ public class DataTypesIT extends AbstractSpannerConnectorIT {
                 + "  numericcol NUMERIC,"
                 + "  jsoncol JSON,"
                 + "  arrcol ARRAY<STRING(MAX)>,"
+                + "  tokenlistcol TOKENLIST AS (TOKENIZE_FULLTEXT(stringcol)) HIDDEN, "
                 + ") PRIMARY KEY (id)");
         databaseConnection.createChangeStream(gsqlChangeStreamName, gsqlTableName);
 
@@ -119,6 +120,7 @@ public class DataTypesIT extends AbstractSpannerConnectorIT {
         assertThat(values.getString("numericcol")).isEqualTo("6.023");
         assertThat(values.getString("jsoncol")).isEqualTo("\"Hello\"");
         assertThat(values.getArray("arrcol")).containsExactly("a", "b");
+        assertThat(values.getString("tokenlistcol")).isNull();
 
         stopConnector();
         assertConnectorNotRunning();
