@@ -60,7 +60,11 @@ class ColumnTypeSchemaMapperTest {
 
                 Arguments.of(
                         ColumnTypeSchemaMapper.getSchema(ColumnTypeParser.parse("{\"code\":\"BYTES\"}"), true),
-                        SchemaBuilder.bytes().optional()));
+                        SchemaBuilder.bytes().optional()),
+
+                Arguments.of(
+                        ColumnTypeSchemaMapper.getSchema(ColumnTypeParser.parse("{\"code\":\"TOKENLIST\"}"), true),
+                        Schema.OPTIONAL_STRING_SCHEMA));
     }
 
     @ParameterizedTest

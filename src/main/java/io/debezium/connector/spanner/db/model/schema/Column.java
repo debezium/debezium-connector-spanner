@@ -87,6 +87,9 @@ public class Column {
                 if ("JSON".equals(spannerType)) {
                     return new ColumnType(DataType.JSON);
                 }
+                if ("TOKENLIST".equals(spannerType)) {
+                    return new ColumnType(DataType.TOKENLIST);
+                }
                 if (spannerType.startsWith("ARRAY")) {
                     // Substring "ARRAY<xxx>"
                     String spannerArrayType = spannerType.substring(6, spannerType.length() - 1);

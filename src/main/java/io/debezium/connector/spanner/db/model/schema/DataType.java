@@ -21,4 +21,5 @@ public enum DataType {
     STRUCT,
     NUMERIC,
     JSON,
+    TOKENLIST,
 }

@@ -25,6 +25,7 @@ public class ColumnTypeSchemaMapper {
             case DATE:
             case JSON:
             case TIMESTAMP:
+            case TOKENLIST:
                 return optional ? Schema.OPTIONAL_STRING_SCHEMA : Schema.STRING_SCHEMA;
             case INT64:
                 return optional ? Schema.OPTIONAL_INT64_SCHEMA : Schema.INT64_SCHEMA;
@@ -57,6 +58,7 @@ public class ColumnTypeSchemaMapper {
             case DATE:
             case JSON:
             case TIMESTAMP:
+            case TOKENLIST:
                 return optional ? Schema.OPTIONAL_STRING_SCHEMA : Schema.STRING_SCHEMA;
             case INT64:
                 return optional ? Schema.OPTIONAL_INT64_SCHEMA : Schema.INT64_SCHEMA;
