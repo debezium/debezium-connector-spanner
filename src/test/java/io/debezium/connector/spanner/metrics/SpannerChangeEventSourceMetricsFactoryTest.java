@@ -11,6 +11,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import java.util.Collections;
+
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
@@ -41,7 +43,7 @@ class SpannerChangeEventSourceMetricsFactoryTest {
         when(spannerSourceTaskContext.getTaskId()).thenReturn("42");
 
         SpannerStreamingChangeEventSourceMetrics streamingMetrics = (SpannerStreamingChangeEventSourceMetrics) spannerChangeEventSourceMetricsFactory.getStreamingMetrics(
-                spannerSourceTaskContext, null, new SpannerEventMetadataProvider());
+                spannerSourceTaskContext, null, new SpannerEventMetadataProvider(), Collections::emptyList);
         assertNull(streamingMetrics.getCapturedTables());
         assertNull(streamingMetrics.getLastTransactionId());
         assertNull(streamingMetrics.getLastEvent());
