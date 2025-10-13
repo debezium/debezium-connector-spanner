@@ -11,10 +11,10 @@ import io.debezium.connector.spanner.SpannerPartition;
 import io.debezium.connector.spanner.context.source.SpannerSourceTaskContext;
 import io.debezium.connector.spanner.metrics.jmx.SpannerSnapshotChangeEventSourceMetricsStub;
 import io.debezium.connector.spanner.metrics.jmx.SpannerStreamingChangeEventSourceMetrics;
+import io.debezium.pipeline.metrics.CapturedTablesSupplier;
 import io.debezium.pipeline.metrics.DefaultChangeEventSourceMetricsFactory;
 import io.debezium.pipeline.metrics.SnapshotChangeEventSourceMetrics;
 import io.debezium.pipeline.metrics.StreamingChangeEventSourceMetrics;
-import io.debezium.pipeline.metrics.spi.CapturedTablesSupplier;
 import io.debezium.pipeline.source.spi.EventMetadataProvider;
 
 /**

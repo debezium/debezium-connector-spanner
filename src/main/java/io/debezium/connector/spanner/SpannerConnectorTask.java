@@ -102,7 +102,7 @@ public class SpannerConnectorTask extends SpannerBaseSourceTask {
 
         final DaoFactory daoFactory = new DaoFactory(databaseClientFactory);
 
-        final SpannerSourceTaskContext taskContext = new SpannerSourceTaskContext(connectorConfig);
+        final SpannerSourceTaskContext taskContext = new SpannerSourceTaskContext(configuration, connectorConfig);
 
         this.queue = new ChangeEventQueue.Builder<DataChangeEvent>()
                 .pollInterval(connectorConfig.getPollInterval())

@@ -7,6 +7,7 @@ package io.debezium.connector.spanner.context.source;
 
 import org.apache.kafka.connect.source.SourceTask;
 
+import io.debezium.config.Configuration;
 import io.debezium.connector.common.CdcSourceTaskContext;
 import io.debezium.connector.spanner.SpannerConnectorConfig;
 
@@ -14,8 +15,8 @@ import io.debezium.connector.spanner.SpannerConnectorConfig;
  * Contains contextual information and objects scoped to the lifecycle of Debezium's {@link SourceTask} implementations.
  * Extends {@code CdcSourceTaskContext}.
  */
-public class SpannerSourceTaskContext extends CdcSourceTaskContext {
-    public SpannerSourceTaskContext(SpannerConnectorConfig config) {
-        super(config, config.getTaskId(), config.getCustomMetricTags());
+public class SpannerSourceTaskContext extends CdcSourceTaskContext<SpannerConnectorConfig> {
+    public SpannerSourceTaskContext(Configuration rawConfig, SpannerConnectorConfig config) {
+        super(rawConfig, config, config.getTaskId(), config.getCustomMetricTags());
     }
 }
