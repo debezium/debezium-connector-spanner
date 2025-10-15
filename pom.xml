@@ -8,7 +8,7 @@
     <modelVersion>4.0.0</modelVersion>
 
     <artifactId>debezium-connector-spanner</artifactId>
-    <version>3.3.1.Final</version>
+    <version>3.3.2-SNAPSHOT</version>
     <name>Debezium Google Spanner Kafka Connector Plugin</name>
 
     <packaging>jar</packaging>
