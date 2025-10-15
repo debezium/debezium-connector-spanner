@@ -5,6 +5,7 @@
  */
 package io.debezium.connector.spanner.metrics;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -44,7 +45,7 @@ class SpannerChangeEventSourceMetricsFactoryTest {
 
         SpannerStreamingChangeEventSourceMetrics streamingMetrics = (SpannerStreamingChangeEventSourceMetrics) spannerChangeEventSourceMetricsFactory.getStreamingMetrics(
                 spannerSourceTaskContext, null, new SpannerEventMetadataProvider(), Collections::emptyList);
-        assertNull(streamingMetrics.getCapturedTables());
+        assertThat(streamingMetrics.getCapturedTables()).isEmpty();
         assertNull(streamingMetrics.getLastTransactionId());
         assertNull(streamingMetrics.getLastEvent());
         assertEquals(0, streamingMetrics.getErrorCount());
