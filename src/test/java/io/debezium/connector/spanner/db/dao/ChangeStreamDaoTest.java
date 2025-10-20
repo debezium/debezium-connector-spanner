@@ -32,7 +32,7 @@ class ChangeStreamDaoTest {
         DatabaseClient databaseClient = mock(DatabaseClient.class);
         when(databaseClient.singleUse()).thenReturn(readContext);
 
-        ChangeStreamDao changeStreamDao = new ChangeStreamDao("Change Stream Name", databaseClient,
+        ChangeStreamDao changeStreamDao = new ChangeStreamDao("Change Stream Name", false, databaseClient,
                 Options.RpcPriority.LOW, "Job Name");
         Timestamp startTimestamp = Timestamp.ofTimeMicroseconds(1L);
         assertNull(changeStreamDao.streamQuery("token", startTimestamp, Timestamp.ofTimeMicroseconds(1L), 1L)

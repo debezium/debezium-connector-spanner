@@ -6,7 +6,13 @@
 package io.debezium.connector.spanner.db;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import org.junit.jupiter.api.Test;
 
@@ -28,7 +34,12 @@ class DaoFactoryTest {
     @Test
     void testGetStreamDao() {
         DatabaseClientFactory databaseClientFactory = mock(DatabaseClientFactory.class);
-        DaoFactory daoFactory = new DaoFactory(databaseClientFactory);
+        SchemaDao mockSchema = mock(SchemaDao.class);
+        when(mockSchema.isMutableKeyRangeChangeStream(any())).thenReturn(true);
+
+        // use a spy so we can stub getSchemaDao() to return our mockSchema
+        DaoFactory daoFactory = spy(new DaoFactory(databaseClientFactory));
+        doReturn(mockSchema).when(daoFactory).getSchemaDao();
 
         String changeStreamName = "";
         Options.RpcPriority rpcPriority = Options.RpcPriority.LOW;
@@ -36,6 +47,6 @@ class DaoFactoryTest {
 
         ChangeStreamDao actualStreamDao = daoFactory.getStreamDao(changeStreamName, rpcPriority, jobName);
         assertNotNull(actualStreamDao);
-
+        verify(mockSchema, times(1)).isMutableKeyRangeChangeStream(changeStreamName);
     }
 }

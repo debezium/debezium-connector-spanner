@@ -91,4 +91,44 @@ class SchemaDaoTest {
         verify(asyncResultSet, atLeast(1)).next();
         verify(asyncResultSet, atLeast(1)).getBoolean(anyInt());
     }
+
+    @Test
+    void testIsMutableKeyRangeChangeStream() throws SpannerException {
+        DatabaseClient databaseClient = mock(DatabaseClient.class);
+        ReadOnlyTransaction readOnlyTransaction = mock(ReadOnlyTransaction.class);
+        when(databaseClient.readOnlyTransaction()).thenReturn(readOnlyTransaction);
+
+        ResultSet resultSet = mock(ResultSet.class);
+        when(readOnlyTransaction.executeQuery(any())).thenReturn(resultSet);
+        when(resultSet.next()).thenReturn(true).thenReturn(false);
+        when(resultSet.getString(0)).thenReturn("partition_mode");
+        when(resultSet.getString(1)).thenReturn("MUTABLE_KEY_RANGE");
+
+        SchemaDao schemaDao = new SchemaDao(databaseClient);
+        boolean actual = schemaDao.isMutableKeyRangeChangeStream("someStream");
+        assertTrue(actual);
+
+        verify(databaseClient).readOnlyTransaction();
+        verify(readOnlyTransaction).executeQuery(any());
+    }
+
+    @Test
+    void testIsNotMutableKeyRangeChangeStream() throws SpannerException {
+        DatabaseClient databaseClient = mock(DatabaseClient.class);
+        ReadOnlyTransaction readOnlyTransaction = mock(ReadOnlyTransaction.class);
+        when(databaseClient.readOnlyTransaction()).thenReturn(readOnlyTransaction);
+
+        ResultSet resultSet = mock(ResultSet.class);
+        when(readOnlyTransaction.executeQuery(any())).thenReturn(resultSet);
+        when(resultSet.next()).thenReturn(true).thenReturn(false);
+        when(resultSet.getString(0)).thenReturn("some_other_option");
+        when(resultSet.getString(1)).thenReturn("SOME_VALUE");
+
+        SchemaDao schemaDao = new SchemaDao(databaseClient);
+        boolean actual = schemaDao.isMutableKeyRangeChangeStream("someStream");
+        assertFalse(actual);
+
+        verify(databaseClient).readOnlyTransaction();
+        verify(readOnlyTransaction).executeQuery(any());
+    }
 }
