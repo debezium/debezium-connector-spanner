@@ -30,7 +30,11 @@ public class DaoFactory {
         return schemaDao;
     }
 
-    public ChangeStreamDao getStreamDao(String changeStreamName, Options.RpcPriority rpcPriority, String jobName) {
-        return new ChangeStreamDao(changeStreamName, this.databaseClientFactory.getDatabaseClient(), rpcPriority, jobName);
+    public ChangeStreamDao getStreamDao(String changeStreamName,
+                                        Options.RpcPriority rpcPriority, String jobName) {
+        SchemaDao schemaDao = getSchemaDao();
+        boolean isMutableKeyRange = schemaDao.isMutableKeyRangeChangeStream(changeStreamName);
+        return new ChangeStreamDao(changeStreamName, isMutableKeyRange, this.databaseClientFactory.getDatabaseClient(),
+                rpcPriority, jobName);
     }
 }

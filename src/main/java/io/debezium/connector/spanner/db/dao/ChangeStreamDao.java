@@ -24,10 +24,12 @@ public class ChangeStreamDao {
     private final DatabaseClient databaseClient;
     private final RpcPriority rpcPriority;
     private final String jobName;
+    private final boolean isMutableKeyRange;
 
-    public ChangeStreamDao(String changeStreamName, DatabaseClient databaseClient, RpcPriority rpcPriority,
-                           String jobName) {
+    public ChangeStreamDao(String changeStreamName, boolean isMutableKeyRange, DatabaseClient databaseClient,
+                           RpcPriority rpcPriority, String jobName) {
         this.changeStreamName = changeStreamName;
+        this.isMutableKeyRange = isMutableKeyRange;
         this.databaseClient = databaseClient;
         this.rpcPriority = rpcPriority;
         this.jobName = jobName;
@@ -40,8 +42,14 @@ public class ChangeStreamDao {
         String query;
         Statement statement;
         if (this.isPostgres()) {
-            query = "SELECT * FROM \"spanner\".\"read_json_" + changeStreamName
-                    + "\"($1, $2, $3, $4, null)";
+            if (this.isMutableKeyRange) {
+                query = "SELECT * FROM \"spanner\".\"read_proto_bytes_" + changeStreamName
+                        + "\"($1, $2, $3, $4, null)";
+            }
+            else {
+                query = "SELECT * FROM \"spanner\".\"read_json_" + changeStreamName
+                        + "\"($1, $2, $3, $4, null)";
+            }
             statement = Statement.newBuilder(query)
                     .bind("p1")
                     .to(startTimestamp)

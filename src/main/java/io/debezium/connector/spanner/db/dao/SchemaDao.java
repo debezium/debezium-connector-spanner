@@ -84,6 +84,21 @@ public class SchemaDao {
         return exist ? builder.build() : null;
     }
 
+    public boolean isMutableKeyRangeChangeStream(String streamName) {
+        try (ReadOnlyTransaction tx = databaseClient.readOnlyTransaction()) {
+            ResultSet resultSet = readChangeStreamOptions(tx, streamName);
+
+            while (resultSet.next()) {
+                String optionName = resultSet.getString(0);
+                if ("partition_mode".equalsIgnoreCase(optionName)) {
+                    String optionValue = resultSet.getString(1);
+                    return "MUTABLE_KEY_RANGE".equalsIgnoreCase(optionValue);
+                }
+            }
+        }
+        return false;
+    }
+
     private ResultSet readColumnsInfo(ReadOnlyTransaction tx, Collection<String> tables) {
         Statement statement;
         if (isPostgres()) {
@@ -195,6 +210,33 @@ public class SchemaDao {
                     "  csc.change_stream_name = cs.change_stream_name\n" +
                     "  and csc.table_name = cst.table_name\n" +
                     "where cs.change_stream_name = @streamName")
+                    .bind("streamName")
+                    .to(streamName)
+                    .build();
+        }
+        return tx.executeQuery(statement);
+    }
+
+    private ResultSet readChangeStreamOptions(ReadOnlyTransaction tx, String streamName) {
+        Statement statement;
+        if (isPostgres()) {
+            statement = Statement.newBuilder("select" +
+                    "  option_name," +
+                    "  option_value\n" +
+                    "from" +
+                    "  information_schema.change_stream_options\n" +
+                    "where change_stream_name = $1")
+                    .bind("p1")
+                    .to(streamName)
+                    .build();
+        }
+        else {
+            statement = Statement.newBuilder("select" +
+                    "  option_name," +
+                    "  option_value\n" +
+                    "from" +
+                    "  information_schema.change_stream_options\n" +
+                    "where change_stream_name = @streamName")
                     .bind("streamName")
                     .to(streamName)
                     .build();
