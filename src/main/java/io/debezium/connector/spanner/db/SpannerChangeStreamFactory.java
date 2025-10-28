@@ -45,7 +45,9 @@ public class SpannerChangeStreamFactory {
                 Options.RpcPriority.MEDIUM,
                 JOB_NAME + "_" + connectorName + "_" + UUID.randomUUID());
 
-        ChangeStreamRecordMapper changeStreamRecordMapper = new ChangeStreamRecordMapper(databaseClientFactory.getDatabaseClient());
+        // TODO: populate isMutableKeyRange from ChangeStreamDao.
+        ChangeStreamRecordMapper changeStreamRecordMapper = new ChangeStreamRecordMapper(
+                databaseClientFactory.getDatabaseClient(), false);
 
         SpannerChangeStreamService streamService = new SpannerChangeStreamService(
                 taskUid, changeStreamDao, changeStreamRecordMapper, heartbeatMillis, metricsEventPublisher);

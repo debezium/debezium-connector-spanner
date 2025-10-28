@@ -41,6 +41,9 @@ import io.debezium.connector.spanner.db.model.event.ChangeStreamEvent;
 import io.debezium.connector.spanner.db.model.event.ChildPartitionsEvent;
 import io.debezium.connector.spanner.db.model.event.DataChangeEvent;
 import io.debezium.connector.spanner.db.model.event.HeartbeatEvent;
+import io.debezium.connector.spanner.db.model.event.PartitionEndEvent;
+import io.debezium.connector.spanner.db.model.event.PartitionEventEvent;
+import io.debezium.connector.spanner.db.model.event.PartitionStartEvent;
 import io.debezium.connector.spanner.db.model.schema.Column;
 import io.debezium.connector.spanner.db.model.schema.ColumnType;
 
@@ -87,9 +90,11 @@ public class ChangeStreamRecordMapper {
     private static final String SYSTEM_TRANSACTION = "is_system_transaction";
 
     private final DatabaseClient databaseClient;
+    private final boolean isMutableKeyRange;
 
-    public ChangeStreamRecordMapper(DatabaseClient databaseClient) {
+    public ChangeStreamRecordMapper(DatabaseClient databaseClient, boolean isMutableKeyRange) {
         this.databaseClient = databaseClient;
+        this.isMutableKeyRange = isMutableKeyRange;
 
         this.printer = JsonFormat.printer().preservingProtoFieldNames()
                 .omittingInsignificantWhitespace();
@@ -100,14 +105,27 @@ public class ChangeStreamRecordMapper {
                                                         Partition partition, ChangeStreamResultSet resultSet,
                                                         ChangeStreamResultSetMetadata resultSetMetadata) {
         if (this.isPostgres()) {
-            // In PostgresQL, change stream records are returned as JsonB.
-            return Collections.singletonList(
-                    toStreamEventJson(partition, resultSet.getPgJsonb(0), resultSetMetadata));
+            if (this.isMutableKeyRange) {
+                throw new IllegalStateException("Mutable key range change stream is not supported in Postgres dialect");
+            }
+            else {
+                // In PostgresQL, immutable key range change stream records are returned as
+                // JsonB.
+                return Collections.singletonList(
+                        toStreamEventJson(partition, resultSet.getPgJsonb(0), resultSetMetadata));
+            }
         }
-        // In GoogleSQL, change stream records are returned as an array of structs.
-        return resultSet.getCurrentRowAsStruct().getStructList(0).stream()
-                .flatMap(struct -> toStreamEvent(partition, struct, resultSetMetadata))
-                .collect(Collectors.toList());
+        if (this.isMutableKeyRange) {
+            return Collections.singletonList(
+                    toStreamEventProto(partition, resultSet.getProtoChangeStreamRecord(0), resultSetMetadata));
+        }
+        else {
+            // In GoogleSQL, immutable key range change stream records are returned as an
+            // array of structs.
+            return resultSet.getCurrentRowAsStruct().getStructList(0).stream()
+                    .flatMap(struct -> toStreamEvent(partition, struct, resultSetMetadata))
+                    .collect(Collectors.toList());
+        }
     }
 
     Stream<ChangeStreamEvent> toStreamEvent(Partition partition, Struct row,
@@ -127,6 +145,32 @@ public class ChangeStreamRecordMapper {
 
         return Stream.concat(
                 Stream.concat(dataChangeEvents, heartbeatEvents), childPartitionsEvents);
+    }
+
+    ChangeStreamEvent toStreamEventProto(Partition partition,
+                                         com.google.spanner.v1.ChangeStreamRecord changeStreamRecord,
+                                         ChangeStreamResultSetMetadata resultSetMetadata) {
+        switch (changeStreamRecord.getRecordCase()) {
+            case DATA_CHANGE_RECORD:
+                return toDataChangeEvent(
+                        partition, changeStreamRecord.getDataChangeRecord(), resultSetMetadata);
+            case HEARTBEAT_RECORD:
+                return toHeartbeatEvent(
+                        partition, changeStreamRecord.getHeartbeatRecord(), resultSetMetadata);
+            case PARTITION_START_RECORD:
+                return toPartitionStartEvent(
+                        partition, changeStreamRecord.getPartitionStartRecord(), resultSetMetadata);
+            case PARTITION_EVENT_RECORD:
+                return toPartitionEventEvent(
+                        partition, changeStreamRecord.getPartitionEventRecord(), resultSetMetadata);
+            case PARTITION_END_RECORD:
+                return toPartitionEndEvent(
+                        partition, changeStreamRecord.getPartitionEndRecord(), resultSetMetadata);
+            default:
+                throw new IllegalArgumentException(
+                        "Unknown change stream record type " + changeStreamRecord.toString());
+
+        }
     }
 
     ChangeStreamEvent toStreamEventJson(
@@ -258,6 +302,33 @@ public class ChangeStreamRecordMapper {
                 streamEventMetadataFrom(partition, commitTimestamp, resultSetMetadata));
     }
 
+    DataChangeEvent toDataChangeEvent(Partition partition,
+                                      com.google.spanner.v1.ChangeStreamRecord.DataChangeRecord dataChangeRecordRecord,
+                                      ChangeStreamResultSetMetadata metadata) {
+        final Timestamp commitTimestamp = Timestamp.ofTimeSecondsAndNanos(
+                dataChangeRecordRecord.getCommitTimestamp().getSeconds(),
+                dataChangeRecordRecord.getCommitTimestamp().getNanos());
+        return new DataChangeEvent(
+                partition.getToken(),
+                commitTimestamp,
+                dataChangeRecordRecord.getServerTransactionId(),
+                dataChangeRecordRecord.getIsLastRecordInTransactionInPartition(),
+                dataChangeRecordRecord.getRecordSequence(),
+                dataChangeRecordRecord.getTable(),
+                dataChangeRecordRecord.getColumnMetadataList().stream()
+                        .map(this::columnTypeFrom)
+                        .collect(Collectors.toList()),
+                modFrom(dataChangeRecordRecord.getModsList(),
+                        dataChangeRecordRecord.getColumnMetadataList()),
+                modTypeFrom(dataChangeRecordRecord.getModType().name()),
+                valueCaptureTypeFrom(dataChangeRecordRecord.getValueCaptureType().name()),
+                dataChangeRecordRecord.getNumberOfRecordsInTransaction(),
+                dataChangeRecordRecord.getNumberOfPartitionsInTransaction(),
+                dataChangeRecordRecord.getTransactionTag(),
+                dataChangeRecordRecord.getIsSystemTransaction(),
+                streamEventMetadataFrom(partition, commitTimestamp, metadata));
+    }
+
     DataChangeEvent toDataChangeEventJson(Partition partition, Value row,
                                           ChangeStreamResultSetMetadata resultSetMetadata) {
         Value dataChangeRecordValue = Optional.ofNullable(
@@ -370,6 +441,58 @@ public class ChangeStreamRecordMapper {
         }
     }
 
+    @VisibleForTesting
+    Column columnTypeFrom(
+                          com.google.spanner.v1.ChangeStreamRecord.DataChangeRecord.ColumnMetadata columnMetadata) {
+        try {
+            final String typeJson = this.printer.print(columnMetadata.getType());
+            final ColumnType parsedColumnType = ColumnTypeParser.parse(typeJson);
+            return new Column(
+                    columnMetadata.getName(),
+                    parsedColumnType,
+                    columnMetadata.getIsPrimaryKey(),
+                    columnMetadata.getOrdinalPosition(),
+                    null);
+        }
+        catch (InvalidProtocolBufferException exc) {
+            throw new IllegalArgumentException("Failed to print type: " + columnMetadata.getType());
+        }
+    }
+
+    private String convertModValueProtosToJson(
+                                               List<com.google.spanner.v1.ChangeStreamRecord.DataChangeRecord.ModValue> modValueProtos,
+                                               List<com.google.spanner.v1.ChangeStreamRecord.DataChangeRecord.ColumnMetadata> columnMetadataProtos) {
+        com.google.protobuf.Struct.Builder modStructValueBuilder = com.google.protobuf.Struct.newBuilder();
+        for (com.google.spanner.v1.ChangeStreamRecord.DataChangeRecord.ModValue modValueProto : modValueProtos) {
+            final String columnName = columnMetadataProtos.get(modValueProto.getColumnMetadataIndex()).getName();
+            final Value columnValue = modValueProto.getValue();
+            modStructValueBuilder.putFields(columnName, columnValue);
+        }
+        Value modStructValue = Value.newBuilder().setStructValue(modStructValueBuilder.build()).build();
+        String modValueJson;
+        try {
+            modValueJson = this.printer.print(modStructValue);
+        }
+        catch (InvalidProtocolBufferException exc) {
+            throw new IllegalArgumentException("Failed to print type: " + modStructValue);
+        }
+        return modValueJson;
+    }
+
+    private List<Mod> modFrom(
+                              List<com.google.spanner.v1.ChangeStreamRecord.DataChangeRecord.Mod> protoMods,
+                              List<com.google.spanner.v1.ChangeStreamRecord.DataChangeRecord.ColumnMetadata> columnMetadata) {
+        List<Mod> mods = new ArrayList<>(protoMods.size());
+        for (com.google.spanner.v1.ChangeStreamRecord.DataChangeRecord.Mod mod : protoMods) {
+            final String keysJson = convertModValueProtosToJson(mod.getKeysList(), columnMetadata);
+            final String oldValuesJson = convertModValueProtosToJson(mod.getOldValuesList(), columnMetadata);
+            final String newValuesJson = convertModValueProtosToJson(mod.getNewValuesList(), columnMetadata);
+            mods.add(new Mod(mods.size(), MapperUtils.getJsonNode(keysJson), MapperUtils.getJsonNode(oldValuesJson),
+                    MapperUtils.getJsonNode(newValuesJson)));
+        }
+        return mods;
+    }
+
     private ValueCaptureType valueCaptureTypeFrom(String name) {
         try {
             return ValueCaptureType.valueOf(name);
@@ -397,6 +520,18 @@ public class ChangeStreamRecordMapper {
 
         return new HeartbeatEvent(timestamp,
                 streamEventMetadataFrom(partition, timestamp, resultSetMetadata));
+    }
+
+    HeartbeatEvent toHeartbeatEvent(
+                                    Partition partition,
+                                    com.google.spanner.v1.ChangeStreamRecord.HeartbeatRecord heartbeatRecord,
+                                    ChangeStreamResultSetMetadata metadata) {
+        final Timestamp timestamp = Timestamp.ofTimeSecondsAndNanos(
+                heartbeatRecord.getTimestamp().getSeconds(),
+                heartbeatRecord.getTimestamp().getNanos());
+
+        return new HeartbeatEvent(timestamp,
+                streamEventMetadataFrom(partition, timestamp, metadata));
     }
 
     @VisibleForTesting
@@ -438,7 +573,8 @@ public class ChangeStreamRecordMapper {
         final String keys = getJsonString(struct, KEYS_COLUMN);
         final String oldValues = struct.isNull(OLD_VALUES_COLUMN) ? null : getJsonString(struct, OLD_VALUES_COLUMN);
         final String newValues = struct.isNull(NEW_VALUES_COLUMN) ? null : getJsonString(struct, NEW_VALUES_COLUMN);
-        return new Mod(modNumber, MapperUtils.getJsonNode(keys), MapperUtils.getJsonNode(oldValues), MapperUtils.getJsonNode(newValues));
+        return new Mod(modNumber, MapperUtils.getJsonNode(keys), MapperUtils.getJsonNode(oldValues),
+                MapperUtils.getJsonNode(newValues));
     }
 
     @VisibleForTesting
@@ -448,6 +584,56 @@ public class ChangeStreamRecordMapper {
             parentTokens.add(partitionToken);
         }
         return new ChildPartition(struct.getString(TOKEN_COLUMN), Collections.unmodifiableSet(parentTokens));
+    }
+
+    PartitionStartEvent toPartitionStartEvent(
+                                              Partition partition,
+                                              com.google.spanner.v1.ChangeStreamRecord.PartitionStartRecord partitionStartRecord,
+                                              ChangeStreamResultSetMetadata resultSetMetadata) {
+        final Timestamp startTimestamp = Timestamp.ofTimeSecondsAndNanos(
+                partitionStartRecord.getStartTimestamp().getSeconds(),
+                partitionStartRecord.getStartTimestamp().getNanos());
+        return new PartitionStartEvent(
+                startTimestamp,
+                partitionStartRecord.getRecordSequence(),
+                partitionStartRecord.getPartitionTokensList().stream()
+                        .collect(Collectors.toList()),
+                InitialPartition.isInitialPartition(partition.getToken()),
+                streamEventMetadataFrom(partition, startTimestamp, resultSetMetadata));
+    }
+
+    PartitionEventEvent toPartitionEventEvent(
+                                              Partition partition,
+                                              com.google.spanner.v1.ChangeStreamRecord.PartitionEventRecord partitionEventRecord,
+                                              ChangeStreamResultSetMetadata resultSetMetadata) {
+        final Timestamp commitTimestamp = Timestamp.ofTimeSecondsAndNanos(
+                partitionEventRecord.getCommitTimestamp().getSeconds(),
+                partitionEventRecord.getCommitTimestamp().getNanos());
+        return new PartitionEventEvent(
+                commitTimestamp,
+                partitionEventRecord.getRecordSequence(),
+                partitionEventRecord.getPartitionToken(),
+                partitionEventRecord.getMoveInEventsList().stream()
+                        .map(event -> event.getSourcePartitionToken())
+                        .collect(Collectors.toList()),
+                partitionEventRecord.getMoveOutEventsList().stream()
+                        .map(event -> event.getDestinationPartitionToken())
+                        .collect(Collectors.toList()),
+                streamEventMetadataFrom(partition, commitTimestamp, resultSetMetadata));
+    }
+
+    PartitionEndEvent toPartitionEndEvent(
+                                          Partition partition,
+                                          com.google.spanner.v1.ChangeStreamRecord.PartitionEndRecord partitionEndRecord,
+                                          ChangeStreamResultSetMetadata resultSetMetadata) {
+        final Timestamp endTimestamp = Timestamp.ofTimeSecondsAndNanos(
+                partitionEndRecord.getEndTimestamp().getSeconds(),
+                partitionEndRecord.getEndTimestamp().getNanos());
+        return new PartitionEndEvent(
+                endTimestamp,
+                partitionEndRecord.getRecordSequence(),
+                partitionEndRecord.getPartitionToken(),
+                streamEventMetadataFrom(partition, endTimestamp, resultSetMetadata));
     }
 
     @VisibleForTesting

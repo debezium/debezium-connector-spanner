@@ -75,4 +75,10 @@ public class ChangeStreamResultSet implements AutoCloseable {
         recordReadAt = Timestamp.now();
         return resultSet.getPgJsonb(index);
     }
+
+    public com.google.spanner.v1.ChangeStreamRecord getProtoChangeStreamRecord(int index) {
+        recordReadAt = Timestamp.now();
+        return resultSet.getProtoMessage(
+                index, com.google.spanner.v1.ChangeStreamRecord.getDefaultInstance());
+    }
 }

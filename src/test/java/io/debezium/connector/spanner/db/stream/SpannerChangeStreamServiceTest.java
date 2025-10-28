@@ -40,7 +40,8 @@ class SpannerChangeStreamServiceTest {
         DatabaseClient gsqlDatabaseClient = mock(DatabaseClient.class);
         when(gsqlDatabaseClient.getDialect()).thenReturn(Dialect.GOOGLE_STANDARD_SQL);
         SpannerChangeStreamService spannerChangeStreamService = new SpannerChangeStreamService("TaskUid", changeStreamDao,
-                new ChangeStreamRecordMapper(gsqlDatabaseClient), Duration.ofMillis(1000), metricsEventPublisher);
+                new ChangeStreamRecordMapper(gsqlDatabaseClient, false), Duration.ofMillis(1000),
+                metricsEventPublisher);
 
         HashSet<String> parentTokens = new HashSet<>();
         Timestamp startTimestamp = Timestamp.ofTimeMicroseconds(1L);
