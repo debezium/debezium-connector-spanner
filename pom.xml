@@ -15,10 +15,10 @@
 
     <properties>
         <version.debezium>${project.version}</version.debezium>
-        <google.cloud.spanner.version>6.30.1</google.cloud.spanner.version>
+        <version.com.google.cloud>26.70.0</version.com.google.cloud>
+        <version.com.google.protobuf>4.29.4</version.com.google.protobuf>
+        <version.opentelemetry>1.47.0</version.opentelemetry>
         <version.sketches-java>0.8.2</version.sketches-java>
-        <version.google.protos>2.8.3</version.google.protos>
-        <version.com.google.protobuf>3.21.7</version.com.google.protobuf>
         <version.joda>2.10.14</version.joda>
         <version.commons-lang3>3.12.0</version.commons-lang3>
         <version.junit>5.8.2</version.junit>
@@ -111,16 +111,18 @@
             <!-- Google API -->
             <dependency>
                 <groupId>com.google.cloud</groupId>
-                <artifactId>google-cloud-spanner</artifactId>
-                <version>${google.cloud.spanner.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>com.google.api.grpc</groupId>
-                <artifactId>proto-google-common-protos</artifactId>
-                <version>${version.google.protos}</version>
+                <artifactId>libraries-bom</artifactId>
+                <version>${version.com.google.cloud}</version>
+                <type>pom</type>
+                <scope>import</scope>
             </dependency>
 
             <!-- Utils -->
+            <dependency>
+                <groupId>io.opentelemetry</groupId>
+                <artifactId>opentelemetry-api</artifactId>
+                <version>${version.opentelemetry}</version>
+            </dependency>
             <dependency>
                 <groupId>joda-time</groupId>
                 <artifactId>joda-time</artifactId>
@@ -135,11 +137,6 @@
                 <groupId>org.apache.commons</groupId>
                 <artifactId>commons-lang3</artifactId>
                 <version>${version.commons-lang3}</version>
-            </dependency>
-            <dependency>
-                <groupId>com.google.protobuf</groupId>
-                <artifactId>protobuf-java</artifactId>
-                <version>${version.com.google.protobuf}</version>
             </dependency>
             <dependency>
                 <groupId>org.slf4j</groupId>
@@ -250,6 +247,14 @@
             <groupId>com.google.cloud</groupId>
             <artifactId>google-cloud-spanner</artifactId>
         </dependency>
+        <dependency>
+            <groupId>com.google.api.grpc</groupId>
+            <artifactId>proto-google-common-protos</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.google.protobuf</groupId>
+            <artifactId>protobuf-java</artifactId>
+        </dependency>
 
         <!-- Utils -->
         <dependency>
@@ -259,10 +264,6 @@
         <dependency>
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-lang3</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.google.protobuf</groupId>
-            <artifactId>protobuf-java</artifactId>
         </dependency>
         <dependency>
             <groupId>joda-time</groupId>
