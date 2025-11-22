@@ -7,9 +7,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout the repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
       - name: Checkout the debezium repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           repository: debezium/debezium
           path: core
