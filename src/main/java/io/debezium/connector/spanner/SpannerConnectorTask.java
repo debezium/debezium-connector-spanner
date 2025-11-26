@@ -276,7 +276,7 @@ public class SpannerConnectorTask extends SpannerBaseSourceTask {
 
     @Override
     protected Optional<ErrorHandler> getErrorHandler() {
-        return Optional.of(errorHandler);
+        return Optional.ofNullable(errorHandler);
     }
 
     @Override
