@@ -17,9 +17,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import io.debezium.bean.StandardBeanNames;
+import io.debezium.config.CommonConnectorConfig;
 import io.debezium.config.Configuration;
 import io.debezium.connector.base.ChangeEventQueue;
 import io.debezium.connector.base.DefaultQueueProvider;
+import io.debezium.connector.common.CdcSourceTaskContext;
 import io.debezium.connector.common.DebeziumHeaderProducer;
 import io.debezium.connector.common.DebeziumHeaderProducerProvider;
 import io.debezium.connector.spanner.config.SpannerTableFilter;
@@ -86,11 +88,20 @@ public class SpannerConnectorTask extends SpannerBaseSourceTask {
 
     private volatile boolean beganPolling = false;
     private SpannerErrorHandler errorHandler;
+    private SpannerConnectorConfig connectorConfig;
+    private SpannerSourceTaskContext taskContext;
+
+    @Override
+    public CdcSourceTaskContext<? extends CommonConnectorConfig> preStart(Configuration config) {
+
+        connectorConfig = new SpannerConnectorConfig(config);
+        taskContext = new SpannerSourceTaskContext(config, connectorConfig);
+
+        return taskContext;
+    }
 
     @Override
     protected SpannerChangeEventSourceCoordinator start(Configuration configuration) {
-
-        final SpannerConnectorConfig connectorConfig = new SpannerConnectorConfig(configuration);
 
         this.taskUid = TaskUid.generateTaskUid(connectorConfig.getConnectorName(),
                 connectorConfig.getTaskId());
@@ -101,8 +112,6 @@ public class SpannerConnectorTask extends SpannerBaseSourceTask {
                 connectorConfig);
 
         final DaoFactory daoFactory = new DaoFactory(databaseClientFactory);
-
-        final SpannerSourceTaskContext taskContext = new SpannerSourceTaskContext(configuration, connectorConfig);
 
         this.queue = new ChangeEventQueue.Builder<DataChangeEvent>()
                 .pollInterval(connectorConfig.getPollInterval())
