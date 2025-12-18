@@ -42,6 +42,7 @@ class SpannerChangeEventSourceMetricsFactoryTest {
         when(spannerSourceTaskContext.getConnectorType()).thenReturn("Connector Type");
         when(spannerSourceTaskContext.getConnectorLogicalName()).thenReturn("Connector Name");
         when(spannerSourceTaskContext.getTaskId()).thenReturn("42");
+        when(spannerSourceTaskContext.getConfig()).thenReturn(connectorConfig);
 
         SpannerStreamingChangeEventSourceMetrics streamingMetrics = (SpannerStreamingChangeEventSourceMetrics) spannerChangeEventSourceMetricsFactory.getStreamingMetrics(
                 spannerSourceTaskContext, null, new SpannerEventMetadataProvider(), Collections::emptyList);
