@@ -90,7 +90,9 @@ class BufferedPublisherTest {
         }
         pub.close();
 
-        // System.out.println("published: " + result.size());
+        System.out.println("published: " + result.size());
+        System.out.println(result);
+
         assertThat(result)
                 .containsAll(required) // no missed required elements
                 .hasSizeGreaterThan(required.size()) // not only required elements
