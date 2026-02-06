@@ -10,11 +10,10 @@ import java.time.Duration;
 import java.util.Arrays;
 import java.util.Set;
 
-import org.apache.avro.generic.GenericRecord;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.ListTopicsResult;
+import org.testcontainers.containers.ComposeContainer;
 import org.testcontainers.containers.ContainerState;
-import org.testcontainers.containers.DockerComposeContainer;
 import org.testcontainers.containers.wait.strategy.Wait;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -23,7 +22,7 @@ import io.debezium.util.Testing;
 
 public class KafkaEnvironment {
 
-    private static final String KAFKA_BROKER_SERVICE_NAME = "broker_1";
+    private static final String KAFKA_BROKER_SERVICE_NAME = "broker-1";
     private static final int KAFKA_BROKER_SERVICE_API_PORT = 9092;
 
     public static final Duration STARTUP_TIMEOUT = Duration.ofSeconds(200L);
@@ -35,16 +34,14 @@ public class KafkaEnvironment {
 
     private boolean isStarted = false;
 
-    private DockerComposeContainer composeContainer;
+    private ComposeContainer composeContainer;
 
     private KafkaBrokerApi<ObjectNode, ObjectNode> brokerApiOn;
-
-    private KafkaBrokerApi<GenericRecord, GenericRecord> brokerApiGr;
 
     public KafkaEnvironment(String dockerComposeFilePath) {
         Testing.Print.enable();
         Testing.print("Initializing kafka environment for IT test...");
-        this.composeContainer = new DockerComposeContainer(new File(dockerComposeFilePath))
+        this.composeContainer = new ComposeContainer(new File(dockerComposeFilePath))
                 .withExposedService(KAFKA_BROKER_SERVICE_NAME, KAFKA_BROKER_SERVICE_API_PORT,
                         Wait.forListeningPort().withStartupTimeout(STARTUP_TIMEOUT));
         Testing.print("Finished initializing kafka environment.");
@@ -93,6 +90,12 @@ public class KafkaEnvironment {
         }
         catch (Exception e) {
             Testing.print(e.getMessage());
+        }
+    }
+
+    public void stop() {
+        if (composeContainer != null) {
+            composeContainer.stop();
         }
     }
 }
