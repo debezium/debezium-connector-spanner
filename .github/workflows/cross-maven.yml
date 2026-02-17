@@ -76,6 +76,8 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: 21
+      - name: Pre-pull socat image
+        run: docker pull mirror.gcr.io/alpine/socat:1.7.4.3-r0  || true
       - name: Maven build core
         run: ./spanner/mvnw clean install -f core/pom.xml -pl debezium-bom,debezium-core,debezium-embedded,debezium-storage -am -DskipTests -DskipITs -Dformat.formatter.goal=validate -Dformat.imports.goal=check -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false -Dmaven.wagon.httpconnectionManager.ttlSeconds=120
       - name: Maven build Spanner
