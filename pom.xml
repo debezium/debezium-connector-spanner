@@ -23,7 +23,6 @@
         <version.commons-lang3>3.12.0</version.commons-lang3>
         <version.junit>5.8.2</version.junit>
         <version.mockito>5.12.0</version.mockito>
-        <version.testcontainers>2.0.2</version.testcontainers>
         <version.assertj>3.23.1</version.assertj>
         <jacoco.version>0.8.6</jacoco.version>
         <jacoco.min.coverage>0.01</jacoco.min.coverage>
@@ -155,13 +154,6 @@
             </dependency>
 
             <!-- Testing -->
-            <dependency>
-                <groupId>org.testcontainers</groupId>
-                <artifactId>testcontainers-bom</artifactId>
-                <version>${version.testcontainers}</version>
-                <type>pom</type>
-                <scope>import</scope>
-            </dependency>
             <dependency>
                 <groupId>org.junit.jupiter</groupId>
                 <artifactId>junit-jupiter-api</artifactId>
