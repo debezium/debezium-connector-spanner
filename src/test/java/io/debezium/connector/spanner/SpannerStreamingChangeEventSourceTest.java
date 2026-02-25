@@ -138,7 +138,7 @@ class SpannerStreamingChangeEventSourceTest {
         SpannerStreamingChangeEventSource spannerStreamingChangeEventSource = new SpannerStreamingChangeEventSource(
                 connectorConfig2, errorHandler, null, eventQueue, metricsEventPublisher, partitionManager, new SchemaRegistry("Stream Name",
                         new SchemaDao(mock(DatabaseClient.class)), mock(Runnable.class)),
-                spannerEventDispatcher, true, mock(SpannerOffsetContextFactory.class));
+                spannerEventDispatcher, true, true, mock(SpannerOffsetContextFactory.class));
         Configuration configuration5 = mock(Configuration.class);
         when(configuration5.getString((Field) any())).thenReturn("String");
         when(configuration5.asProperties()).thenReturn(new Properties());
@@ -257,7 +257,7 @@ class SpannerStreamingChangeEventSourceTest {
 
         SpannerStreamingChangeEventSource spannerStreamingChangeEventSource = new SpannerStreamingChangeEventSource(
                 new SpannerConnectorConfig(configuration5), errorHandler, null, eventQueue, metricsEventPublisher, partitionManager,
-                schemaRegistryDatabaseClient, spannerEventDispatcher, true, offsetContextFactory);
+                schemaRegistryDatabaseClient, spannerEventDispatcher, true, true, offsetContextFactory);
         Timestamp commitTimestamp = Timestamp.ofTimeMicroseconds(1L);
         ArrayList<Column> rowType = new ArrayList<>();
         io.debezium.connector.spanner.db.model.event.DataChangeEvent dataChangeEvent = spy(new io.debezium.connector.spanner.db.model.event.DataChangeEvent("ABC123",
@@ -275,7 +275,7 @@ class SpannerStreamingChangeEventSourceTest {
         SpannerStreamingChangeEventSource spannerStreamingChangeEventSource = new SpannerStreamingChangeEventSource(
                 null, null, null, null, null, partitionManager, new SchemaRegistry(
                         "Stream Name", new SchemaDao(mock(DatabaseClient.class)), mock(Runnable.class)),
-                null, true, mock(SpannerOffsetContextFactory.class));
+                null, true, true, mock(SpannerOffsetContextFactory.class));
 
         spannerStreamingChangeEventSource.commitOffset(
                 Map.of("partitionToken", "v1"), Map.of("offset", Timestamp.now().toString()));
@@ -289,7 +289,7 @@ class SpannerStreamingChangeEventSourceTest {
         SpannerStreamingChangeEventSource spannerStreamingChangeEventSource = new SpannerStreamingChangeEventSource(
                 null, null, null, null, null, partitionManager, new SchemaRegistry(
                         "Stream Name", new SchemaDao(mock(DatabaseClient.class)), mock(Runnable.class)),
-                null, true, mock(SpannerOffsetContextFactory.class));
+                null, true, true, mock(SpannerOffsetContextFactory.class));
 
         SourceRecord sourceRecord1 = spy(new SourceRecord(Map.of(), Map.of(), "t1", Schema.STRING_SCHEMA, "v1"));
         SourceRecord sourceRecord2 = spy(new SourceRecord(Map.of(), Map.of(), "t2", Schema.STRING_SCHEMA, "v2"));

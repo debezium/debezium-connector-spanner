@@ -54,6 +54,7 @@ public class TaskStateChangeEventHandler {
     private final SpannerConnectorConfig connectorConfig;
     private final SpannerEventDispatcher spannerEventDispatcher;
     private final Consumer<RuntimeException> errorHandler;
+    private final boolean waitForParents;
 
     private final AtomicLong failOverloadedTaskTimer = new AtomicLong(System.currentTimeMillis());
 
@@ -71,6 +72,7 @@ public class TaskStateChangeEventHandler {
         this.changeStream = changeStream;
         this.finishingHandler = finishingHandler;
         this.connectorConfig = connectorConfig;
+        waitForParents = connectorConfig.isChildWaitingForParents();
         this.errorHandler = errorHandler;
         this.spannerEventDispatcher = spannerEventDispatcher;
     }
@@ -103,7 +105,7 @@ public class TaskStateChangeEventHandler {
         performOperation(
                 new PartitionStatusUpdateOperation(event.getToken(), event.getState()),
                 new ClearSharedPartitionOperation(),
-                new FindPartitionForStreamingOperation(),
+                new FindPartitionForStreamingOperation(waitForParents),
                 new TakePartitionForStreamingOperation(changeStream, partitionFactory));
     }
 
@@ -111,7 +113,7 @@ public class TaskStateChangeEventHandler {
         performOperation(
                 new ChildPartitionOperation(newPartitionsEvent.getPartitions()),
                 new ClearSharedPartitionOperation(),
-                new FindPartitionForStreamingOperation(),
+                new FindPartitionForStreamingOperation(waitForParents),
                 new TakePartitionForStreamingOperation(changeStream, partitionFactory),
                 new RemoveFinishedPartitionOperation(spannerEventDispatcher, connectorConfig));
     }
@@ -120,7 +122,7 @@ public class TaskStateChangeEventHandler {
         TaskSyncContext taskSyncContext = performOperation(
                 new ClearSharedPartitionOperation(),
                 new TakeSharedPartitionOperation(),
-                new FindPartitionForStreamingOperation(),
+                new FindPartitionForStreamingOperation(waitForParents),
                 new TakePartitionForStreamingOperation(changeStream, partitionFactory),
                 new RemoveFinishedPartitionOperation(spannerEventDispatcher, connectorConfig),
                 new ConnectorEndDetectionOperation(finishingHandler, connectorConfig.endTime()));

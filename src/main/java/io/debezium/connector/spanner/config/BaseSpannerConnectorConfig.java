@@ -78,6 +78,7 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
 
     private static final String CONNECTOR_SPANNER_PARTITION_FINISHING_AFTER_COMMIT_PROPERTY_NAME = "connector.spanner.partition.finishing.afterCommit";
     private static final String CONNECTOR_SPANNER_FINISHED_PRTITION_DELETION_DELAY_PROPERTY_NAME = "connector.spanner.finished.partition.deletion.delay";
+    private static final String CONNECTOR_SPANNER_PARTITION_START_WAIT_FOR_PARENTS_PROPERTY_NAME = "connector.spanner.partition.starting.waitForParents";
 
     private static final String CONNECTOR_SPANNER_REBALANCING_TASK_WAITING_TIMEOUT_PROPERTY_NAME = "connector.spanner.rebalancing.task.wait.timeout";
     private static final String CONNECTOR_SPANNER_SYNC_EVENT_PUBLISH_WAITING_TIMEOUT_PROPERTY_NAME = "connector.spanner.sync.publisher.wait.timeout";
@@ -510,6 +511,15 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
 
     protected static final Field CONNECTOR_SPANNER_PARTITION_FINISHING_AFTER_COMMIT_FIELD = Field.create(CONNECTOR_SPANNER_PARTITION_FINISHING_AFTER_COMMIT_PROPERTY_NAME)
             .withDisplayName("Connector spanner partition finishing after commit strategy")
+            .withType(Type.BOOLEAN)
+            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR, 14))
+            .withWidth(Width.SHORT)
+            .withImportance(Importance.MEDIUM)
+            .withDefault(true)
+            .withDescription("default true");
+
+    protected static final Field CONNECTOR_SPANNER_PARTITION_START_WAIT_FOR_PARENTS = Field.create(CONNECTOR_SPANNER_PARTITION_START_WAIT_FOR_PARENTS_PROPERTY_NAME)
+            .withDisplayName("Connector spanner child waits for parents before starting")
             .withType(Type.BOOLEAN)
             .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR, 14))
             .withWidth(Width.SHORT)

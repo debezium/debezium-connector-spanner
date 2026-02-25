@@ -98,6 +98,7 @@ public class SpannerChangeEventSourceFactory implements ChangeEventSourceFactory
                 schemaRegistry,
                 dispatcher,
                 connectorConfig.isFinishingPartitionAfterCommit(),
+                connectorConfig.isChildWaitingForParents(),
                 offsetContextFactory);
     }
 }

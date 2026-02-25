@@ -25,8 +25,10 @@ public class FindPartitionForStreamingOperation implements Operation {
     private static final Logger LOGGER = LoggerFactory.getLogger(FindPartitionForStreamingOperation.class);
 
     private boolean isRequiredPublishSyncEvent = false;
+    private final boolean waitForParents;
 
-    public FindPartitionForStreamingOperation() {
+    public FindPartitionForStreamingOperation(boolean waitForParents) {
+        this.waitForParents = waitForParents;
     }
 
     private TaskSyncContext takePartitionForStreaming(TaskSyncContext taskSyncContext) {
@@ -39,7 +41,7 @@ public class FindPartitionForStreamingOperation implements Operation {
                     if (partitionState.getState().equals(PartitionStateEnum.CREATED)) {
                         boolean takePartitionForStreaming = false;
                         LOGGER.debug("Task sees partition with CREATED state, task Uid {}, partition {}", taskSyncContext.getTaskUid(), partitionState);
-                        if (finishedPartitions.containsAll(partitionState.getParents())) {
+                        if (!waitForParents || finishedPartitions.containsAll(partitionState.getParents())) {
                             takePartitionForStreaming = true;
                             LOGGER.info("Task takes partition for streaming, taskUid: {}, partition {}",
                                     taskSyncContext.getTaskUid(), partitionState.getToken());

@@ -89,6 +89,7 @@ public class SpannerStreamingChangeEventSource implements CommittingRecordsStrea
                                              SchemaRegistry schemaRegistry,
                                              SpannerEventDispatcher spannerEventDispatcher,
                                              boolean finishingAfterCommit,
+                                             boolean waitForParents,
                                              SpannerOffsetContextFactory offsetContextFactory) {
         this.connectorConfig = connectorConfig;
         this.offsetContextFactory = offsetContextFactory;
@@ -104,9 +105,14 @@ public class SpannerStreamingChangeEventSource implements CommittingRecordsStrea
             processFailure(new FinishingPartitionTimeout(tokens));
         });
 
-        this.finishPartitionStrategy = finishingAfterCommit
-                ? FinishPartitionStrategy.AFTER_COMMIT
-                : FinishPartitionStrategy.AFTER_STREAMING_FINISH;
+        if (finishingAfterCommit && !waitForParents) {
+            this.finishPartitionStrategy = FinishPartitionStrategy.AFTER_COMMIT_NO_PARENT_WAIT;
+        }
+        else {
+            this.finishPartitionStrategy = finishingAfterCommit
+                    ? FinishPartitionStrategy.AFTER_COMMIT
+                    : FinishPartitionStrategy.AFTER_STREAMING_FINISH;
+        }
     }
 
     @Override
@@ -232,7 +238,8 @@ public class SpannerStreamingChangeEventSource implements CommittingRecordsStrea
 
                         LOGGER.info("Received FinishPartitionEvent for partition {}", event.getMetadata().getPartitionToken());
 
-                        if (finishPartitionStrategy.equals(FinishPartitionStrategy.AFTER_COMMIT)) {
+                        if (finishPartitionStrategy.equals(FinishPartitionStrategy.AFTER_COMMIT)
+                                || finishPartitionStrategy.equals(FinishPartitionStrategy.AFTER_COMMIT_NO_PARENT_WAIT)) {
                             this.finishingPartitionManager.onPartitionFinishEvent(event.getMetadata().getPartitionToken());
                         }
                         else if (finishPartitionStrategy.equals(FinishPartitionStrategy.AFTER_STREAMING_FINISH)) {
@@ -328,7 +335,8 @@ public class SpannerStreamingChangeEventSource implements CommittingRecordsStrea
     @Override
     public void commitRecords(List<SourceRecord> records) throws InterruptedException {
 
-        if (!finishPartitionStrategy.equals(FinishPartitionStrategy.AFTER_COMMIT)) {
+        if (!finishPartitionStrategy.equals(FinishPartitionStrategy.AFTER_COMMIT)
+                && !finishPartitionStrategy.equals(FinishPartitionStrategy.AFTER_COMMIT_NO_PARENT_WAIT)) {
             return;
         }
 

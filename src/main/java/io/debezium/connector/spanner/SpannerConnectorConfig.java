@@ -292,6 +292,10 @@ public class SpannerConnectorConfig extends BaseSpannerConnectorConfig {
         return getConfig().getBoolean(CONNECTOR_SPANNER_PARTITION_FINISHING_AFTER_COMMIT_FIELD);
     }
 
+    public boolean isChildWaitingForParents() {
+        return getConfig().getBoolean(CONNECTOR_SPANNER_PARTITION_START_WAIT_FOR_PARENTS);
+    }
+
     public int taskStateChangeEventQueueCapacity() {
         return getConfig().getInteger(TASK_STATE_CHANGE_EVENT_QUEUE_CAPACITY,
                 (int) TASK_STATE_CHANGE_EVENT_QUEUE_CAPACITY.defaultValue());

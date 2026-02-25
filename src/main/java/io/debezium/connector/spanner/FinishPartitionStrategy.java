@@ -12,5 +12,6 @@ package io.debezium.connector.spanner;
  */
 public enum FinishPartitionStrategy {
     AFTER_COMMIT, // Provides strong delivery guarantee but adds latency
-    AFTER_STREAMING_FINISH // Weaker delivery guarantee but faster
+    AFTER_STREAMING_FINISH, // Weaker delivery guarantee but faster
+    AFTER_COMMIT_NO_PARENT_WAIT // Provides strong delivery guarantee without ordering guarantees for faster perofrmance
 }
