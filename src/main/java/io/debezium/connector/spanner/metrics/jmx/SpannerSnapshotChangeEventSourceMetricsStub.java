@@ -116,4 +116,5 @@ public class SpannerSnapshotChangeEventSourceMetricsStub implements SnapshotChan
     public void currentChunk(SpannerPartition partition, String chunkId, Object[] chunkFrom, Object[] chunkTo, Object[] tableTo) {
         // spanner connector doesn't support snapshots
     }
+
 }

@@ -15,8 +15,8 @@ import io.debezium.connector.spanner.SpannerConnectorConfig;
  * Contains contextual information and objects scoped to the lifecycle of Debezium's {@link SourceTask} implementations.
  * Extends {@code CdcSourceTaskContext}.
  */
-public class SpannerSourceTaskContext extends CdcSourceTaskContext<SpannerConnectorConfig> {
+public class SpannerSourceTaskContext extends CdcSourceTaskContext {
     public SpannerSourceTaskContext(Configuration rawConfig, SpannerConnectorConfig config) {
-        super(rawConfig, config, config.getTaskId(), config.getCustomMetricTags());
+        super(config, config.getTaskId(), config.getCustomMetricTags(), null);
     }
 }

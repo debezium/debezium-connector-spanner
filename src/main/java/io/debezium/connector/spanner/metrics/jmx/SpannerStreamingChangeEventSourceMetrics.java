@@ -14,7 +14,6 @@ import io.debezium.connector.spanner.SpannerPartition;
 import io.debezium.connector.spanner.context.source.SpannerSourceTaskContext;
 import io.debezium.connector.spanner.metrics.SpannerMeter;
 import io.debezium.data.Envelope;
-import io.debezium.pipeline.metrics.CapturedTablesSupplier;
 import io.debezium.pipeline.metrics.DefaultStreamingChangeEventSourceMetrics;
 import io.debezium.pipeline.source.spi.EventMetadataProvider;
 import io.debezium.pipeline.spi.OffsetContext;
@@ -38,11 +37,10 @@ public class SpannerStreamingChangeEventSourceMetrics
     public SpannerStreamingChangeEventSourceMetrics(SpannerSourceTaskContext taskContext,
                                                     ChangeEventQueueMetrics changeEventQueueMetrics,
                                                     EventMetadataProvider metadataProvider,
-                                                    SpannerMeter spannerMeter, CapturedTablesSupplier capturedTablesSupplier) {
+                                                    SpannerMeter spannerMeter) {
         super(taskContext, changeEventQueueMetrics, metadataProvider,
                 Collect.linkMapOf(CONNECTOR_NAME_TAG, taskContext.getConnectorLogicalName(),
-                        TASK_ID_TAG, TASK_ID_TAG + "-" + taskContext.getTaskId()),
-                capturedTablesSupplier);
+                        TASK_ID_TAG, TASK_ID_TAG + "-" + taskContext.getTaskId()));
         this.spannerMeter = spannerMeter;
         this.jsonSerializer = new JsonSerializer();
     }

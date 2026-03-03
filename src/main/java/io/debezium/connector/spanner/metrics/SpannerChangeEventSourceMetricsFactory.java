@@ -11,7 +11,6 @@ import io.debezium.connector.spanner.SpannerPartition;
 import io.debezium.connector.spanner.context.source.SpannerSourceTaskContext;
 import io.debezium.connector.spanner.metrics.jmx.SpannerSnapshotChangeEventSourceMetricsStub;
 import io.debezium.connector.spanner.metrics.jmx.SpannerStreamingChangeEventSourceMetrics;
-import io.debezium.pipeline.metrics.CapturedTablesSupplier;
 import io.debezium.pipeline.metrics.DefaultChangeEventSourceMetricsFactory;
 import io.debezium.pipeline.metrics.SnapshotChangeEventSourceMetrics;
 import io.debezium.pipeline.metrics.StreamingChangeEventSourceMetrics;
@@ -38,9 +37,8 @@ public class SpannerChangeEventSourceMetricsFactory extends DefaultChangeEventSo
     @Override
     public <T extends CdcSourceTaskContext> StreamingChangeEventSourceMetrics<SpannerPartition> getStreamingMetrics(T taskContext,
                                                                                                                     ChangeEventQueueMetrics changeEventQueueMetrics,
-                                                                                                                    EventMetadataProvider eventMetadataProvider,
-                                                                                                                    CapturedTablesSupplier capturedTablesSupplier) {
+                                                                                                                    EventMetadataProvider eventMetadataProvider) {
         return new SpannerStreamingChangeEventSourceMetrics((SpannerSourceTaskContext) taskContext,
-                changeEventQueueMetrics, eventMetadataProvider, spannerMeter, capturedTablesSupplier);
+                changeEventQueueMetrics, eventMetadataProvider, spannerMeter);
     }
 }

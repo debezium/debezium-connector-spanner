@@ -17,11 +17,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import io.debezium.bean.StandardBeanNames;
-import io.debezium.config.CommonConnectorConfig;
 import io.debezium.config.Configuration;
 import io.debezium.connector.base.ChangeEventQueue;
 import io.debezium.connector.base.DefaultQueueProvider;
-import io.debezium.connector.common.CdcSourceTaskContext;
 import io.debezium.connector.common.DebeziumHeaderProducer;
 import io.debezium.connector.common.DebeziumHeaderProducerProvider;
 import io.debezium.connector.spanner.config.SpannerTableFilter;
@@ -92,16 +90,10 @@ public class SpannerConnectorTask extends SpannerBaseSourceTask {
     private SpannerSourceTaskContext taskContext;
 
     @Override
-    public CdcSourceTaskContext<? extends CommonConnectorConfig> preStart(Configuration config) {
-
-        connectorConfig = new SpannerConnectorConfig(config);
-        taskContext = new SpannerSourceTaskContext(config, connectorConfig);
-
-        return taskContext;
-    }
-
-    @Override
     protected SpannerChangeEventSourceCoordinator start(Configuration configuration) {
+
+        connectorConfig = new SpannerConnectorConfig(configuration);
+        taskContext = new SpannerSourceTaskContext(configuration, connectorConfig);
 
         this.taskUid = TaskUid.generateTaskUid(connectorConfig.getConnectorName(),
                 connectorConfig.getTaskId());
