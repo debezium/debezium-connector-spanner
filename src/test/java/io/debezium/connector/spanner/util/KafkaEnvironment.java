@@ -22,7 +22,7 @@ import io.debezium.util.Testing;
 
 public class KafkaEnvironment {
 
-    private static final String KAFKA_BROKER_SERVICE_NAME = "broker-1";
+    private static final String KAFKA_BROKER_SERVICE_NAME = "broker";
     private static final int KAFKA_BROKER_SERVICE_API_PORT = 9092;
 
     public static final Duration STARTUP_TIMEOUT = Duration.ofSeconds(200L);
