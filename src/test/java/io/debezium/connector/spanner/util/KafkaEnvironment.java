@@ -30,7 +30,6 @@ public class KafkaEnvironment {
     public static final Duration CONFIGURE_CONNECTOR_TIMEOUT = Duration.ofSeconds(200L);
 
     public static final String DOCKER_COMPOSE_FILE = "src/test/java/io/debezium/connector/spanner/util/docker-compose.yml";
-    public static final KafkaEnvironment TEST_KAFKA_ENVIRONMENT = new KafkaEnvironment(DOCKER_COMPOSE_FILE);
 
     private boolean isStarted = false;
 
@@ -89,7 +88,8 @@ public class KafkaEnvironment {
             adminClient.deleteTopics(topics);
         }
         catch (Exception e) {
-            Testing.print(e.getMessage());
+            Testing.print("Error clearing Kafka topics: " + e.getClass().getName() + " - " + e.getMessage());
+            e.printStackTrace();
         }
     }
 

@@ -58,6 +58,10 @@ public class KafkaBrokerApi<K, V> {
     public AdminClient createAdminClient() {
         final Properties props = new Properties();
         props.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, getAddress());
+        props.put(AdminClientConfig.REQUEST_TIMEOUT_MS_CONFIG, 10000); // 10 seconds
+        props.put(AdminClientConfig.DEFAULT_API_TIMEOUT_MS_CONFIG, 15000); // 15 seconds
+        props.put(AdminClientConfig.RECONNECT_BACKOFF_MS_CONFIG, 100);
+        props.put(AdminClientConfig.RECONNECT_BACKOFF_MAX_MS_CONFIG, 1000);
         return AdminClient.create(props);
     }
 }

@@ -21,4 +21,12 @@
         level="warn" additivity="false">
         <appender-ref ref="CONSOLE" />
     </logger>
+
+    <!-- Enable ERROR and WARN logging for Kafka clients to see connection issues -->
+    <logger name="org.apache.kafka.clients" level="warn" additivity="false">
+        <appender-ref ref="CONSOLE" />
+    </logger>
+    <logger name="org.apache.kafka.clients.NetworkClient" level="error" additivity="false">
+        <appender-ref ref="CONSOLE" />
+    </logger>
 </configuration>
