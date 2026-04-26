@@ -115,6 +115,7 @@ public class SpannerConnectorTask extends SpannerBaseSourceTask {
 
         this.queue = new ChangeEventQueue.Builder<DataChangeEvent>()
                 .pollInterval(connectorConfig.getPollInterval())
+                .pollDispatchInterval(connectorConfig.getPollDispatchInterval())
                 .maxBatchSize(connectorConfig.getMaxBatchSize())
                 .maxQueueSize(connectorConfig.getMaxQueueSize())
                 .queueProvider(new DefaultQueueProvider<>(connectorConfig.getMaxQueueSize()))
