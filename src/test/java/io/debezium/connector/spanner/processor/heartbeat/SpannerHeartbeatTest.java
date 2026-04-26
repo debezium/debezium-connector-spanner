@@ -39,6 +39,7 @@ class SpannerHeartbeatTest {
     private final SchemaNameAdjuster schemaNameAdjuster = mock(SchemaNameAdjuster.class);
     private final ChangeEventQueue<DataChangeEvent> changeEventQueue = new ChangeEventQueue.Builder<DataChangeEvent>()
             .pollInterval(Duration.ofMillis(1))
+            .pollDispatchInterval(Duration.ofMillis(0))
             .maxBatchSize(10)
             .maxQueueSize(10)
             .queueProvider(new DefaultQueueProvider<>(10))
