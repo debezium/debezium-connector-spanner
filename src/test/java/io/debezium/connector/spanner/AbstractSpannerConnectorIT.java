@@ -46,6 +46,8 @@ public class AbstractSpannerConnectorIT extends AbstractAsyncEngineConnectorTest
             .with("heartbeat.interval.ms", "300000")
             .with("gcp.spanner.low-watermark.enabled", false)
             .with("tasks.max", 3) // see DBZ-8428
+            .with("spanner.omni.endpoint", Database.getSpannerOmniEndpoint())
+            .with("spanner.omni.use.plaintext", true)
             .build();
 
     protected static final Configuration basePgConfig = Configuration.copy(baseConfig)

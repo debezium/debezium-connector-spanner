@@ -47,6 +47,12 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
     protected static final String END_TIME_PROPERTY_NAME = "gcp.spanner.end.time";
     protected static final String GCP_SPANNER_CREDENTIALS_PATH_PROPERTY_NAME = "gcp.spanner.credentials.path";
     protected static final String GCP_SPANNER_CREDENTIALS_JSON_PROPERTY_NAME = "gcp.spanner.credentials.json";
+
+    protected static final String SPANNER_OMNI_ENDPOINT_PROPERTY_NAME = "spanner.omni.endpoint";
+    protected static final String SPANNER_OMNI_USE_PLAINTEXT_PROPERTY_NAME = "spanner.omni.use.plaintext";
+    protected static final String SPANNER_OMNI_CLIENT_KEY_PATH_PROPERTY_NAME = "spanner.omni.client.key.path";
+    protected static final String SPANNER_OMNI_CLIENT_CERT_PATH_PROPERTY_NAME = "spanner.omni.client.cert.path";
+
     private static final String STREAM_EVENT_QUEUE_CAPACITY_PROPERTY_NAME = "gcp.spanner.stream.event.queue.capacity";
 
     private static final String TASK_STATE_CHANGE_EVENT_QUEUE_CAPACITY_PROPERTY_NAME = "connector.spanner.task.state.change.event.queue.capacity";
@@ -584,6 +590,38 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
     public static final Field SOURCE_INFO_STRUCT_MAKER = CommonConnectorConfig.SOURCE_INFO_STRUCT_MAKER
             .withDefault(SpannerSourceInfoStructMaker.class.getName());
 
+    public static final Field SPANNER_OMNI_ENDPOINT = Field.create(SPANNER_OMNI_ENDPOINT_PROPERTY_NAME)
+            .withDisplayName("SpannerOmniEndpoint")
+            .withType(Type.STRING)
+            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR, 7))
+            .withWidth(Width.MEDIUM)
+            .withImportance(Importance.LOW)
+            .withDescription("Spanner Omni endpoint");
+
+    public static final Field SPANNER_OMNI_USE_PLAINTEXT = Field.create(SPANNER_OMNI_USE_PLAINTEXT_PROPERTY_NAME)
+            .withDisplayName("SpannerOmniUsePlaintext")
+            .withType(Type.BOOLEAN)
+            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR, 8))
+            .withWidth(Width.SHORT)
+            .withImportance(Importance.LOW)
+            .withDescription("Whether to use plaintext for Spanner Omni connection");
+
+    public static final Field SPANNER_OMNI_CLIENT_KEY_PATH = Field.create(SPANNER_OMNI_CLIENT_KEY_PATH_PROPERTY_NAME)
+            .withDisplayName("SpannerOmniClientKeyPath")
+            .withType(Type.STRING)
+            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR, 9))
+            .withWidth(Width.MEDIUM)
+            .withImportance(Importance.LOW)
+            .withDescription("Path to the client key file for Spanner Omni connection");
+
+    public static final Field SPANNER_OMNI_CLIENT_CERT_PATH = Field.create(SPANNER_OMNI_CLIENT_CERT_PATH_PROPERTY_NAME)
+            .withDisplayName("SpannerOmniClientCertPath")
+            .withType(Type.STRING)
+            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR, 10))
+            .withWidth(Width.MEDIUM)
+            .withImportance(Importance.LOW)
+            .withDescription("Path to the client certificate file for Spanner Omni connection");
+
     protected static final ConfigDefinition CONFIG_DEFINITION = ConfigDefinition.editor()
             .name("Spanner")
             .type(PROJECT_ID)
@@ -597,6 +635,10 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
                     SPANNER_CREDENTIALS_JSON,
                     SPANNER_HOST,
                     SPANNER_EMULATOR_HOST,
+                    SPANNER_OMNI_ENDPOINT,
+                    SPANNER_OMNI_USE_PLAINTEXT,
+                    SPANNER_OMNI_CLIENT_KEY_PATH,
+                    SPANNER_OMNI_CLIENT_CERT_PATH,
                     STREAM_EVENT_QUEUE_CAPACITY,
                     TASK_STATE_CHANGE_EVENT_QUEUE_CAPACITY,
                     VALUE_CAPTURE_MODE,
