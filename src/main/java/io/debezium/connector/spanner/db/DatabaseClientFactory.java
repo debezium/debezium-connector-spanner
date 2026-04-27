@@ -38,6 +38,7 @@ public class DatabaseClientFactory {
     private final String instanceId;
     private final String databaseId;
 
+    private final String SPANNER_OMNI_DEFAULT_ID = "default";
     private final SpannerOptions options;
     private volatile Spanner spanner;
 
@@ -46,8 +47,23 @@ public class DatabaseClientFactory {
     public DatabaseClientFactory(String projectId, String instanceId, String databaseId,
                                  String credentialsJson,
                                  String credentialsPath, String host, String emulatorHost, String databaseRole) {
-        this.projectId = projectId;
-        this.instanceId = instanceId;
+
+        this(projectId, instanceId, databaseId, credentialsJson, credentialsPath, host, emulatorHost, databaseRole, null, false, null, null);
+    }
+
+    public DatabaseClientFactory(String projectId, String instanceId, String databaseId,
+                                 String credentialsJson,
+                                 String credentialsPath, String host, String emulatorHost, String databaseRole, String spannerOmniEndpoint, boolean usePlainText,
+                                 String clientKeyPath, String clientCertPath) {
+
+        if (Strings.isNullOrEmpty(spannerOmniEndpoint)) {
+            this.projectId = projectId;
+            this.instanceId = instanceId;
+        }
+        else {
+            this.projectId = SPANNER_OMNI_DEFAULT_ID;
+            this.instanceId = SPANNER_OMNI_DEFAULT_ID;
+        }
         this.databaseId = databaseId;
 
         SpannerOptions.Builder builder = SpannerOptions.newBuilder();
@@ -58,7 +74,19 @@ public class DatabaseClientFactory {
         if (!Strings.isNullOrEmpty(host)) {
             builder.setHost(host);
         }
-        if (!Strings.isNullOrEmpty(emulatorHost)) {
+        if (!Strings.isNullOrEmpty(spannerOmniEndpoint)) {
+            builder.setExperimentalHost(spannerOmniEndpoint);
+            builder.setCredentials(NoCredentials.getInstance());
+            builder.setBuiltInMetricsEnabled(false);
+            if (usePlainText) {
+                builder.setCredentials(NoCredentials.getInstance());
+                builder.usePlainText();
+            }
+            else if (!Strings.isNullOrEmpty(clientCertPath) && !Strings.isNullOrEmpty(clientKeyPath)) {
+                builder.useClientCert(clientCertPath, clientKeyPath);
+            }
+        }
+        else if (!Strings.isNullOrEmpty(emulatorHost)) {
             builder.setEmulatorHost(emulatorHost);
             builder.setCredentials(NoCredentials.getInstance());
         }
@@ -68,7 +96,7 @@ public class DatabaseClientFactory {
             }
         }
 
-        if (!Strings.isNullOrEmpty(databaseRole)) {
+        if (!Strings.isNullOrEmpty(databaseRole) && Strings.isNullOrEmpty(spannerOmniEndpoint)) {
             builder.setDatabaseRole(databaseRole);
         }
         String userAgentString = USER_AGENT_PREFIX + Module.version();
@@ -81,7 +109,8 @@ public class DatabaseClientFactory {
     public DatabaseClientFactory(SpannerConnectorConfig config) {
         this(config.projectId(), config.instanceId(), config.databaseId(),
                 config.gcpSpannerCredentialsJson(), config.gcpSpannerCredentialsPath(),
-                config.spannerHost(), config.spannerEmulatorHost(), config.databaseRole());
+                config.spannerHost(), config.spannerEmulatorHost(), config.databaseRole(), config.spannerOmniEndpoint(), config.usePlainText(), config.clientKeyPath(),
+                config.clientCertPath());
     }
 
     @VisibleForTesting
