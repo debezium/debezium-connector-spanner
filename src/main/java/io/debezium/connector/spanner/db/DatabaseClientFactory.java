@@ -25,6 +25,7 @@ import com.google.common.annotations.VisibleForTesting;
 import io.debezium.connector.spanner.Module;
 import io.debezium.connector.spanner.SpannerConnectorConfig;
 import io.debezium.util.Strings;
+import io.grpc.ManagedChannelBuilder;
 
 /**
  * Factory for {@code DatabaseClient}
@@ -38,7 +39,7 @@ public class DatabaseClientFactory {
     private final String instanceId;
     private final String databaseId;
 
-    private final String SPANNER_OMNI_DEFAULT_ID = "default";
+    public static final String SPANNER_OMNI_DEFAULT_ID = "default";
     private final SpannerOptions options;
     private volatile Spanner spanner;
 
@@ -79,8 +80,7 @@ public class DatabaseClientFactory {
             builder.setCredentials(NoCredentials.getInstance());
             builder.setBuiltInMetricsEnabled(false);
             if (usePlainText) {
-                builder.setCredentials(NoCredentials.getInstance());
-                builder.usePlainText();
+                builder.setChannelConfigurator(ManagedChannelBuilder::usePlaintext);
             }
             else if (!Strings.isNullOrEmpty(clientCertPath) && !Strings.isNullOrEmpty(clientKeyPath)) {
                 builder.useClientCert(clientCertPath, clientKeyPath);
