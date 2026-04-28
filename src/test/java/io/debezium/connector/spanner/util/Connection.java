@@ -38,6 +38,7 @@ import com.google.spanner.admin.instance.v1.CreateInstanceMetadata;
 
 import io.debezium.connector.spanner.db.DatabaseClientFactory;
 import io.debezium.connector.spanner.db.dao.SchemaDao;
+import io.grpc.ManagedChannelBuilder;
 
 public class Connection {
 
@@ -321,7 +322,8 @@ public class Connection {
         builder.setProjectId(projectId);
         if (isSpannerOmniEndpoint()) {
             builder.setExperimentalHost(getSpannerOmniEndpoint());
-            builder.usePlainText()
+            builder.setChannelConfigurator(ManagedChannelBuilder::usePlaintext)
+                    .setBuiltInMetricsEnabled(false)
                     .setCredentials(NoCredentials.getInstance());
         }
         else {
