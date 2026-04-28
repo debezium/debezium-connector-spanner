@@ -10,12 +10,13 @@ import java.util.UUID;
 import com.google.cloud.spanner.Dialect;
 import com.google.common.base.Strings;
 
+import io.debezium.connector.spanner.config.BaseSpannerConnectorConfig;
+import io.debezium.connector.spanner.db.DatabaseClientFactory;
+
 public class Database {
 
     private static final String projectId = "test-project";
     private static final String instanceId = "test-instance";
-    private static final String spannerOmniDefaultId = "default";
-    private static final String SPANNER_OMNI_ENDPOINT_PROPERTY_NAME = "spanner.omni.endpoint";
 
     private final String databaseId;
 
@@ -29,10 +30,10 @@ public class Database {
     }
 
     public static String getSpannerOmniEndpoint() {
-        return System.getProperty(SPANNER_OMNI_ENDPOINT_PROPERTY_NAME);
+        return System.getProperty(BaseSpannerConnectorConfig.SPANNER_OMNI_ENDPOINT_PROPERTY_NAME);
     }
 
-    public static boolean IsSpannerOmniEndpoint() {
+    public static boolean isSpannerOmniEndpoint() {
         return !Strings.isNullOrEmpty(getSpannerOmniEndpoint());
     }
 
@@ -46,17 +47,11 @@ public class Database {
             .build();
 
     public String getProjectId() {
-        if (IsSpannerOmniEndpoint()) {
-            return spannerOmniDefaultId;
-        }
-        return projectId;
+        return isSpannerOmniEndpoint() ? DatabaseClientFactory.SPANNER_OMNI_DEFAULT_ID : projectId;
     }
 
     public String getInstanceId() {
-        if (IsSpannerOmniEndpoint()) {
-            return spannerOmniDefaultId;
-        }
-        return instanceId;
+        return isSpannerOmniEndpoint() ? DatabaseClientFactory.SPANNER_OMNI_DEFAULT_ID : instanceId;
     }
 
     public String getDatabaseId() {
