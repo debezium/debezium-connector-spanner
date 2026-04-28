@@ -48,7 +48,7 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
     protected static final String GCP_SPANNER_CREDENTIALS_PATH_PROPERTY_NAME = "gcp.spanner.credentials.path";
     protected static final String GCP_SPANNER_CREDENTIALS_JSON_PROPERTY_NAME = "gcp.spanner.credentials.json";
 
-    protected static final String SPANNER_OMNI_ENDPOINT_PROPERTY_NAME = "spanner.omni.endpoint";
+    public static final String SPANNER_OMNI_ENDPOINT_PROPERTY_NAME = "spanner.omni.endpoint";
     protected static final String SPANNER_OMNI_USE_PLAINTEXT_PROPERTY_NAME = "spanner.omni.use.plaintext";
     protected static final String SPANNER_OMNI_CLIENT_KEY_PATH_PROPERTY_NAME = "spanner.omni.client.key.path";
     protected static final String SPANNER_OMNI_CLIENT_CERT_PATH_PROPERTY_NAME = "spanner.omni.client.cert.path";

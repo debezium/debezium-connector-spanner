@@ -41,6 +41,7 @@ public class ConfigurationValidator {
         ConnectionValidator.withContext(validationContext).validate()
                 .then(ChangeStreamValidator.withContext(validationContext));
         StartEndTimeValidator.withContext(validationContext).validate();
+        SpannerOmniValidator.withContext(validationContext).validate();
 
         return new Config(validationContext.getResults());
     }
@@ -85,6 +86,20 @@ public class ConfigurationValidator {
             }
             for (Field field : fields) {
                 this.configValueMap.get(field.name()).addErrorMessage(message);
+            }
+        }
+
+        /**
+         * Clears errors for a field
+         * @param field field object
+         */
+        public void clearErrors(Field field) {
+            ConfigValue configValue = this.configValueMap.get(field.name());
+            if (configValue != null) {
+                // Clear all error messages by creating a new ConfigValue
+                ConfigValue clearedValue = new ConfigValue(field.name());
+                clearedValue.value(configValue.value());
+                this.configValueMap.put(field.name(), clearedValue);
             }
         }
 
