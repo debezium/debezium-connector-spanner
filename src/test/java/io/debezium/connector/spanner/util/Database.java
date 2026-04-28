@@ -8,11 +8,16 @@ package io.debezium.connector.spanner.util;
 import java.util.UUID;
 
 import com.google.cloud.spanner.Dialect;
+import com.google.common.base.Strings;
+
+import io.debezium.connector.spanner.config.BaseSpannerConnectorConfig;
+import io.debezium.connector.spanner.db.DatabaseClientFactory;
 
 public class Database {
 
     private static final String projectId = "test-project";
     private static final String instanceId = "test-instance";
+
     private final String databaseId;
 
     private Connection connection;
@@ -22,6 +27,14 @@ public class Database {
     private Database(String databaseId, Dialect dialect) {
         this.databaseId = databaseId;
         this.dialect = dialect;
+    }
+
+    public static String getSpannerOmniEndpoint() {
+        return System.getProperty(BaseSpannerConnectorConfig.SPANNER_OMNI_ENDPOINT_PROPERTY_NAME);
+    }
+
+    public static boolean isSpannerOmniEndpoint() {
+        return !Strings.isNullOrEmpty(getSpannerOmniEndpoint());
     }
 
     public static final Database TEST_DATABASE = Database.builder()
@@ -34,11 +47,11 @@ public class Database {
             .build();
 
     public String getProjectId() {
-        return projectId;
+        return isSpannerOmniEndpoint() ? DatabaseClientFactory.SPANNER_OMNI_DEFAULT_ID : projectId;
     }
 
     public String getInstanceId() {
-        return instanceId;
+        return isSpannerOmniEndpoint() ? DatabaseClientFactory.SPANNER_OMNI_DEFAULT_ID : instanceId;
     }
 
     public String getDatabaseId() {
