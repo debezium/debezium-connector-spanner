@@ -92,7 +92,7 @@ public class DatabaseClientFactory {
                 credential = GoogleCredentials.fromStream(new ByteArrayInputStream(credentialsJson.getBytes()));
             }
             catch (IOException ex) {
-                LOGGER.error("Error read GOOGLE CREDENTIALS from params {}", credentialsJson);
+                LOGGER.error("Error reading Google credentials from JSON parameter");
                 LOGGER.error(ex.getMessage(), ex);
             }
         }
@@ -101,7 +101,7 @@ public class DatabaseClientFactory {
                 credential = GoogleCredentials.fromStream(new FileInputStream(credentialsPath));
             }
             catch (IOException e) {
-                LOGGER.error("Error read GOOGLE CREDENTIALS from path {}", credentialsPath);
+                LOGGER.error("Error reading Google credentials from file path");
                 LOGGER.error(e.getMessage(), e);
             }
         }

@@ -52,7 +52,7 @@ public class SpannerConnector extends SourceConnector {
     public void start(Map<String, String> props) {
         this.props = props;
 
-        LOGGER.info("Starting connector: props {}", props);
+        LOGGER.info("Starting connector");
 
         final SpannerConnectorConfig config = new SpannerConnectorConfig(Configuration.from(props));
 
