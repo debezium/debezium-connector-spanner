@@ -196,7 +196,7 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
 
     public static final Field SPANNER_CREDENTIALS_JSON = Field.create(GCP_SPANNER_CREDENTIALS_JSON_PROPERTY_NAME)
             .withDisplayName(GCP_SPANNER_CREDENTIALS_JSON_PROPERTY_NAME)
-            .withType(Type.STRING)
+            .withType(Type.PASSWORD)
             .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR, 2))
             .withWidth(Width.LONG)
             .withImportance(Importance.MEDIUM)
