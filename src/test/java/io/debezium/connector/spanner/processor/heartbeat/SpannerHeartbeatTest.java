@@ -41,7 +41,7 @@ class SpannerHeartbeatTest {
             .pollInterval(Duration.ofMillis(1))
             .maxBatchSize(10)
             .maxQueueSize(10)
-            .queueProvider(new DefaultQueueProvider<>(10))
+            .queueProvider(createDefaultQueueProvider(10))
             .loggingContextSupplier(() -> LoggingContext.forConnector("test", "test", "test"))
             .build();
 
@@ -167,4 +167,9 @@ class SpannerHeartbeatTest {
         };
     }
 
+    private static DefaultQueueProvider<DataChangeEvent> createDefaultQueueProvider(int maxQueueSize) {
+        DefaultQueueProvider<DataChangeEvent> provider = new DefaultQueueProvider<>();
+        provider.configure(java.util.Map.of("max.queue.size", String.valueOf(maxQueueSize)));
+        return provider;
+    }
 }
