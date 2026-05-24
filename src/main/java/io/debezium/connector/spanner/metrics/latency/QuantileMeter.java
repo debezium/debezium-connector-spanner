@@ -6,9 +6,6 @@
 package io.debezium.connector.spanner.metrics.latency;
 
 import java.time.Duration;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
 import org.apache.commons.lang3.ArrayUtils;
@@ -23,60 +20,28 @@ import io.debezium.connector.spanner.task.utils.TimeoutMeter;
  */
 public class QuantileMeter {
 
-    private static final int QUEUE_SIZE = 1000;
     private static final double[] QUANTILES = { 0.5, 0.95, 0.99 };
     private static final Double[] EMPTY_VALUES = { null, null, null };
-    private final BlockingQueue<Double> queue = new LinkedBlockingQueue<>(QUEUE_SIZE);
 
-    private final Thread thread;
     private final DDSketch sketch = DDSketches.unboundedDense(0.01);
-    private final Consumer<Throwable> errorConsumer;
+    private final Duration clearInterval;
+    private TimeoutMeter timeoutMeter;
 
     public QuantileMeter(Duration clearInterval, Consumer<Throwable> errorConsumer) {
-        this.errorConsumer = errorConsumer;
-
-        this.thread = new Thread(() -> {
-
-            TimeoutMeter timeoutMeter = null;
-            if (!clearInterval.isZero()) {
-                timeoutMeter = TimeoutMeter.setTimeout(clearInterval);
-            }
-
-            while (!Thread.currentThread().isInterrupted()) {
-                Double pollValue;
-                try {
-                    pollValue = queue.poll(100, TimeUnit.MILLISECONDS);
-
-                    if (timeoutMeter != null && timeoutMeter.isExpired()) {
-                        timeoutMeter = TimeoutMeter.setTimeout(clearInterval);
-                        sketch.clear();
-                    }
-
-                    if (pollValue == null) {
-                        continue;
-                    }
-                }
-                catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    return;
-                }
-                accept(pollValue);
-            }
-        }, "SpannerConnector-QuantileMeter");
-
-        this.thread.setUncaughtExceptionHandler((t, ex) -> this.errorConsumer.accept(ex));
-
+        this.clearInterval = clearInterval;
     }
 
     public void start() {
-        this.thread.start();
+        if (clearInterval != null && !clearInterval.isZero()) {
+            timeoutMeter = TimeoutMeter.setTimeout(clearInterval);
+        }
     }
 
-    public boolean addValue(double value) {
-        return queue.offer(value);
-    }
-
-    private synchronized void accept(double value) {
+    public synchronized void addValue(double value) {
+        if (timeoutMeter != null && timeoutMeter.isExpired()) {
+            timeoutMeter = TimeoutMeter.setTimeout(clearInterval);
+            sketch.clear();
+        }
         sketch.accept(value);
     }
 
@@ -89,13 +54,11 @@ public class QuantileMeter {
     }
 
     public synchronized void reset() {
-        queue.clear();
         sketch.clear();
     }
 
     public void shutdown() {
         this.reset();
-        this.thread.interrupt();
     }
 
     // for testing
