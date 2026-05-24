@@ -8,11 +8,10 @@ package io.debezium.connector.spanner.metrics.latency;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.mockito.Mockito.mock;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import java.time.Duration;
 import java.util.Arrays;
-import java.util.function.Consumer;
 
 import org.junit.jupiter.api.Test;
 
@@ -24,32 +23,31 @@ class QuantileMeterTest {
     }
 
     @Test
-    void testAddValue() throws InterruptedException {
-        QuantileMeter quantileMeter = new QuantileMeter(Duration.ofSeconds(10), (Consumer<Throwable>) mock(Consumer.class));
+    void testAddValue() {
+        QuantileMeter quantileMeter = new QuantileMeter(Duration.ofSeconds(10), null);
         assertArrayEquals(new Double[]{ null, null, null }, quantileMeter.getValuesAtQuantiles());
-        quantileMeter.addValue(20.0d);
         quantileMeter.start();
-        Thread.sleep(1000);
+        quantileMeter.addValue(20.0d);
         assertFalse(Arrays.equals(new Double[]{ 0d, 0d, 0d }, quantileMeter.getValuesAtQuantiles()));
+        assertNotNull(quantileMeter.getValueAtQuantile(0.5));
     }
 
     @Test
     void testGetValueAtQuantile() {
-        QuantileMeter quantileMeter = new QuantileMeter(
-                Duration.ofSeconds(10), (Consumer<Throwable>) mock(Consumer.class));
+        QuantileMeter quantileMeter = new QuantileMeter(Duration.ofSeconds(10), null);
         assertEquals(null, quantileMeter.getValueAtQuantile(10.0d));
     }
 
     @Test
     void testReset() {
-        QuantileMeter quantileMeter = new QuantileMeter(Duration.ofSeconds(10), (Consumer<Throwable>) mock(Consumer.class));
+        QuantileMeter quantileMeter = new QuantileMeter(Duration.ofSeconds(10), null);
         quantileMeter.reset();
         assertEquals(0.0d, quantileMeter.getCount());
     }
 
     @Test
     void testShutdown() {
-        QuantileMeter quantileMeter = new QuantileMeter(Duration.ofSeconds(10), (Consumer<Throwable>) mock(Consumer.class));
+        QuantileMeter quantileMeter = new QuantileMeter(Duration.ofSeconds(10), null);
         quantileMeter.shutdown();
         assertEquals(0.0d, quantileMeter.getCount());
     }
