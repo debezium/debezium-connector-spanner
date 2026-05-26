@@ -40,4 +40,18 @@ class ColumnTest {
         assertEquals(1L, actualCreateResult.getOrdinalPosition());
         assertEquals(DataType.INT64, actualCreateResult.getType().getType());
     }
+
+    @Test
+    void testCreateStringGoogleStandardSql() {
+        Column actualCreateResult = Column.create("Name", "STRING", true, 1L, true,
+               Dialect.GOOGLE_STANDARD_SQL);
+        assertEquals(DataType.STRING, actualCreateResult.getType().getType());
+    }
+
+    @Test
+    void testCreateStringPostgresql() {
+        Column actualCreateResult = Column.create("Name", "STRING", true, 1L, true,
+                Dialect.POSTGRESQL);
+        assertEquals(DataType.STRING, actualCreateResult.getType().getType());
+    }
 }
