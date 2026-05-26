@@ -90,6 +90,9 @@ public class Column {
                 if ("TOKENLIST".equals(spannerType)) {
                     return new ColumnType(DataType.TOKENLIST);
                 }
+                if ("UUID".equals(spannerType)) {
+                    return new ColumnType(DataType.STRING);
+                }
                 if (spannerType.startsWith("ARRAY")) {
                     // Substring "ARRAY<xxx>"
                     String spannerArrayType = spannerType.substring(6, spannerType.length() - 1);
@@ -137,6 +140,9 @@ public class Column {
                 }
                 if ("JSONB".equals(spannerType)) {
                     return new ColumnType(DataType.JSON);
+                }
+                if ("UUID".equals(spannerType)) {
+                    return new ColumnType(DataType.STRING);
                 }
                 throw new IllegalArgumentException("Unknown spanner type " + spannerType);
             default:
