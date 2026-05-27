@@ -44,7 +44,7 @@ class ColumnTest {
     @Test
     void testCreateStringGoogleStandardSql() {
         Column actualCreateResult = Column.create("Name", "STRING", true, 1L, true,
-               Dialect.GOOGLE_STANDARD_SQL);
+                Dialect.GOOGLE_STANDARD_SQL);
         assertEquals(DataType.STRING, actualCreateResult.getType().getType());
     }
 
