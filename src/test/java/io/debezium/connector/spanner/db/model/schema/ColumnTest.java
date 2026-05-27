@@ -50,7 +50,7 @@ class ColumnTest {
 
     @Test
     void testCreateStringPostgresql() {
-        Column actualCreateResult = Column.create("Name", "STRING", true, 1L, true,
+        Column actualCreateResult = Column.create("Name", "CHARACTER VARYING", true, 1L, true,
                 Dialect.POSTGRESQL);
         assertEquals(DataType.STRING, actualCreateResult.getType().getType());
     }
