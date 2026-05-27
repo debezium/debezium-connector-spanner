@@ -22,4 +22,5 @@ public enum DataType {
     NUMERIC,
     JSON,
     TOKENLIST,
+    UUID,
 }

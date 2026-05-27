@@ -16,6 +16,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 
 import io.debezium.connector.spanner.db.mapper.parser.ColumnTypeParser;
 import io.debezium.connector.spanner.schema.mapper.ColumnTypeSchemaMapper;
+import io.debezium.data.Uuid;
 
 class ColumnTypeSchemaMapperTest {
 
@@ -64,7 +65,11 @@ class ColumnTypeSchemaMapperTest {
 
                 Arguments.of(
                         ColumnTypeSchemaMapper.getSchema(ColumnTypeParser.parse("{\"code\":\"TOKENLIST\"}"), true),
-                        Schema.OPTIONAL_STRING_SCHEMA));
+                        Schema.OPTIONAL_STRING_SCHEMA),
+
+                Arguments.of(
+                        ColumnTypeSchemaMapper.getSchema(ColumnTypeParser.parse("{\"code\":\"UUID\"}"), true),
+                        Uuid.builder().optional().build()));
     }
 
     @ParameterizedTest

@@ -10,6 +10,7 @@ import org.apache.kafka.connect.data.SchemaBuilder;
 
 import io.debezium.connector.spanner.db.model.schema.ColumnType;
 import io.debezium.connector.spanner.db.model.schema.DataType;
+import io.debezium.data.Uuid;
 
 /**
  * Generates Kafka Connect Schema for Spanner data types
@@ -27,6 +28,8 @@ public class ColumnTypeSchemaMapper {
             case TIMESTAMP:
             case TOKENLIST:
                 return optional ? Schema.OPTIONAL_STRING_SCHEMA : Schema.STRING_SCHEMA;
+            case UUID:
+                return optional ? Uuid.builder().optional().build() : Uuid.builder().build();
             case INT64:
                 return optional ? Schema.OPTIONAL_INT64_SCHEMA : Schema.INT64_SCHEMA;
             case BOOL:
@@ -60,6 +63,8 @@ public class ColumnTypeSchemaMapper {
             case TIMESTAMP:
             case TOKENLIST:
                 return optional ? Schema.OPTIONAL_STRING_SCHEMA : Schema.STRING_SCHEMA;
+            case UUID:
+                return optional ? Uuid.builder().optional().build() : Uuid.builder().build();
             case INT64:
                 return optional ? Schema.OPTIONAL_INT64_SCHEMA : Schema.INT64_SCHEMA;
             case BOOL:
