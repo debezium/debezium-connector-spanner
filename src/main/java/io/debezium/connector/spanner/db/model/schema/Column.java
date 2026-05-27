@@ -91,7 +91,7 @@ public class Column {
                     return new ColumnType(DataType.TOKENLIST);
                 }
                 if ("UUID".equals(spannerType)) {
-                    return new ColumnType(DataType.STRING);
+                    return new ColumnType(DataType.UUID);
                 }
                 if (spannerType.startsWith("ARRAY")) {
                     // Substring "ARRAY<xxx>"
@@ -142,7 +142,7 @@ public class Column {
                     return new ColumnType(DataType.JSON);
                 }
                 if ("UUID".equals(spannerType)) {
-                    return new ColumnType(DataType.STRING);
+                    return new ColumnType(DataType.UUID);
                 }
                 throw new IllegalArgumentException("Unknown spanner type " + spannerType);
             default:
