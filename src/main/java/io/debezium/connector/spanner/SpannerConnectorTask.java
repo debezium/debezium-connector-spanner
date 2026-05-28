@@ -21,6 +21,7 @@ import io.debezium.config.CommonConnectorConfig;
 import io.debezium.config.Configuration;
 import io.debezium.connector.base.ChangeEventQueue;
 import io.debezium.connector.base.QueueProviderService;
+import io.debezium.connector.base.QueueProviderServiceProvider;
 import io.debezium.connector.common.CdcSourceTaskContext;
 import io.debezium.connector.common.DebeziumHeaderProducer;
 import io.debezium.connector.common.DebeziumHeaderProducerProvider;
@@ -113,19 +114,8 @@ public class SpannerConnectorTask extends SpannerBaseSourceTask {
 
         final DaoFactory daoFactory = new DaoFactory(databaseClientFactory);
 
-        this.queue = new ChangeEventQueue.Builder<DataChangeEvent>()
-                .pollInterval(connectorConfig.getPollInterval())
-                .maxBatchSize(connectorConfig.getMaxBatchSize())
-                .maxQueueSize(connectorConfig.getMaxQueueSize())
-                .queueProvider(connectorConfig.getServiceRegistry().tryGetService(QueueProviderService.class).getQueueProvider())
-                .maxQueueSizeInBytes(connectorConfig.getMaxQueueSizeInBytes())
-                .loggingContextSupplier(() -> taskContext.configureLoggingContext(CONTEXT_NAME))
-                .build();
-
-        errorHandler = new SpannerErrorHandler(this, queue);
-
-        this.spannerMeter = new SpannerMeter(
-                this, connectorConfig, errorHandler, () -> lowWatermarkHolder.getLowWatermark());
+        // Service providers
+        registerServiceProviders(connectorConfig.getServiceRegistry());
 
         final SchemaNameAdjuster schemaNameAdjuster = connectorConfig.schemaNameAdjuster();
 
@@ -150,8 +140,27 @@ public class SpannerConnectorTask extends SpannerBaseSourceTask {
 
         final DebeziumHeartbeatFactory spannerHeartbeatFactory = new SpannerHeartbeatFactory();
 
-        final PartitionOffsetProvider partitionOffsetProvider = new PartitionOffsetProvider(
-                this.context.offsetStorageReader(), spannerMeter.getMetricsEventPublisher());
+        // Manual Bean Registration
+        connectorConfig.getBeanRegistry().add(StandardBeanNames.CONFIGURATION, configuration);
+        connectorConfig.getBeanRegistry().add(StandardBeanNames.CONNECTOR_CONFIG, connectorConfig);
+        connectorConfig.getBeanRegistry().add(StandardBeanNames.DATABASE_SCHEMA, schema);
+        connectorConfig.getBeanRegistry().add(StandardBeanNames.CDC_SOURCE_TASK_CONTEXT, taskContext);
+
+        this.queue = new ChangeEventQueue.Builder<DataChangeEvent>()
+                .pollInterval(connectorConfig.getPollInterval())
+                .maxBatchSize(connectorConfig.getMaxBatchSize())
+                .maxQueueSize(connectorConfig.getMaxQueueSize())
+                .queueProvider(connectorConfig.getServiceRegistry().tryGetService(QueueProviderService.class).getQueueProvider())
+                .maxQueueSizeInBytes(connectorConfig.getMaxQueueSizeInBytes())
+                .loggingContextSupplier(() -> taskContext.configureLoggingContext(CONTEXT_NAME))
+                .build();
+
+        errorHandler = new SpannerErrorHandler(this, queue);
+
+        this.lowWatermarkHolder = new LowWatermarkHolder();
+
+        this.spannerMeter = new SpannerMeter(
+                this, connectorConfig, errorHandler, () -> lowWatermarkHolder.getLowWatermark());
 
         final SynchronizedPartitionManager partitionManager = new SynchronizedPartitionManager(
                 event -> this.synchronizationTaskContext.publishEvent(event));
@@ -168,22 +177,14 @@ public class SpannerConnectorTask extends SpannerBaseSourceTask {
                 connectorConfig.getHeartbeatInterval(),
                 connectorConfig.getMaxMissedHeartbeats());
 
-        this.lowWatermarkHolder = new LowWatermarkHolder();
-
         final SourceInfoFactory sourceInfoFactory = new SourceInfoFactory(connectorConfig, lowWatermarkHolder);
 
         this.adminClientFactory = new KafkaAdminClientFactory(connectorConfig);
 
         final KafkaPartitionInfoProvider kafkaPartitionInfoProvider = new KafkaPartitionInfoProvider(adminClientFactory.getAdminClient());
 
-        // Manual Bean Registration
-        connectorConfig.getBeanRegistry().add(StandardBeanNames.CONFIGURATION, configuration);
-        connectorConfig.getBeanRegistry().add(StandardBeanNames.CONNECTOR_CONFIG, connectorConfig);
-        connectorConfig.getBeanRegistry().add(StandardBeanNames.DATABASE_SCHEMA, schema);
-        connectorConfig.getBeanRegistry().add(StandardBeanNames.CDC_SOURCE_TASK_CONTEXT, taskContext);
-
-        // Service providers
-        registerServiceProviders(connectorConfig.getServiceRegistry());
+        final PartitionOffsetProvider partitionOffsetProvider = new PartitionOffsetProvider(
+                this.context.offsetStorageReader(), spannerMeter.getMetricsEventPublisher());
 
         this.dispatcher = new SpannerEventDispatcher(
                 connectorConfig,
@@ -333,8 +334,8 @@ public class SpannerConnectorTask extends SpannerBaseSourceTask {
     // Remove when support for SPI snapshotter will be supported by this connector
     @Override
     protected void registerServiceProviders(ServiceRegistry serviceRegistry) {
-
         serviceRegistry.registerServiceProvider(new PostProcessorRegistryServiceProvider());
         serviceRegistry.registerServiceProvider(new DebeziumHeaderProducerProvider());
+        serviceRegistry.registerServiceProvider(new QueueProviderServiceProvider());
     }
 }
