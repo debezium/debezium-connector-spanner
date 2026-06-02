@@ -7,8 +7,6 @@ package io.debezium.connector.spanner;
 
 import java.util.List;
 
-import org.apache.kafka.connect.source.SourceRecord;
-
 import io.debezium.config.CommonConnectorConfig;
 import io.debezium.connector.spanner.context.offset.SpannerOffsetContext;
 import io.debezium.pipeline.ChangeEventSourceCoordinator;
@@ -38,7 +36,7 @@ public class SpannerChangeEventSourceCoordinator extends ChangeEventSourceCoordi
                 changeEventSourceMetricsFactory, eventDispatcher, schema, null, notificationService, snapshotterService);
     }
 
-    public void commitRecords(List<SourceRecord> recordList) throws InterruptedException {
+    public void commitRecords(List<CommittedRecord> recordList) throws InterruptedException {
         if (this.streamingSource instanceof CommittingRecordsStreamingChangeEventSource) {
             SpannerStreamingChangeEventSource streamingChangeEventSource = (SpannerStreamingChangeEventSource) this.streamingSource;
             streamingChangeEventSource.commitRecords(recordList);

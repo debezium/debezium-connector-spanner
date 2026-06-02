@@ -7,14 +7,12 @@ package io.debezium.connector.spanner;
 
 import java.util.List;
 
-import org.apache.kafka.connect.source.SourceRecord;
-
 import io.debezium.pipeline.spi.OffsetContext;
 import io.debezium.pipeline.spi.Partition;
 
 public interface CommittingRecordsStreamingChangeEventSource<P extends Partition, O extends OffsetContext>
         extends io.debezium.pipeline.source.spi.StreamingChangeEventSource<P, O> {
 
-    default void commitRecords(List<SourceRecord> recordList) throws InterruptedException {
+    default void commitRecords(List<CommittedRecord> recordList) throws InterruptedException {
     }
 }

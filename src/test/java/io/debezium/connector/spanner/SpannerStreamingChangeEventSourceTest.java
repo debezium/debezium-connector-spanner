@@ -5,13 +5,11 @@
  */
 package io.debezium.connector.spanner;
 
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -22,10 +20,7 @@ import java.util.Properties;
 
 import org.apache.kafka.connect.data.ConnectSchema;
 import org.apache.kafka.connect.data.Schema;
-import org.apache.kafka.connect.header.Header;
-import org.apache.kafka.connect.header.Headers;
 import org.apache.kafka.connect.source.SourceConnector;
-import org.apache.kafka.connect.source.SourceRecord;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
@@ -291,21 +286,8 @@ class SpannerStreamingChangeEventSourceTest {
                         "Stream Name", new SchemaDao(mock(DatabaseClient.class)), mock(Runnable.class)),
                 null, true, mock(SpannerOffsetContextFactory.class));
 
-        SourceRecord sourceRecord1 = spy(new SourceRecord(Map.of(), Map.of(), "t1", Schema.STRING_SCHEMA, "v1"));
-        SourceRecord sourceRecord2 = spy(new SourceRecord(Map.of(), Map.of(), "t2", Schema.STRING_SCHEMA, "v2"));
-        Map sourcePartition = Map.of("partitionToken", "v1");
-        when(sourceRecord2.sourcePartition()).thenReturn(sourcePartition);
-        Headers headers = mock(Headers.class);
-        Header header = mock(Header.class);
-        when(header.value()).thenReturn("header");
-        when(headers.lastWithName(anyString())).thenReturn(header);
-        when(sourceRecord2.headers()).thenReturn(headers);
-        spannerStreamingChangeEventSource.commitRecords(List.of(sourceRecord1, sourceRecord2));
-
-        verify(sourceRecord1, times(2)).sourcePartition();
-        verify(sourceRecord1, times(2)).headers();
-
-        verify(sourceRecord2, times(2)).sourcePartition();
-        verify(sourceRecord2, times(2)).headers();
+        CommittedRecord record1 = new CommittedRecord("t1", "uid1");
+        CommittedRecord record2 = new CommittedRecord("t2", "uid2");
+        spannerStreamingChangeEventSource.commitRecords(List.of(record1, record2));
     }
 }

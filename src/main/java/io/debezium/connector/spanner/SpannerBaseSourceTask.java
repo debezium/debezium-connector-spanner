@@ -6,7 +6,7 @@
 package io.debezium.connector.spanner;
 
 import java.time.Instant;
-import java.util.LinkedList;
+import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.kafka.clients.producer.RecordMetadata;
@@ -27,14 +27,18 @@ public abstract class SpannerBaseSourceTask
 
     protected SpannerChangeEventSourceCoordinator coordinator;
 
-    private final List<SourceRecord> records = new LinkedList<>();
+    private final List<CommittedRecord> committedRecords = new ArrayList<>();
 
     @Override
     public void commitRecord(SourceRecord sourceRecord, RecordMetadata metadata) throws InterruptedException {
         super.commitRecord(sourceRecord, metadata);
 
-        synchronized (this) {
-            records.add(sourceRecord);
+        String token = SourceRecordUtils.extractToken(sourceRecord);
+        String recordUid = SourceRecordUtils.extractRecordUid(sourceRecord);
+        if (token != null && recordUid != null) {
+            synchronized (this) {
+                committedRecords.add(new CommittedRecord(token, recordUid));
+            }
         }
 
         if (metadata != null) {
@@ -54,8 +58,8 @@ public abstract class SpannerBaseSourceTask
             return;
         }
         synchronized (this) {
-            coordinator.commitRecords(records);
-            records.clear();
+            coordinator.commitRecords(committedRecords);
+            committedRecords.clear();
         }
     }
 

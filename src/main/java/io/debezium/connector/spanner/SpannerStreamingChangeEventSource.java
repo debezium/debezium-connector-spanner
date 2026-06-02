@@ -11,7 +11,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
-import org.apache.kafka.connect.source.SourceRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -35,7 +34,6 @@ import io.debezium.connector.spanner.db.stream.PartitionEventListener;
 import io.debezium.connector.spanner.exception.FinishingPartitionTimeout;
 import io.debezium.connector.spanner.metrics.MetricsEventPublisher;
 import io.debezium.connector.spanner.metrics.event.ChildPartitionsMetricEvent;
-import io.debezium.connector.spanner.processor.SourceRecordUtils;
 import io.debezium.connector.spanner.processor.SpannerChangeRecordEmitter;
 import io.debezium.connector.spanner.processor.SpannerEventDispatcher;
 import io.debezium.pipeline.ErrorHandler;
@@ -326,21 +324,14 @@ public class SpannerStreamingChangeEventSource implements CommittingRecordsStrea
     }
 
     @Override
-    public void commitRecords(List<SourceRecord> records) throws InterruptedException {
+    public void commitRecords(List<CommittedRecord> records) throws InterruptedException {
 
         if (!finishPartitionStrategy.equals(FinishPartitionStrategy.AFTER_COMMIT)) {
             return;
         }
 
-        for (SourceRecord sourceRecord : records) {
-            String token = SourceRecordUtils.extractToken(sourceRecord);
-            String recordUid = SourceRecordUtils.extractRecordUid(sourceRecord);
-
-            if (token == null || recordUid == null) {
-                continue;
-            }
-
-            this.finishingPartitionManager.commitRecord(token, recordUid);
+        for (CommittedRecord record : records) {
+            this.finishingPartitionManager.commitRecord(record.getToken(), record.getRecordUid());
         }
     }
 
