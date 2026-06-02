@@ -36,7 +36,7 @@ public class PartitionOffset {
 
     public Map<String, String> getOffset() {
         if (this.offset == null) {
-            return null;
+            return Map.of();
         }
         return Map.of(OFFSET_KEY, offset.toString(),
                 DEBUG_START_TIME_KEY, metadata.getPartitionStartTimestamp().toString(),
