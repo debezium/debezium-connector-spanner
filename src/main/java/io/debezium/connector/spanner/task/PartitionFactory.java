@@ -7,8 +7,11 @@ package io.debezium.connector.spanner.task;
 
 import static org.slf4j.LoggerFactory.getLogger;
 
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 
@@ -50,43 +53,58 @@ public class PartitionFactory {
         return partition;
     }
 
+    public Map<String, Partition> getPartitions(List<PartitionState> partitionStates) {
+        List<String> tokens = partitionStates.stream()
+                .map(PartitionState::getToken)
+                .collect(Collectors.toList());
+
+        Map<String, Timestamp> offsets = partitionOffsetProvider.getOffsets(tokens);
+
+        Map<String, Partition> partitionMap = new HashMap<>();
+        for (PartitionState partitionState : partitionStates) {
+            Timestamp offset = offsets.get(partitionState.getToken());
+            Timestamp startTime = resolveOffset(partitionState, offset);
+
+            partitionMap.put(partitionState.getToken(), Partition.builder()
+                    .token(partitionState.getToken())
+                    .startTimestamp(startTime)
+                    .endTimestamp(partitionState.getEndTimestamp())
+                    .parentTokens(partitionState.getParents())
+                    .build());
+        }
+        return partitionMap;
+    }
+
     public Partition getPartition(PartitionState partitionState) {
+        Timestamp offset = partitionOffsetProvider.getOffset(partitionState);
         return Partition.builder()
                 .token(partitionState.getToken())
-                .startTimestamp(getOffset(partitionState))
+                .startTimestamp(resolveOffset(partitionState, offset))
                 .endTimestamp(partitionState.getEndTimestamp())
                 .parentTokens(partitionState.getParents())
                 .build();
     }
 
-    private Timestamp getOffset(PartitionState partitionState) {
-        final Timestamp offset = partitionOffsetProvider.getOffset(partitionState);
+    private Timestamp resolveOffset(PartitionState partitionState, Timestamp offset) {
         Timestamp startTime;
 
         if (offset != null) {
-
             if (offset.toSqlTimestamp().before(partitionState.getStartTimestamp().toSqlTimestamp())) {
-                Map<String, String> offsetMap = partitionOffsetProvider.getOffsetMap(partitionState);
-
-                LOGGER.warn("Incorrect offset, start time will be taken for partition {}, offsetMap {}", partitionState.getToken(), offsetMap);
-
+                LOGGER.warn("Incorrect offset {}, start time will be taken for partition {}", offset, partitionState.getToken());
                 startTime = partitionState.getStartTimestamp();
             }
             else {
                 LOGGER.info("Found previous offset {}", Map.of(partitionState.getToken(), offset.toString()));
-
                 startTime = offset;
             }
         }
         else {
             LOGGER.info("Previous offset not found, start time will be taken {}",
                     Map.of(partitionState.getToken(), partitionState.getStartTimestamp()));
-
             startTime = partitionState.getStartTimestamp();
         }
 
         metricsEventPublisher.publishMetricEvent(PartitionOffsetLagMetricEvent.from(partitionState.getToken(), startTime));
-
         return startTime;
     }
 }
