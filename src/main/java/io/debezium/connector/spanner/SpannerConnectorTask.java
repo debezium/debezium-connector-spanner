@@ -184,7 +184,8 @@ public class SpannerConnectorTask extends SpannerBaseSourceTask {
         final KafkaPartitionInfoProvider kafkaPartitionInfoProvider = new KafkaPartitionInfoProvider(adminClientFactory.getAdminClient());
 
         final PartitionOffsetProvider partitionOffsetProvider = new PartitionOffsetProvider(
-                this.context.offsetStorageReader(), spannerMeter.getMetricsEventPublisher());
+                this.context.offsetStorageReader(), spannerMeter.getMetricsEventPublisher(),
+                connectorConfig.offsetBatchRetrievalTimeoutMs());
 
         this.dispatcher = new SpannerEventDispatcher(
                 connectorConfig,

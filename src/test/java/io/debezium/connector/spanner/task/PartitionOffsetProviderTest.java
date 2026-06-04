@@ -37,7 +37,7 @@ class PartitionOffsetProviderTest {
 
         when(reader.offsets(any())).thenAnswer(invocation -> offsets);
 
-        PartitionOffsetProvider provider = new PartitionOffsetProvider(reader, metricsPublisher);
+        PartitionOffsetProvider provider = new PartitionOffsetProvider(reader, metricsPublisher, 30000L);
         Map<String, Timestamp> result = provider.getOffsets(List.of("token1"));
 
         assertEquals(1, result.size());
@@ -51,7 +51,7 @@ class PartitionOffsetProviderTest {
 
         when(reader.offsets(any())).thenAnswer(invocation -> null);
 
-        PartitionOffsetProvider provider = new PartitionOffsetProvider(reader, metricsPublisher);
+        PartitionOffsetProvider provider = new PartitionOffsetProvider(reader, metricsPublisher, 30000L);
         Map<String, Timestamp> result = provider.getOffsets(List.of("token1"));
 
         assertTrue(result.isEmpty());
@@ -67,7 +67,7 @@ class PartitionOffsetProviderTest {
             return null;
         });
 
-        PartitionOffsetProvider provider = new PartitionOffsetProvider(reader, metricsPublisher);
+        PartitionOffsetProvider provider = new PartitionOffsetProvider(reader, metricsPublisher, 30000L);
         Map<String, Timestamp> result = provider.getOffsets(List.of("token1"));
 
         assertTrue(result.isEmpty());

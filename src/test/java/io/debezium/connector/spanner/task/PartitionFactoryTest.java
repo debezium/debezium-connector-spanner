@@ -46,7 +46,7 @@ class PartitionFactoryTest {
         when(reader.offsets(any())).thenAnswer(invocation -> offsets);
 
         MetricsEventPublisher metricsPublisher = new MetricsEventPublisher();
-        PartitionOffsetProvider offsetProvider = new PartitionOffsetProvider(reader, metricsPublisher);
+        PartitionOffsetProvider offsetProvider = new PartitionOffsetProvider(reader, metricsPublisher, 30000L);
         return new PartitionFactory(offsetProvider, metricsPublisher);
     }
 

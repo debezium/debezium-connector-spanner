@@ -40,12 +40,15 @@ public class PartitionOffsetProvider {
 
     private final OffsetStorageReader offsetStorageReader;
     private final MetricsEventPublisher metricsEventPublisher;
+    private final long batchRetrievalTimeoutMs;
 
     private final ExecutorService executor;
 
-    public PartitionOffsetProvider(OffsetStorageReader offsetStorageReader, MetricsEventPublisher metricsEventPublisher) {
+    public PartitionOffsetProvider(OffsetStorageReader offsetStorageReader, MetricsEventPublisher metricsEventPublisher,
+                                   long batchRetrievalTimeoutMs) {
         this.offsetStorageReader = offsetStorageReader;
         this.metricsEventPublisher = metricsEventPublisher;
+        this.batchRetrievalTimeoutMs = batchRetrievalTimeoutMs;
         this.executor = Executors.newCachedThreadPool();
     }
 
@@ -72,7 +75,7 @@ public class PartitionOffsetProvider {
         Future<Map<Map<String, String>, Map<String, Object>>> future = executor.submit(
                 () -> this.offsetStorageReader.offsets(partitionsMapList));
         try {
-            result = future.get(30, TimeUnit.SECONDS);
+            result = future.get(batchRetrievalTimeoutMs, TimeUnit.MILLISECONDS);
         }
         catch (TimeoutException ex) {
             LOGGER.error("Failed to retrieve batch offsets for {} partitions in time", partitions.size(), ex);

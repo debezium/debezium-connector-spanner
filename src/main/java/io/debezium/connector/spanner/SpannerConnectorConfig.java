@@ -157,6 +157,10 @@ public class SpannerConnectorConfig extends BaseSpannerConnectorConfig {
         return getConfig().getInteger(STREAM_EVENT_QUEUE_CAPACITY, (int) STREAM_EVENT_QUEUE_CAPACITY.defaultValue());
     }
 
+    public long offsetBatchRetrievalTimeoutMs() {
+        return getConfig().getLong(OFFSET_BATCH_RETRIEVAL_TIMEOUT_MS, (long) OFFSET_BATCH_RETRIEVAL_TIMEOUT_MS.defaultValue());
+    }
+
     public String gcpSpannerCredentialsJson() {
         return getConfig().getString(GCP_SPANNER_CREDENTIALS_JSON_PROPERTY_NAME);
     }
