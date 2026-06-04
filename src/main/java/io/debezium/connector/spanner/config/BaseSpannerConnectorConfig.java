@@ -48,6 +48,7 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
     protected static final String GCP_SPANNER_CREDENTIALS_PATH_PROPERTY_NAME = "gcp.spanner.credentials.path";
     protected static final String GCP_SPANNER_CREDENTIALS_JSON_PROPERTY_NAME = "gcp.spanner.credentials.json";
     private static final String STREAM_EVENT_QUEUE_CAPACITY_PROPERTY_NAME = "gcp.spanner.stream.event.queue.capacity";
+    private static final String OFFSET_BATCH_RETRIEVAL_TIMEOUT_MS_PROPERTY_NAME = "gcp.spanner.offset.batch.retrieval.timeout.ms";
 
     private static final String TASK_STATE_CHANGE_EVENT_QUEUE_CAPACITY_PROPERTY_NAME = "connector.spanner.task.state.change.event.queue.capacity";
 
@@ -240,6 +241,16 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
             .withImportance(ConfigDef.Importance.MEDIUM)
             .withValidation(FieldValidator::isCorrectDateTime)
             .withDescription("End change stream time");
+
+    public static final Field OFFSET_BATCH_RETRIEVAL_TIMEOUT_MS = Field.create(OFFSET_BATCH_RETRIEVAL_TIMEOUT_MS_PROPERTY_NAME)
+            .withDisplayName("Batch offset retrieval timeout")
+            .withType(Type.LONG)
+            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR, 9))
+            .withWidth(Width.SHORT)
+            .withImportance(Importance.LOW)
+            .withDefault(30000L)
+            .withValidation(Field::isPositiveLong)
+            .withDescription("Timeout in milliseconds for batch offset retrieval from Kafka Connect offset storage");
 
     public static final Field SPANNER_HEART_BEAT_INTERVAL = Heartbeat.HEARTBEAT_INTERVAL
             .withValidation(FieldValidator::isCorrectHeartBeatInterval)
@@ -598,6 +609,7 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
                     SPANNER_HOST,
                     SPANNER_EMULATOR_HOST,
                     STREAM_EVENT_QUEUE_CAPACITY,
+                    OFFSET_BATCH_RETRIEVAL_TIMEOUT_MS,
                     TASK_STATE_CHANGE_EVENT_QUEUE_CAPACITY,
                     VALUE_CAPTURE_MODE,
                     SPANNER_HEART_BEAT_INTERVAL,
