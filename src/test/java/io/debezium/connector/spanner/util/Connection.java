@@ -5,6 +5,8 @@
  */
 package io.debezium.connector.spanner.util;
 
+import static io.debezium.connector.spanner.util.Database.getSpannerOmniEndpoint;
+import static io.debezium.connector.spanner.util.Database.isSpannerOmniEndpoint;
 import static org.awaitility.Awaitility.await;
 
 import java.time.Duration;
@@ -34,7 +36,9 @@ import com.google.spanner.admin.database.v1.CreateDatabaseMetadata;
 import com.google.spanner.admin.database.v1.UpdateDatabaseDdlMetadata;
 import com.google.spanner.admin.instance.v1.CreateInstanceMetadata;
 
+import io.debezium.connector.spanner.db.DatabaseClientFactory;
 import io.debezium.connector.spanner.db.dao.SchemaDao;
+import io.grpc.ManagedChannelBuilder;
 
 public class Connection {
 
@@ -142,6 +146,9 @@ public class Connection {
     }
 
     private String createInstance() {
+        if (isSpannerOmniEndpoint()) {
+            return DatabaseClientFactory.SPANNER_OMNI_DEFAULT_ID;
+        }
         for (Instance value : this.spanner.getInstanceAdminClient().listInstances().iterateAll()) {
             if (value.getId().getInstance().equals("test-instance")) {
                 return "test-instance";
@@ -269,7 +276,9 @@ public class Connection {
     }
 
     public void createDatabase(String databaseId, Dialect dialect) throws InterruptedException {
-        createInstance();
+        if (!isSpannerOmniEndpoint()) {
+            createInstance();
+        }
         DatabaseAdminClient dbAdminClient = this.spanner.getDatabaseAdminClient();
         OperationFuture<com.google.cloud.spanner.Database, CreateDatabaseMetadata> operationFuture = dbAdminClient
                 .createDatabase(
@@ -311,7 +320,15 @@ public class Connection {
 
         builder.setCredentials(NoCredentials.getInstance());
         builder.setProjectId(projectId);
-        builder.setEmulatorHost(emulatorHost);
+        if (isSpannerOmniEndpoint()) {
+            builder.setExperimentalHost(getSpannerOmniEndpoint());
+            builder.setChannelConfigurator(ManagedChannelBuilder::usePlaintext)
+                    .setBuiltInMetricsEnabled(false)
+                    .setCredentials(NoCredentials.getInstance());
+        }
+        else {
+            builder.setEmulatorHost(emulatorHost);
+        }
 
         SpannerOptions options = builder.build();
         try {

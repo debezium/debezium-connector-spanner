@@ -320,4 +320,20 @@ public class SpannerConnectorConfig extends BaseSpannerConnectorConfig {
     public Duration getAwaitTaskAnswerTimeout() {
         return getConfig().getDuration(TASK_AWAIT_ANSWER_TIMEOUT, ChronoUnit.MILLIS);
     }
+
+    public String spannerOmniEndpoint() {
+        return getConfig().getString(SPANNER_OMNI_ENDPOINT_PROPERTY_NAME);
+    }
+
+    public boolean usePlainText() {
+        return getConfig().getBoolean(SPANNER_OMNI_USE_PLAINTEXT_PROPERTY_NAME);
+    }
+
+    public String clientKeyPath() {
+        return getConfig().getString(SPANNER_OMNI_CLIENT_KEY_PATH);
+    }
+
+    public String clientCertPath() {
+        return getConfig().getString(SPANNER_OMNI_CLIENT_CERT_PATH);
+    }
 }
