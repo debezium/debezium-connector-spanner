@@ -9,8 +9,8 @@ import static io.debezium.connector.spanner.config.BaseSpannerConnectorConfig.IN
 import static io.debezium.connector.spanner.config.BaseSpannerConnectorConfig.PROJECT_ID;
 import static io.debezium.connector.spanner.config.BaseSpannerConnectorConfig.SPANNER_OMNI_CLIENT_CERT_PATH;
 import static io.debezium.connector.spanner.config.BaseSpannerConnectorConfig.SPANNER_OMNI_CLIENT_KEY_PATH;
-import static io.debezium.connector.spanner.config.BaseSpannerConnectorConfig.SPANNER_OMNI_ENDPOINT;
 import static io.debezium.connector.spanner.config.BaseSpannerConnectorConfig.SPANNER_OMNI_USE_PLAINTEXT;
+import static io.debezium.connector.spanner.config.BaseSpannerConnectorConfig.SPANNER_TYPE;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.HashMap;
@@ -40,12 +40,12 @@ class SpannerOmniValidatorTest {
     void testValidConfigWithPlaintextAndNoClientCerts() {
         // Valid: plaintext enabled without client certificates and with endpoint
         Map<String, String> configs = new HashMap<>();
-        configs.put(SPANNER_OMNI_ENDPOINT.name(), "localhost:5432");
+        configs.put(SPANNER_TYPE.name(), "OMNI");
         configs.put(SPANNER_OMNI_USE_PLAINTEXT.name(), "true");
 
         Config result = validateConfig(configs);
         ConfigValue endpointValue = result.configValues().stream()
-                .filter(cv -> cv.name().equals(SPANNER_OMNI_ENDPOINT.name()))
+                .filter(cv -> cv.name().equals(SPANNER_TYPE.name()))
                 .findFirst()
                 .orElse(null);
         assertTrue(endpointValue != null && endpointValue.errorMessages().isEmpty());
@@ -55,7 +55,7 @@ class SpannerOmniValidatorTest {
     void testValidConfigWithClientCertsAndNoPlaintext() {
         // Valid: client certs provided without plaintext being true
         Map<String, String> configs = new HashMap<>();
-        configs.put(SPANNER_OMNI_ENDPOINT.name(), "localhost:5432");
+        configs.put(SPANNER_TYPE.name(), "OMNI");
         configs.put(SPANNER_OMNI_CLIENT_KEY_PATH.name(), "/path/to/key");
         configs.put(SPANNER_OMNI_CLIENT_CERT_PATH.name(), "/path/to/cert");
 
@@ -75,7 +75,7 @@ class SpannerOmniValidatorTest {
 
         Config result = validateConfig(configs);
         ConfigValue endpointValue = result.configValues().stream()
-                .filter(cv -> cv.name().equals(SPANNER_OMNI_ENDPOINT.name()))
+                .filter(cv -> cv.name().equals(SPANNER_TYPE.name()))
                 .findFirst()
                 .orElse(null);
         assertTrue(endpointValue != null && !endpointValue.errorMessages().isEmpty());
@@ -90,7 +90,7 @@ class SpannerOmniValidatorTest {
 
         Config result = validateConfig(configs);
         ConfigValue endpointValue = result.configValues().stream()
-                .filter(cv -> cv.name().equals(SPANNER_OMNI_ENDPOINT.name()))
+                .filter(cv -> cv.name().equals(SPANNER_TYPE.name()))
                 .findFirst()
                 .orElse(null);
         assertTrue(endpointValue != null && !endpointValue.errorMessages().isEmpty());
@@ -100,7 +100,7 @@ class SpannerOmniValidatorTest {
     void testInvalidConfigPlaintextWithClientCerts() {
         // Invalid: plaintext enabled but client certs are provided
         Map<String, String> configs = new HashMap<>();
-        configs.put(SPANNER_OMNI_ENDPOINT.name(), "localhost:5432");
+        configs.put(SPANNER_TYPE.name(), "OMNI");
         configs.put(SPANNER_OMNI_USE_PLAINTEXT.name(), "true");
         configs.put(SPANNER_OMNI_CLIENT_KEY_PATH.name(), "/path/to/key");
         configs.put(SPANNER_OMNI_CLIENT_CERT_PATH.name(), "/path/to/cert");
@@ -117,7 +117,7 @@ class SpannerOmniValidatorTest {
     void testInvalidConfigMissingClientKeyPath() {
         // Invalid: client cert provided without client key
         Map<String, String> configs = new HashMap<>();
-        configs.put(SPANNER_OMNI_ENDPOINT.name(), "localhost:5432");
+        configs.put(SPANNER_TYPE.name(), "OMNI");
         configs.put(SPANNER_OMNI_CLIENT_CERT_PATH.name(), "/path/to/cert");
 
         Config result = validateConfig(configs);
@@ -132,7 +132,7 @@ class SpannerOmniValidatorTest {
     void testInvalidConfigMissingClientCertPath() {
         // Invalid: client key provided without client cert
         Map<String, String> configs = new HashMap<>();
-        configs.put(SPANNER_OMNI_ENDPOINT.name(), "localhost:5432");
+        configs.put(SPANNER_TYPE.name(), "OMNI");
         configs.put(SPANNER_OMNI_CLIENT_KEY_PATH.name(), "/path/to/key");
 
         Config result = validateConfig(configs);
@@ -150,7 +150,7 @@ class SpannerOmniValidatorTest {
 
         Config result = validateConfig(configs);
         ConfigValue endpointValue = result.configValues().stream()
-                .filter(cv -> cv.name().equals(SPANNER_OMNI_ENDPOINT.name()))
+                .filter(cv -> cv.name().equals(SPANNER_TYPE.name()))
                 .findFirst()
                 .orElse(null);
         assertTrue(endpointValue != null && endpointValue.errorMessages().isEmpty());
@@ -160,7 +160,7 @@ class SpannerOmniValidatorTest {
     void testValidConfigPlaintextFalseWithClientCerts() {
         // Valid: plaintext is false and client certs are provided
         Map<String, String> configs = new HashMap<>();
-        configs.put(SPANNER_OMNI_ENDPOINT.name(), "localhost:5432");
+        configs.put(SPANNER_TYPE.name(), "OMNI");
         configs.put(SPANNER_OMNI_USE_PLAINTEXT.name(), "false");
         configs.put(SPANNER_OMNI_CLIENT_KEY_PATH.name(), "/path/to/key");
         configs.put(SPANNER_OMNI_CLIENT_CERT_PATH.name(), "/path/to/cert");
@@ -177,7 +177,7 @@ class SpannerOmniValidatorTest {
     void testValidConfigOmniEndpointClearsProjectInstanceErrors() {
         // Valid: when Spanner Omni endpoint is specified, project and instance validation errors should be cleared
         Map<String, String> configs = new HashMap<>();
-        configs.put(SPANNER_OMNI_ENDPOINT.name(), "localhost:5432");
+        configs.put(SPANNER_TYPE.name(), "OMNI");
         configs.put(SPANNER_OMNI_USE_PLAINTEXT.name(), "true");
 
         Config result = validateConfig(configs);

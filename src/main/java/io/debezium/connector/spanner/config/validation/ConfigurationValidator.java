@@ -15,6 +15,8 @@ import org.apache.kafka.common.config.ConfigValue;
 import io.debezium.config.Configuration;
 import io.debezium.config.Field;
 import io.debezium.connector.spanner.SpannerConnectorConfig;
+import io.debezium.connector.spanner.config.BaseSpannerConnectorConfig;
+import io.debezium.connector.spanner.config.SpannerType;
 
 /**
  * Validates all the properties of the Connector configuration
@@ -37,11 +39,21 @@ public class ConfigurationValidator {
 
         ValidationContext validationContext = new ValidationContext(config, results);
 
+        String spannerType = config.getString(BaseSpannerConnectorConfig.SPANNER_TYPE);
+        if (SpannerType.OMNI.name().equalsIgnoreCase(spannerType)) {
+            SpannerOmniValidator.withContext(validationContext).validate();
+        }
+        else {
+            CloudSpannerValidator.withContext(validationContext).validate();
+            // SpannerOmniValidator is still run to catch cases where omni parameters are specified
+            // but spanner.type is not OMNI.
+            SpannerOmniValidator.withContext(validationContext).validate();
+        }
+
         // high level validation
         ConnectionValidator.withContext(validationContext).validate()
                 .then(ChangeStreamValidator.withContext(validationContext));
         StartEndTimeValidator.withContext(validationContext).validate();
-        SpannerOmniValidator.withContext(validationContext).validate();
 
         return new Config(validationContext.getResults());
     }

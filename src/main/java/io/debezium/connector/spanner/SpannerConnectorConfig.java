@@ -24,6 +24,7 @@ import io.debezium.config.Configuration;
 import io.debezium.config.EnumeratedValue;
 import io.debezium.connector.SourceInfoStructMaker;
 import io.debezium.connector.spanner.config.BaseSpannerConnectorConfig;
+import io.debezium.connector.spanner.config.SpannerType;
 import io.debezium.connector.spanner.context.source.SourceInfo;
 
 /**
@@ -136,6 +137,9 @@ public class SpannerConnectorConfig extends BaseSpannerConnectorConfig {
     }
 
     public String spannerEmulatorHost() {
+        if (SpannerType.OMNI == spannerType()) {
+            return null;
+        }
         return getConfig().getString(GCP_SPANNER_EMULATOR_HOST_PROPERTY_NAME);
     }
 
@@ -325,8 +329,12 @@ public class SpannerConnectorConfig extends BaseSpannerConnectorConfig {
         return getConfig().getDuration(TASK_AWAIT_ANSWER_TIMEOUT, ChronoUnit.MILLIS);
     }
 
-    public String spannerOmniEndpoint() {
-        return getConfig().getString(SPANNER_OMNI_ENDPOINT_PROPERTY_NAME);
+    public SpannerType spannerType() {
+        String typeString = getConfig().getString(SPANNER_TYPE_PROPERTY_NAME);
+        if (typeString == null || typeString.trim().isEmpty()) {
+            return SpannerType.CLOUD;
+        }
+        return SpannerType.valueOf(typeString.toUpperCase());
     }
 
     public boolean usePlainText() {

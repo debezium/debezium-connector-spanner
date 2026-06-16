@@ -8,9 +8,9 @@ package io.debezium.connector.spanner.util;
 import java.util.UUID;
 
 import com.google.cloud.spanner.Dialect;
-import com.google.common.base.Strings;
 
 import io.debezium.connector.spanner.config.BaseSpannerConnectorConfig;
+import io.debezium.connector.spanner.config.SpannerType;
 import io.debezium.connector.spanner.db.DatabaseClientFactory;
 
 public class Database {
@@ -29,12 +29,12 @@ public class Database {
         this.dialect = dialect;
     }
 
-    public static String getSpannerOmniEndpoint() {
-        return System.getProperty(BaseSpannerConnectorConfig.SPANNER_OMNI_ENDPOINT_PROPERTY_NAME);
+    public static String getSpannerType() {
+        return System.getProperty(BaseSpannerConnectorConfig.SPANNER_TYPE_PROPERTY_NAME);
     }
 
     public static boolean isSpannerOmniEndpoint() {
-        return !Strings.isNullOrEmpty(getSpannerOmniEndpoint());
+        return SpannerType.OMNI.name().equalsIgnoreCase(getSpannerType());
     }
 
     public static final Database TEST_DATABASE = Database.builder()
