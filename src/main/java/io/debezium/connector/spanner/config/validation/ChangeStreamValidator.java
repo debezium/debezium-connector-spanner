@@ -16,8 +16,8 @@ import static io.debezium.connector.spanner.config.BaseSpannerConnectorConfig.SP
 import static io.debezium.connector.spanner.config.BaseSpannerConnectorConfig.SPANNER_HOST;
 import static io.debezium.connector.spanner.config.BaseSpannerConnectorConfig.SPANNER_OMNI_CLIENT_CERT_PATH;
 import static io.debezium.connector.spanner.config.BaseSpannerConnectorConfig.SPANNER_OMNI_CLIENT_KEY_PATH;
-import static io.debezium.connector.spanner.config.BaseSpannerConnectorConfig.SPANNER_OMNI_ENDPOINT;
 import static io.debezium.connector.spanner.config.BaseSpannerConnectorConfig.SPANNER_OMNI_USE_PLAINTEXT;
+import static io.debezium.connector.spanner.config.BaseSpannerConnectorConfig.SPANNER_TYPE;
 import static org.slf4j.LoggerFactory.getLogger;
 
 import org.slf4j.Logger;
@@ -27,6 +27,7 @@ import com.google.cloud.spanner.Dialect;
 import com.google.cloud.spanner.Statement;
 import com.google.common.annotations.VisibleForTesting;
 
+import io.debezium.connector.spanner.config.SpannerType;
 import io.debezium.connector.spanner.db.DatabaseClientFactory;
 
 /**
@@ -76,7 +77,7 @@ public class ChangeStreamValidator implements ConfigurationValidator.Validator {
                 context.getString(SPANNER_HOST),
                 context.getString(SPANNER_EMULATOR_HOST),
                 context.getString(DATABASE_ROLE),
-                context.getString(SPANNER_OMNI_ENDPOINT),
+                context.getString(SPANNER_TYPE) != null ? SpannerType.valueOf(context.getString(SPANNER_TYPE).toUpperCase()) : SpannerType.CLOUD,
                 Boolean.parseBoolean(context.getString(SPANNER_OMNI_USE_PLAINTEXT)),
                 context.getString(SPANNER_OMNI_CLIENT_KEY_PATH),
                 context.getString(SPANNER_OMNI_CLIENT_CERT_PATH));

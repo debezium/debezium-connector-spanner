@@ -48,7 +48,7 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
     protected static final String GCP_SPANNER_CREDENTIALS_PATH_PROPERTY_NAME = "gcp.spanner.credentials.path";
     protected static final String GCP_SPANNER_CREDENTIALS_JSON_PROPERTY_NAME = "gcp.spanner.credentials.json";
 
-    public static final String SPANNER_OMNI_ENDPOINT_PROPERTY_NAME = "spanner.omni.endpoint";
+    public static final String SPANNER_TYPE_PROPERTY_NAME = "spanner.type";
     protected static final String SPANNER_OMNI_USE_PLAINTEXT_PROPERTY_NAME = "spanner.omni.use.plaintext";
     protected static final String SPANNER_OMNI_CLIENT_KEY_PATH_PROPERTY_NAME = "spanner.omni.client.key.path";
     protected static final String SPANNER_OMNI_CLIENT_CERT_PATH_PROPERTY_NAME = "spanner.omni.client.cert.path";
@@ -137,7 +137,6 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
             .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR, 0))
             .withWidth(Width.SHORT)
             .withImportance(Importance.HIGH)
-            .withValidation(FieldValidator::isNotBlank)
             .withDescription("Spanner project id");
 
     public static final Field INSTANCE_ID = Field.create(GCP_SPANNER_INSTANCE_ID_PROPERTY_NAME)
@@ -146,7 +145,6 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
             .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR, 4))
             .withWidth(Width.SHORT)
             .withImportance(Importance.HIGH)
-            .withValidation(FieldValidator::isNotBlank)
             .withDescription("Spanner instance id");
 
     public static final Field DATABASE_ID = Field.create(GCP_SPANNER_DATABASE_ID_PROPERTY_NAME)
@@ -601,13 +599,11 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
     public static final Field SOURCE_INFO_STRUCT_MAKER = CommonConnectorConfig.SOURCE_INFO_STRUCT_MAKER
             .withDefault(SpannerSourceInfoStructMaker.class.getName());
 
-    public static final Field SPANNER_OMNI_ENDPOINT = Field.create(SPANNER_OMNI_ENDPOINT_PROPERTY_NAME)
-            .withDisplayName("SpannerOmniEndpoint")
+    public static final Field SPANNER_TYPE = Field.create(SPANNER_TYPE_PROPERTY_NAME)
+            .withDisplayName("SpannerType")
             .withType(Type.STRING)
-            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR, 7))
-            .withWidth(Width.MEDIUM)
-            .withImportance(Importance.LOW)
-            .withDescription("Spanner Omni endpoint");
+            .withDefault("CLOUD")
+            .withDescription("Type of Spanner to connect to. Valid values are CLOUD or OMNI. Default is CLOUD.");
 
     public static final Field SPANNER_OMNI_USE_PLAINTEXT = Field.create(SPANNER_OMNI_USE_PLAINTEXT_PROPERTY_NAME)
             .withDisplayName("SpannerOmniUsePlaintext")
@@ -646,7 +642,7 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
                     SPANNER_CREDENTIALS_JSON,
                     SPANNER_HOST,
                     SPANNER_EMULATOR_HOST,
-                    SPANNER_OMNI_ENDPOINT,
+                    SPANNER_TYPE,
                     SPANNER_OMNI_USE_PLAINTEXT,
                     SPANNER_OMNI_CLIENT_KEY_PATH,
                     SPANNER_OMNI_CLIENT_CERT_PATH,

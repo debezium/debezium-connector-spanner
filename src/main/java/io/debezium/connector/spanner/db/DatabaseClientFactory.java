@@ -24,6 +24,7 @@ import com.google.common.annotations.VisibleForTesting;
 
 import io.debezium.connector.spanner.Module;
 import io.debezium.connector.spanner.SpannerConnectorConfig;
+import io.debezium.connector.spanner.config.SpannerType;
 import io.debezium.util.Strings;
 import io.grpc.ManagedChannelBuilder;
 
@@ -54,16 +55,16 @@ public class DatabaseClientFactory {
 
     public DatabaseClientFactory(String projectId, String instanceId, String databaseId,
                                  String credentialsJson,
-                                 String credentialsPath, String host, String emulatorHost, String databaseRole, String spannerOmniEndpoint, boolean usePlainText,
+                                 String credentialsPath, String host, String emulatorHost, String databaseRole, SpannerType spannerType, boolean usePlainText,
                                  String clientKeyPath, String clientCertPath) {
 
-        if (Strings.isNullOrEmpty(spannerOmniEndpoint)) {
-            this.projectId = projectId;
-            this.instanceId = instanceId;
-        }
-        else {
+        if (SpannerType.OMNI == spannerType) {
             this.projectId = SPANNER_OMNI_DEFAULT_ID;
             this.instanceId = SPANNER_OMNI_DEFAULT_ID;
+        }
+        else {
+            this.projectId = projectId;
+            this.instanceId = instanceId;
         }
         this.databaseId = databaseId;
 
@@ -75,8 +76,8 @@ public class DatabaseClientFactory {
         if (!Strings.isNullOrEmpty(host)) {
             builder.setHost(host);
         }
-        if (!Strings.isNullOrEmpty(spannerOmniEndpoint)) {
-            builder.setExperimentalHost(spannerOmniEndpoint);
+        // Note: Spanner Omni configuration takes precedence and will override the emulator endpoint.
+        if (SpannerType.OMNI == spannerType) {
             builder.setCredentials(NoCredentials.getInstance());
             builder.setBuiltInMetricsEnabled(false);
             if (usePlainText) {
@@ -96,7 +97,8 @@ public class DatabaseClientFactory {
             }
         }
 
-        if (!Strings.isNullOrEmpty(databaseRole) && Strings.isNullOrEmpty(spannerOmniEndpoint)) {
+        // Note: DatabaseRoles are not supported on Spanner Omni yet
+        if (!Strings.isNullOrEmpty(databaseRole) && SpannerType.OMNI != spannerType) {
             builder.setDatabaseRole(databaseRole);
         }
         String userAgentString = USER_AGENT_PREFIX + Module.version();
@@ -109,7 +111,7 @@ public class DatabaseClientFactory {
     public DatabaseClientFactory(SpannerConnectorConfig config) {
         this(config.projectId(), config.instanceId(), config.databaseId(),
                 config.gcpSpannerCredentialsJson(), config.gcpSpannerCredentialsPath(),
-                config.spannerHost(), config.spannerEmulatorHost(), config.databaseRole(), config.spannerOmniEndpoint(), config.usePlainText(), config.clientKeyPath(),
+                config.spannerHost(), config.spannerEmulatorHost(), config.databaseRole(), config.spannerType(), config.usePlainText(), config.clientKeyPath(),
                 config.clientCertPath());
     }
 

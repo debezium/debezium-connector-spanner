@@ -5,7 +5,6 @@
  */
 package io.debezium.connector.spanner.util;
 
-import static io.debezium.connector.spanner.util.Database.getSpannerOmniEndpoint;
 import static io.debezium.connector.spanner.util.Database.isSpannerOmniEndpoint;
 import static org.awaitility.Awaitility.await;
 
@@ -321,7 +320,7 @@ public class Connection {
         builder.setCredentials(NoCredentials.getInstance());
         builder.setProjectId(projectId);
         if (isSpannerOmniEndpoint()) {
-            builder.setExperimentalHost(getSpannerOmniEndpoint());
+            builder.setExperimentalHost(System.getProperty("gcp.spanner.host"));
             builder.setChannelConfigurator(ManagedChannelBuilder::usePlaintext)
                     .setBuiltInMetricsEnabled(false)
                     .setCredentials(NoCredentials.getInstance());

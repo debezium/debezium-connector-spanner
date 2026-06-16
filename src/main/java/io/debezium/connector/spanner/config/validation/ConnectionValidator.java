@@ -12,6 +12,7 @@ import static io.debezium.connector.spanner.config.BaseSpannerConnectorConfig.SP
 import static io.debezium.connector.spanner.config.BaseSpannerConnectorConfig.SPANNER_CREDENTIALS_PATH;
 import static io.debezium.connector.spanner.config.BaseSpannerConnectorConfig.SPANNER_EMULATOR_HOST;
 import static io.debezium.connector.spanner.config.BaseSpannerConnectorConfig.SPANNER_HOST;
+import static io.debezium.connector.spanner.config.BaseSpannerConnectorConfig.SPANNER_TYPE;
 import static org.slf4j.LoggerFactory.getLogger;
 
 import java.io.IOException;
@@ -19,6 +20,8 @@ import java.io.IOException;
 import org.slf4j.Logger;
 
 import com.google.auth.oauth2.ServiceAccountCredentials;
+
+import io.debezium.connector.spanner.config.SpannerType;
 
 /**
  * Checks if the connection to database could be established by given configuration
@@ -50,9 +53,11 @@ public class ConnectionValidator implements ConfigurationValidator.Validator {
     @Override
     public ConnectionValidator validate() {
         String host = context.getString(SPANNER_HOST);
-        String emulatorHost = context.getString(SPANNER_EMULATOR_HOST);
+        String spannerType = context.getString(SPANNER_TYPE);
+        boolean isOmni = SpannerType.OMNI.name().equalsIgnoreCase(spannerType);
+        String emulatorHost = isOmni ? null : context.getString(SPANNER_EMULATOR_HOST);
         boolean isAgainstEmulator = FieldValidator.isSpecified(emulatorHost);
-        if (!canValidate(isAgainstEmulator)) {
+        if (!canValidate(isAgainstEmulator || isOmni)) {
             this.result = false;
             return this;
         }
@@ -62,7 +67,7 @@ public class ConnectionValidator implements ConfigurationValidator.Validator {
         String credentialPath = context.getString(SPANNER_CREDENTIALS_PATH);
         String credentialJson = context.getString(SPANNER_CREDENTIALS_JSON);
 
-        if (!isAgainstEmulator && !FieldValidator.isSpecified(googleCredentials) && !FieldValidator.isSpecified(credentialPath)
+        if (!isAgainstEmulator && !isOmni && !FieldValidator.isSpecified(googleCredentials) && !FieldValidator.isSpecified(credentialPath)
                 && !FieldValidator.isSpecified(credentialJson)) {
             try {
                 ServiceAccountCredentials.getApplicationDefault();

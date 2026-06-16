@@ -9,6 +9,7 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 
 import io.debezium.config.Configuration;
+import io.debezium.connector.spanner.config.BaseSpannerConnectorConfig;
 import io.debezium.connector.spanner.util.Connection;
 import io.debezium.connector.spanner.util.Database;
 import io.debezium.connector.spanner.util.KafkaEnvironment;
@@ -33,22 +34,31 @@ public class AbstractSpannerConnectorIT extends AbstractAsyncEngineConnectorTest
         }
     }
 
-    protected static final Configuration baseConfig = Configuration.create()
-            .with("gcp.spanner.instance.id", database.getInstanceId())
-            .with("gcp.spanner.project.id", database.getProjectId())
-            .with("gcp.spanner.database.id", database.getDatabaseId())
-            .with("gcp.spanner.emulator.host",
-                    "http://localhost:9010")
-            .with("offset.storage", "org.apache.kafka.connect.storage.MemoryOffsetBackingStore")
-            .with("connector.spanner.sync.kafka.bootstrap.servers", KAFKA_ENVIRONMENT.kafkaBrokerApiOn().getAddress())
-            .with("internal.schema.history.kafka.bootstrap.servers", KAFKA_ENVIRONMENT.kafkaBrokerApiOn().getAddress())
-            .with("bootstrap.servers", KAFKA_ENVIRONMENT.kafkaBrokerApiOn().getAddress())
-            .with("heartbeat.interval.ms", "300000")
-            .with("gcp.spanner.low-watermark.enabled", false)
-            .with("tasks.max", 3) // see DBZ-8428
-            .with("spanner.omni.endpoint", Database.getSpannerOmniEndpoint())
-            .with("spanner.omni.use.plaintext", true)
-            .build();
+    protected static final Configuration baseConfig;
+    static {
+        Configuration.Builder builder = Configuration.create()
+                .with("gcp.spanner.instance.id", database.getInstanceId())
+                .with("gcp.spanner.project.id", database.getProjectId())
+                .with("gcp.spanner.database.id", database.getDatabaseId())
+                .with("gcp.spanner.emulator.host", "http://localhost:9010")
+                .with("offset.storage", "org.apache.kafka.connect.storage.MemoryOffsetBackingStore")
+                .with("connector.spanner.sync.kafka.bootstrap.servers", KAFKA_ENVIRONMENT.kafkaBrokerApiOn().getAddress())
+                .with("internal.schema.history.kafka.bootstrap.servers", KAFKA_ENVIRONMENT.kafkaBrokerApiOn().getAddress())
+                .with("bootstrap.servers", KAFKA_ENVIRONMENT.kafkaBrokerApiOn().getAddress())
+                .with("heartbeat.interval.ms", "300000")
+                .with("gcp.spanner.low-watermark.enabled", false)
+                .with("tasks.max", 3); // see DBZ-8428
+        if (System.getProperty(BaseSpannerConnectorConfig.SPANNER_TYPE_PROPERTY_NAME) != null) {
+            builder.with(BaseSpannerConnectorConfig.SPANNER_TYPE_PROPERTY_NAME, System.getProperty(BaseSpannerConnectorConfig.SPANNER_TYPE_PROPERTY_NAME));
+        }
+        if (System.getProperty("gcp.spanner.host") != null) {
+            builder.with("gcp.spanner.host", System.getProperty("gcp.spanner.host"));
+        }
+        if (System.getProperty("spanner.omni.use.plaintext") != null) {
+            builder.with("spanner.omni.use.plaintext", System.getProperty("spanner.omni.use.plaintext"));
+        }
+        baseConfig = builder.build();
+    }
 
     protected static final Configuration basePgConfig = Configuration.copy(baseConfig)
             .with("gcp.spanner.instance.id", pgDatabase.getInstanceId())
