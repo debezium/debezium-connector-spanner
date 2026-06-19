@@ -21,7 +21,7 @@ import org.slf4j.Logger;
 
 import com.google.auth.oauth2.ServiceAccountCredentials;
 
-import io.debezium.connector.spanner.config.SpannerType;
+import io.debezium.connector.spanner.config.BaseSpannerConnectorConfig;
 
 /**
  * Checks if the connection to database could be established by given configuration
@@ -54,7 +54,7 @@ public class ConnectionValidator implements ConfigurationValidator.Validator {
     public ConnectionValidator validate() {
         String host = context.getString(SPANNER_HOST);
         String spannerType = context.getString(SPANNER_TYPE);
-        boolean isOmni = SpannerType.OMNI.name().equalsIgnoreCase(spannerType);
+        boolean isOmni = BaseSpannerConnectorConfig.SpannerType.OMNI.name().equalsIgnoreCase(spannerType);
         String emulatorHost = isOmni ? null : context.getString(SPANNER_EMULATOR_HOST);
         boolean isAgainstEmulator = FieldValidator.isSpecified(emulatorHost);
         if (!canValidate(isAgainstEmulator || isOmni)) {

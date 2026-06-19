@@ -13,7 +13,7 @@ import static org.slf4j.LoggerFactory.getLogger;
 
 import org.slf4j.Logger;
 
-import io.debezium.connector.spanner.config.SpannerType;
+import io.debezium.connector.spanner.config.BaseSpannerConnectorConfig;
 
 /**
  * Validates Spanner Omni configuration properties to ensure they follow the correct usage patterns.
@@ -43,7 +43,7 @@ public class SpannerOmniValidator implements ConfigurationValidator.Validator {
         String clientKeyPath = context.getString(SPANNER_OMNI_CLIENT_KEY_PATH);
         String clientCertPath = context.getString(SPANNER_OMNI_CLIENT_CERT_PATH);
 
-        boolean isOmni = SpannerType.OMNI.name().equalsIgnoreCase(spannerType);
+        boolean isOmni = BaseSpannerConnectorConfig.SpannerType.OMNI.name().equalsIgnoreCase(spannerType);
         boolean plaintextSpecified = FieldValidator.isSpecified(plaintext);
         boolean clientKeySpecified = FieldValidator.isSpecified(clientKeyPath);
         boolean clientCertSpecified = FieldValidator.isSpecified(clientCertPath);

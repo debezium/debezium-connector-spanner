@@ -16,6 +16,7 @@ import org.apache.kafka.common.config.ConfigDef.Width;
 import io.debezium.config.CommonConnectorConfig;
 import io.debezium.config.ConfigDefinition;
 import io.debezium.config.Configuration;
+import io.debezium.config.EnumeratedValue;
 import io.debezium.config.Field;
 import io.debezium.connector.spanner.SpannerSourceInfoStructMaker;
 import io.debezium.connector.spanner.config.validation.FieldValidator;
@@ -26,6 +27,35 @@ import io.debezium.schema.AbstractTopicNamingStrategy;
  * Provides all configuration properties for Spanner connector
  */
 public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
+
+    public enum SpannerType implements EnumeratedValue {
+        CLOUD("cloud"),
+        OMNI("omni");
+
+        private final String value;
+
+        SpannerType(String value) {
+            this.value = value;
+        }
+
+        @Override
+        public String getValue() {
+            return value;
+        }
+
+        public static SpannerType parse(String value) {
+            if (value == null) {
+                return SpannerType.CLOUD;
+            }
+            value = value.trim();
+            for (SpannerType option : SpannerType.values()) {
+                if (option.getValue().equalsIgnoreCase(value)) {
+                    return option;
+                }
+            }
+            return SpannerType.CLOUD;
+        }
+    }
 
     public static final String CONNECTOR_NAME_PROPERTY_NAME = "name";
     private static final String LOW_WATERMARK_ENABLED = "gcp.spanner.low-watermark.enabled";
