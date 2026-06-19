@@ -17,6 +17,7 @@ import java.util.concurrent.ExecutionException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.google.api.client.util.Strings;
 import com.google.api.gax.longrunning.OperationFuture;
 import com.google.cloud.NoCredentials;
 import com.google.cloud.spanner.DatabaseAdminClient;
@@ -321,8 +322,14 @@ public class Connection {
         builder.setProjectId(projectId);
         if (isSpannerOmniEndpoint()) {
             builder.setExperimentalHost(System.getProperty("gcp.spanner.host"));
-            builder.setChannelConfigurator(ManagedChannelBuilder::usePlaintext)
-                    .setBuiltInMetricsEnabled(false)
+            if (Boolean.parseBoolean(System.getProperty("spanner.omni.use.plaintext", "false"))) {
+                builder.setChannelConfigurator(ManagedChannelBuilder::usePlaintext);
+            }
+            else if (!Strings.isNullOrEmpty(System.getProperty("spanner.omni.client.key.path"))
+                    && !Strings.isNullOrEmpty(System.getProperty("spanner.omni.client.cert.path"))) {
+                builder.useClientCert(System.getProperty("spanner.omni.client.cert.path"), System.getProperty("spanner.omni.client.key.path"));
+            }
+            builder.setBuiltInMetricsEnabled(false)
                     .setCredentials(NoCredentials.getInstance());
         }
         else {

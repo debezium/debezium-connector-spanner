@@ -57,6 +57,10 @@ public class AbstractSpannerConnectorIT extends AbstractAsyncEngineConnectorTest
         if (System.getProperty("spanner.omni.use.plaintext") != null) {
             builder.with("spanner.omni.use.plaintext", System.getProperty("spanner.omni.use.plaintext"));
         }
+        if (System.getProperty("spanner.omni.client.key.path") != null && System.getProperty("spanner.omni.client.cert.path") != null) {
+            builder.with("spanner.omni.client.key.path", System.getProperty("spanner.omni.client.key.path"));
+            builder.with("spanner.omni.client.cert.path", System.getProperty("spanner.omni.client.cert.path"));
+        }
         baseConfig = builder.build();
     }
 
