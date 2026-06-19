@@ -24,7 +24,6 @@ import io.debezium.config.Configuration;
 import io.debezium.config.EnumeratedValue;
 import io.debezium.connector.SourceInfoStructMaker;
 import io.debezium.connector.spanner.config.BaseSpannerConnectorConfig;
-import io.debezium.connector.spanner.config.SpannerType;
 import io.debezium.connector.spanner.context.source.SourceInfo;
 
 /**
@@ -330,15 +329,12 @@ public class SpannerConnectorConfig extends BaseSpannerConnectorConfig {
     }
 
     public SpannerType spannerType() {
-        String typeString = getConfig().getString(SPANNER_TYPE_PROPERTY_NAME);
-        if (typeString == null || typeString.trim().isEmpty()) {
-            return SpannerType.CLOUD;
-        }
-        return SpannerType.valueOf(typeString.toUpperCase());
+        return SpannerType.parse(getConfig().getString(SPANNER_TYPE_PROPERTY_NAME));
     }
 
     public boolean usePlainText() {
-        return getConfig().getBoolean(SPANNER_OMNI_USE_PLAINTEXT_PROPERTY_NAME);
+        Boolean value = getConfig().getBoolean(SPANNER_OMNI_USE_PLAINTEXT);
+        return value != null && value;
     }
 
     public String clientKeyPath() {

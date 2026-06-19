@@ -16,7 +16,6 @@ import io.debezium.config.Configuration;
 import io.debezium.config.Field;
 import io.debezium.connector.spanner.SpannerConnectorConfig;
 import io.debezium.connector.spanner.config.BaseSpannerConnectorConfig;
-import io.debezium.connector.spanner.config.SpannerType;
 
 /**
  * Validates all the properties of the Connector configuration
@@ -40,7 +39,7 @@ public class ConfigurationValidator {
         ValidationContext validationContext = new ValidationContext(config, results);
 
         String spannerType = config.getString(BaseSpannerConnectorConfig.SPANNER_TYPE);
-        if (SpannerType.OMNI.name().equalsIgnoreCase(spannerType)) {
+        if (BaseSpannerConnectorConfig.SpannerType.OMNI.name().equalsIgnoreCase(spannerType)) {
             SpannerOmniValidator.withContext(validationContext).validate();
         }
         else {

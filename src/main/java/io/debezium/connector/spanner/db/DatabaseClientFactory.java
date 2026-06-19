@@ -24,7 +24,7 @@ import com.google.common.annotations.VisibleForTesting;
 
 import io.debezium.connector.spanner.Module;
 import io.debezium.connector.spanner.SpannerConnectorConfig;
-import io.debezium.connector.spanner.config.SpannerType;
+import io.debezium.connector.spanner.config.BaseSpannerConnectorConfig;
 import io.debezium.util.Strings;
 import io.grpc.ManagedChannelBuilder;
 
@@ -55,10 +55,11 @@ public class DatabaseClientFactory {
 
     public DatabaseClientFactory(String projectId, String instanceId, String databaseId,
                                  String credentialsJson,
-                                 String credentialsPath, String host, String emulatorHost, String databaseRole, SpannerType spannerType, boolean usePlainText,
+                                 String credentialsPath, String host, String emulatorHost, String databaseRole, BaseSpannerConnectorConfig.SpannerType spannerType,
+                                 boolean usePlainText,
                                  String clientKeyPath, String clientCertPath) {
 
-        if (SpannerType.OMNI == spannerType) {
+        if (BaseSpannerConnectorConfig.SpannerType.OMNI == spannerType) {
             this.projectId = SPANNER_OMNI_DEFAULT_ID;
             this.instanceId = SPANNER_OMNI_DEFAULT_ID;
         }
@@ -77,7 +78,7 @@ public class DatabaseClientFactory {
             builder.setHost(host);
         }
         // Note: Spanner Omni configuration takes precedence and will override the emulator endpoint.
-        if (SpannerType.OMNI == spannerType) {
+        if (BaseSpannerConnectorConfig.SpannerType.OMNI == spannerType) {
             builder.setCredentials(NoCredentials.getInstance());
             builder.setBuiltInMetricsEnabled(false);
             if (usePlainText) {
@@ -98,7 +99,7 @@ public class DatabaseClientFactory {
         }
 
         // Note: DatabaseRoles are not supported on Spanner Omni yet
-        if (!Strings.isNullOrEmpty(databaseRole) && SpannerType.OMNI != spannerType) {
+        if (!Strings.isNullOrEmpty(databaseRole) && BaseSpannerConnectorConfig.SpannerType.OMNI != spannerType) {
             builder.setDatabaseRole(databaseRole);
         }
         String userAgentString = USER_AGENT_PREFIX + Module.version();

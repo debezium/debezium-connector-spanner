@@ -10,7 +10,6 @@ import java.util.UUID;
 import com.google.cloud.spanner.Dialect;
 
 import io.debezium.connector.spanner.config.BaseSpannerConnectorConfig;
-import io.debezium.connector.spanner.config.SpannerType;
 import io.debezium.connector.spanner.db.DatabaseClientFactory;
 
 public class Database {
@@ -34,7 +33,7 @@ public class Database {
     }
 
     public static boolean isSpannerOmniEndpoint() {
-        return SpannerType.OMNI.name().equalsIgnoreCase(getSpannerType());
+        return BaseSpannerConnectorConfig.SpannerType.OMNI.name().equalsIgnoreCase(getSpannerType());
     }
 
     public static final Database TEST_DATABASE = Database.builder()
