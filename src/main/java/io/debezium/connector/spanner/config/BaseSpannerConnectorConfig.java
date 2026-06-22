@@ -53,7 +53,7 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
                     return option;
                 }
             }
-            return SpannerType.CLOUD;
+            return null;
         }
     }
 
@@ -631,7 +631,7 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
 
     public static final Field SPANNER_TYPE = Field.create(SPANNER_TYPE_PROPERTY_NAME)
             .withDisplayName("SpannerType")
-            .withType(Type.STRING)
+            .withEnum(SpannerType.class, SpannerType.CLOUD)
             .withDefault("CLOUD")
             .withDescription("Type of Spanner to connect to. Valid values are CLOUD or OMNI. Default is CLOUD.");
 
