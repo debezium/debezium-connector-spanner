@@ -632,7 +632,6 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
     public static final Field SPANNER_TYPE = Field.create(SPANNER_TYPE_PROPERTY_NAME)
             .withDisplayName("SpannerType")
             .withEnum(SpannerType.class, SpannerType.CLOUD)
-            .withDefault("CLOUD")
             .withDescription("Type of Spanner to connect to. Valid values are CLOUD or OMNI. Default is CLOUD.");
 
     public static final Field SPANNER_OMNI_USE_PLAINTEXT = Field.create(SPANNER_OMNI_USE_PLAINTEXT_PROPERTY_NAME)
