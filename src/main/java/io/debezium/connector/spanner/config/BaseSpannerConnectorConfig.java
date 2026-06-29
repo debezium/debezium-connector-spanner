@@ -146,7 +146,7 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
     protected static final Field LOW_WATERMARK_ENABLED_FIELD = Field.create(LOW_WATERMARK_ENABLED)
             .withDisplayName(LOW_WATERMARK_ENABLED)
             .withType(Type.BOOLEAN)
-            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR, 0))
+            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR))
             .withWidth(Width.SHORT)
             .withImportance(Importance.HIGH)
             .withDefault(false)
@@ -155,7 +155,7 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
     protected static final Field LOW_WATERMARK_UPDATE_PERIOD_MS_FIELD = Field.create(LOW_WATERMARK_UPDATE_PERIOD_MS)
             .withDisplayName(LOW_WATERMARK_UPDATE_PERIOD_MS)
             .withType(Type.LONG)
-            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR, 0))
+            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR))
             .withWidth(Width.SHORT)
             .withImportance(Importance.HIGH)
             .withDefault(1000L)
@@ -164,7 +164,7 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
     public static final Field PROJECT_ID = Field.create(GCP_SPANNER_PROJECT_ID_PROPERTY_NAME)
             .withDisplayName("ProjectId")
             .withType(Type.STRING)
-            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR, 0))
+            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR))
             .withWidth(Width.SHORT)
             .withImportance(Importance.HIGH)
             .withDescription("Spanner project id");
@@ -172,7 +172,7 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
     public static final Field INSTANCE_ID = Field.create(GCP_SPANNER_INSTANCE_ID_PROPERTY_NAME)
             .withDisplayName("InstanceId")
             .withType(Type.STRING)
-            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR, 4))
+            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR))
             .withWidth(Width.SHORT)
             .withImportance(Importance.HIGH)
             .withDescription("Spanner instance id");
@@ -180,7 +180,7 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
     public static final Field DATABASE_ID = Field.create(GCP_SPANNER_DATABASE_ID_PROPERTY_NAME)
             .withDisplayName("DatabaseId")
             .withType(Type.STRING)
-            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR, 5))
+            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR))
             .withWidth(Width.SHORT)
             .withImportance(Importance.HIGH)
             .withValidation(FieldValidator::isNotBlank)
@@ -189,7 +189,7 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
     public static final Field DATABASE_ROLE = Field.create(GCP_SPANNER_DATABASE_ROLE_PROPERTY_NAME)
             .withDisplayName("DatabaseRole")
             .withType(Type.STRING)
-            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR, 5))
+            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR))
             .withWidth(Width.SHORT)
             .withImportance(Importance.HIGH)
             .withDescription("Spanner database role");
@@ -198,7 +198,7 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
             GCP_SPANNER_CHANGE_STREAM_PROPERTY_NAME)
             .withDisplayName("Change stream name")
             .withType(Type.STRING)
-            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR, 6))
+            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR))
             .withWidth(Width.MEDIUM)
             .withImportance(Importance.HIGH)
             .withValidation(FieldValidator::isNotBlank)
@@ -207,7 +207,7 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
     public static final Field SPANNER_HOST = Field.create(GCP_SPANNER_HOST_PROPERTY_NAME)
             .withDisplayName("SpannerHost")
             .withType(Type.STRING)
-            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR, 7))
+            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR))
             .withWidth(Width.SHORT)
             .withImportance(Importance.LOW)
             .withDescription("Spanner host");
@@ -215,7 +215,7 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
     public static final Field SPANNER_EMULATOR_HOST = Field.create(GCP_SPANNER_EMULATOR_HOST_PROPERTY_NAME)
             .withDisplayName("SpannerEmulatorHost")
             .withType(Type.STRING)
-            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR, 7))
+            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR))
             .withWidth(Width.MEDIUM)
             .withImportance(Importance.LOW)
             .withDescription("Spanner emulator host");
@@ -223,7 +223,7 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
     public static final Field SPANNER_CREDENTIALS_PATH = Field.create(GCP_SPANNER_CREDENTIALS_PATH_PROPERTY_NAME)
             .withDisplayName(GCP_SPANNER_CREDENTIALS_PATH_PROPERTY_NAME)
             .withType(Type.STRING)
-            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR, 1))
+            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR))
             .withWidth(Width.MEDIUM)
             .withImportance(Importance.MEDIUM)
             .withValidation(FieldValidator::isCorrectPath)
@@ -232,7 +232,7 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
     public static final Field SPANNER_CREDENTIALS_JSON = Field.create(GCP_SPANNER_CREDENTIALS_JSON_PROPERTY_NAME)
             .withDisplayName(GCP_SPANNER_CREDENTIALS_JSON_PROPERTY_NAME)
             .withType(Type.PASSWORD)
-            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR, 2))
+            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR))
             .withWidth(Width.LONG)
             .withImportance(Importance.MEDIUM)
             .withValidation(FieldValidator::isCorrectJson)
@@ -241,7 +241,7 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
     public static final Field STREAM_EVENT_QUEUE_CAPACITY = Field.create(STREAM_EVENT_QUEUE_CAPACITY_PROPERTY_NAME)
             .withDisplayName("Change steam queue capacity")
             .withType(Type.INT)
-            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR, 3))
+            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR))
             .withWidth(Width.SHORT)
             .withImportance(Importance.MEDIUM)
             .withDefault(10000)
@@ -251,7 +251,7 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
     public static final Field TASK_STATE_CHANGE_EVENT_QUEUE_CAPACITY = Field.create(TASK_STATE_CHANGE_EVENT_QUEUE_CAPACITY_PROPERTY_NAME)
             .withDisplayName("Task state change event queue capacity")
             .withType(Type.INT)
-            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR, 4))
+            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR))
             .withWidth(Width.SHORT)
             .withImportance(Importance.MEDIUM)
             .withDefault(1000)
@@ -261,7 +261,7 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
     public static final Field START_TIME = Field.create(START_TIME_PROPERTY_NAME)
             .withDisplayName("Start time")
             .withType(Type.STRING)
-            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR, 7))
+            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR))
             .withWidth(Width.SHORT)
             .withImportance(ConfigDef.Importance.MEDIUM)
             .withValidation(FieldValidator::isCorrectDateTime)
@@ -270,7 +270,7 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
     public static final Field END_TIME = Field.create(END_TIME_PROPERTY_NAME)
             .withDisplayName("End time")
             .withType(Type.STRING)
-            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR, 8))
+            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR))
             .withWidth(Width.SHORT)
             .withImportance(ConfigDef.Importance.MEDIUM)
             .withValidation(FieldValidator::isCorrectDateTime)
@@ -279,7 +279,7 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
     public static final Field OFFSET_BATCH_RETRIEVAL_TIMEOUT_MS = Field.create(OFFSET_BATCH_RETRIEVAL_TIMEOUT_MS_PROPERTY_NAME)
             .withDisplayName("Batch offset retrieval timeout")
             .withType(Type.LONG)
-            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR, 9))
+            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR))
             .withWidth(Width.SHORT)
             .withImportance(Importance.LOW)
             .withDefault(30000L)
@@ -293,7 +293,7 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
     protected static final Field LOW_WATERMARK_STAMP_INTERVAL = Field.create(LOW_WATERMARK_STAMP_INTERVAL_NAME)
             .withDisplayName("Low watermark stamp interval (milli-seconds)")
             .withType(Type.INT)
-            .withGroup(Field.createGroupEntry(Field.Group.CONNECTION_ADVANCED, 0))
+            .withGroup(Field.createGroupEntry(Field.Group.CONNECTION_ADVANCED))
             .withWidth(Width.MEDIUM)
             .withImportance(Importance.MEDIUM)
             .withDescription("Length of an interval in milli-seconds in in which the connector periodically sends " +
@@ -304,7 +304,7 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
     protected static final Field TOPIC_DEFAULT_AUTO_CREATION_PARTITIONS_FIELD = Field.create(TOPIC_DEFAULT_AUTO_CREATION_PARTITIONS_PROPERTY_NAME)
             .withDisplayName("Topic auto creation num partitions")
             .withType(Type.INT)
-            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR, 10))
+            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR))
             .withWidth(Width.SHORT)
             .withImportance(Importance.HIGH)
             .withDefault(1)
@@ -313,7 +313,7 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
     protected static final Field MAX_MISSED_HEARTBEATS = Field.create(MAX_MISSED_HEARTBEATS_PROPERTY_NAME)
             .withDisplayName("Maximum missed heartbeats to identify that partition gets stuck")
             .withType(Type.INT)
-            .withGroup(Field.createGroupEntry(Field.Group.CONNECTION_ADVANCED, 0))
+            .withGroup(Field.createGroupEntry(Field.Group.CONNECTION_ADVANCED))
             .withWidth(Width.SHORT)
             .withImportance(Importance.LOW)
             .withDescription("Maximum missed heartbeats to identify that partition gets stuck")
@@ -323,7 +323,7 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
     private static final Field VALUE_CAPTURE_MODE = Field.create(VALUE_CAPTURE_MODE_PROPERTY_NAME)
             .withDisplayName("Value capture mode")
             .withType(Type.STRING)
-            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR_ADVANCED, 0))
+            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR_ADVANCED))
             .withWidth(Width.SHORT)
             .withImportance(ConfigDef.Importance.MEDIUM)
             .withValidation(FieldValidator::isCorrectCaptureMode)
@@ -333,7 +333,7 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
     protected static final Field TABLE_INCLUDE_LIST = Field.create(TABLE_INCLUDE_LIST_PROPERTY_NAME)
             .withDisplayName("Include Tables")
             .withType(Type.LIST)
-            .withGroup(Field.createGroupEntry(Field.Group.FILTERS, 0))
+            .withGroup(Field.createGroupEntry(Field.Group.FILTERS))
             .withWidth(Width.LONG)
             .withImportance(Importance.MEDIUM)
             .withValidation(Field::isListOfRegex)
@@ -342,7 +342,7 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
     protected static final Field TABLE_EXCLUDE_LIST = Field.create(TABLE_EXCLUDE_LIST_PROPERTY_NAME)
             .withDisplayName("Exclude Tables")
             .withType(Type.LIST)
-            .withGroup(Field.createGroupEntry(Field.Group.FILTERS, 1))
+            .withGroup(Field.createGroupEntry(Field.Group.FILTERS))
             .withWidth(Width.LONG)
             .withImportance(Importance.MEDIUM)
             .withValidation(Field::isListOfRegex)
@@ -351,7 +351,7 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
     protected static final Field SYNC_TOPIC = Field.create(CONNECTOR_SPANNER_SYNC_TOPIC_PROPERTY_NAME)
             .withDisplayName("Sync Topic Prefix")
             .withType(Type.STRING)
-            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR, 20))
+            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR))
             .withWidth(Width.SHORT)
             .withImportance(Importance.LOW)
             .withDefault(DEFAULT_SYNC_TOPIC_PREFIX)
@@ -359,7 +359,7 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
     protected static final Field REBALANCING_TOPIC = Field.create(CONNECTOR_SPANNER_REBALANCING_TOPIC_PROPERTY_NAME)
             .withDisplayName("Rebalancing Topic Prefix")
             .withType(Type.STRING)
-            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR, 21))
+            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR))
             .withWidth(Width.SHORT)
             .withImportance(Importance.LOW)
             .withDefault(DEFAULT_REBALANCING_TOPIC_PREFIX)
@@ -368,7 +368,7 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
     protected static final Field REBALANCING_POLL_DURATION = Field.create(CONNECTOR_SPANNER_REBALANCING_POLL_DURATION_PROPERTY_NAME)
             .withDisplayName("Rebalancing Topic Poll Duration")
             .withType(Type.INT)
-            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR, 25))
+            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR))
             .withWidth(Width.SHORT)
             .withImportance(Importance.LOW)
             .withDefault(5000)
@@ -378,7 +378,7 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
     protected static final Field REBALANCING_COMMIT_OFFSETS_TIMEOUT = Field.create(CONNECTOR_SPANNER_REBALANCING_COMMIT_OFFSETS_TIMEOUT_PROPERTY_NAME)
             .withDisplayName("Rebalancing Topic Commit Offsets Timeout")
             .withType(Type.INT)
-            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR, 26))
+            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR))
             .withWidth(Width.SHORT)
             .withImportance(Importance.LOW)
             .withDefault(5000)
@@ -388,7 +388,7 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
     protected static final Field SYNC_POLL_DURATION = Field.create(CONNECTOR_SPANNER_SYNC_POLL_DURATION_PROPERTY_NAME)
             .withDisplayName("Sync Topic Poll Duration")
             .withType(Type.INT)
-            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR, 27))
+            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR))
             .withWidth(Width.SHORT)
             .withImportance(Importance.LOW)
             .withDefault(500)
@@ -398,7 +398,7 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
     protected static final Field SYNC_COMMIT_OFFSETS_TIMEOUT = Field.create(CONNECTOR_SPANNER_SYNC_COMMIT_OFFSETS_TIMEOUT_PROPERTY_NAME)
             .withDisplayName("Sync Topic Commit Offsets Timeout")
             .withType(Type.INT)
-            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR, 28))
+            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR))
             .withWidth(Width.SHORT)
             .withImportance(Importance.LOW)
             .withDefault(5000)
@@ -408,7 +408,7 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
     protected static final Field SYNC_KAFKA_BOOTSTRAP_SERVERS = Field.create(CONNECTOR_SPANNER_SYNC_KAFKA_BOOTSTRAP_SERVERS_PROPERTY_NAME)
             .withDisplayName("Sync Kafka Bootstrap Servers")
             .withType(Type.STRING)
-            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR, 30))
+            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR))
             .withWidth(Width.LONG)
             .withImportance(Importance.LOW)
             .withDescription("Kafka bootstrapServers for synchronization between tasks");
@@ -416,7 +416,7 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
     protected static final Field SYNC_REQUEST_TIMEOUT = Field.create(CONNECTOR_SPANNER_SYNC_REQUEST_TIMEOUT_PROPERTY_NAME)
             .withDisplayName("Sync Request Timeout")
             .withType(Type.INT)
-            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR, 31))
+            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR))
             .withWidth(Width.SHORT)
             .withImportance(Importance.LOW)
             .withDefault(5000)
@@ -426,7 +426,7 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
     protected static final Field SYNC_DELIVERY_TIMEOUT = Field.create(CONNECTOR_SPANNER_SYNC_DELIVERY_TIMEOUT_PROPERTY_NAME)
             .withDisplayName("Sync Delivery Timeout")
             .withType(Type.INT)
-            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR, 32))
+            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR))
             .withWidth(Width.SHORT)
             .withImportance(Importance.LOW)
             .withDefault(15000)
@@ -436,7 +436,7 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
     protected static final Field SYNC_CLEANUP_POLICY = Field.create(CONNECTOR_SPANNER_SYNC_CLEANUP_POLICY_PROPERTY_NAME)
             .withDisplayName("Sync Topic property: cleanup.policy")
             .withType(Type.STRING)
-            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR, 33))
+            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR))
             .withWidth(Width.MEDIUM)
             .withImportance(Importance.LOW)
             .withDefault("delete")
@@ -445,7 +445,7 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
     protected static final Field SYNC_RETENTION_MS = Field.create(CONNECTOR_SPANNER_SYNC_RETENTION_MS_PROPERTY_NAME)
             .withDisplayName("Sync Topic property: retention.ms")
             .withType(Type.INT)
-            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR, 34))
+            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR))
             .withWidth(Width.MEDIUM)
             .withImportance(Importance.LOW)
             .withDefault(86400000)
@@ -454,7 +454,7 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
     protected static final Field SYNC_SEGMENT_MS = Field.create(CONNECTOR_SPANNER_SYNC_SEGMENT_MS_POLICY_PROPERTY_NAME)
             .withDisplayName("Sync Topic property: segment.ms")
             .withType(Type.INT)
-            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR, 35))
+            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR))
             .withWidth(Width.MEDIUM)
             .withImportance(Importance.LOW)
             .withDefault(43200000)
@@ -463,7 +463,7 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
     protected static final Field SYNC_MIN_CLEANABLE_DIRTY_RATIO = Field.create(CONNECTOR_SPANNER_SYNC_MIN_CLEANABLE_DIRTY_RATIO_PROPERTY_NAME)
             .withDisplayName("Sync Topic property: min.cleanable.dirty.ratio")
             .withType(Type.STRING)
-            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR, 36))
+            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR))
             .withWidth(Width.MEDIUM)
             .withImportance(Importance.LOW)
             .withDefault("0.1")
@@ -472,7 +472,7 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
     protected static final Field SYNC_COMMIT_OFFSETS_INTERVAL_MS = Field.create(CONNECTOR_SPANNER_SYNC_COMMIT_OFFSET_INTERVAL_MS_PROPERTY_NAME)
             .withDisplayName("Sync Topic Commit Offsets Interval")
             .withType(Type.INT)
-            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR, 37))
+            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR))
             .withWidth(Width.SHORT)
             .withImportance(Importance.LOW)
             .withDefault(60_000)
@@ -482,7 +482,7 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
     protected static final Field REBALANCING_COMMIT_OFFSETS_INTERVAL_MS = Field.create(CONNECTOR_SPANNER_REBALANCING_COMMIT_OFFSET_INTERVAL_MS_PROPERTY_NAME)
             .withDisplayName("Rebalancing Topic Commit Offsets Interval")
             .withType(Type.INT)
-            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR, 38))
+            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR))
             .withWidth(Width.SHORT)
             .withImportance(Importance.LOW)
             .withDefault(60_000)
@@ -492,7 +492,7 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
     protected static final Field TASKS_FAIL_OVERLOADED = Field.create(TASKS_FAIL_OVERLOADED_PROPERTY_NAME)
             .withDisplayName("Fail Overloaded Task")
             .withType(Type.BOOLEAN)
-            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR, 39))
+            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR))
             .withWidth(Width.SHORT)
             .withImportance(Importance.LOW)
             .withDefault(false)
@@ -501,7 +501,7 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
     protected static final Field TASKS_FAIL_OVERLOADED_CHECK_INTERVAL = Field.create(TASKS_FAIL_OVERLOADED_CHECK_INTERVAL_PROPERTY_NAME)
             .withDisplayName("Check Interval for \"Fail Overloaded Task\"")
             .withType(Type.LONG)
-            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR, 40))
+            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR))
             .withWidth(Width.SHORT)
             .withImportance(Importance.LOW)
             .withDefault(5000)
@@ -510,7 +510,7 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
     protected static final Field MAX_TASKS = Field.create(MAX_TASKS_PROPERTY_NAME)
             .withDisplayName("Max Tasks")
             .withType(Type.INT)
-            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR, 10))
+            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR))
             .withWidth(Width.SHORT)
             .withImportance(Importance.HIGH)
             .withDefault(10)
@@ -519,7 +519,7 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
     protected static final Field MIN_TASKS = Field.create(MIN_TASKS_PROPERTY_NAME)
             .withDisplayName("Min Tasks")
             .withType(Type.INT)
-            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR, 11))
+            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR))
             .withWidth(Width.SHORT)
             .withImportance(Importance.HIGH)
             .withDefault(2)
@@ -528,7 +528,7 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
     protected static final Field DESIRED_PARTITIONS_TASKS = Field.create(DESIRED_PARTITIONS_TASKS_PROPERTY_NAME)
             .withDisplayName("Desired partitions per task")
             .withType(Type.INT)
-            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR, 12))
+            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR))
             .withWidth(Width.SHORT)
             .withImportance(Importance.HIGH)
             .withDefault(2)
@@ -538,7 +538,7 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
     protected static final Field SCALER_MONITOR_ENABLED = Field.create(SCALER_MONITOR_ENABLED_PROPERTY_NAME)
             .withDisplayName("Scaler monitor enabled")
             .withType(Type.BOOLEAN)
-            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR, 13))
+            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR))
             .withWidth(Width.SHORT)
             .withImportance(Importance.MEDIUM)
             .withDefault(false)
@@ -547,7 +547,7 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
     protected static final Field LOGGING_JSON_ENABLED = Field.create(LOGGING_JSON_ENABLED_PROPERTY_NAME)
             .withDisplayName("Logging json enabled")
             .withType(Type.BOOLEAN)
-            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR, 13))
+            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR))
             .withWidth(Width.SHORT)
             .withImportance(Importance.MEDIUM)
             .withDefault(false)
@@ -556,7 +556,7 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
     protected static final Field CONNECTOR_SPANNER_PARTITION_FINISHING_AFTER_COMMIT_FIELD = Field.create(CONNECTOR_SPANNER_PARTITION_FINISHING_AFTER_COMMIT_PROPERTY_NAME)
             .withDisplayName("Connector spanner partition finishing after commit strategy")
             .withType(Type.BOOLEAN)
-            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR, 14))
+            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR))
             .withWidth(Width.SHORT)
             .withImportance(Importance.MEDIUM)
             .withDefault(true)
@@ -566,7 +566,7 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
             .create(CONNECTOR_SPANNER_FINISHED_PRTITION_DELETION_DELAY_PROPERTY_NAME)
             .withDisplayName("Connector spanner partition deletion delay after finished(seconds)")
             .withType(Type.INT)
-            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR, 14))
+            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR))
             .withWidth(Width.MEDIUM)
             .withImportance(Importance.LOW)
             .withDefault(7200)
@@ -575,7 +575,7 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
     protected static final Field REBALANCING_TASK_WAITING_TIMEOUT = Field.create(CONNECTOR_SPANNER_REBALANCING_TASK_WAITING_TIMEOUT_PROPERTY_NAME)
             .withDisplayName("Rebalancing Task waiting timeout")
             .withType(Type.INT)
-            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR, 16))
+            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR))
             .withWidth(Width.SHORT)
             .withImportance(Importance.LOW)
             .withDefault(1000)
@@ -584,7 +584,7 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
     protected static final Field SYNC_EVENT_PUBLISH_WAITING_TIMEOUT = Field.create(CONNECTOR_SPANNER_SYNC_EVENT_PUBLISH_WAITING_TIMEOUT_PROPERTY_NAME)
             .withDisplayName("Sync Event Publisher waiting timeout")
             .withType(Type.INT)
-            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR, 17))
+            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR))
             .withWidth(Width.SHORT)
             .withImportance(Importance.LOW)
             .withDefault(5)
@@ -593,7 +593,7 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
     protected static final Field TASK_AWAIT_INITIALIZATION_TMEOUT = Field.create(CONNECTOR_SPANNER_TASK_AWAIT_INITIALIZATION_TIMEOUT_PROPERTY_NAME)
             .withDisplayName("Task await initialization timeout")
             .withType(Type.INT)
-            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR, 16))
+            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR))
             .withWidth(Width.SHORT)
             .withImportance(Importance.LOW)
             .withDefault(120000)
@@ -602,7 +602,7 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
     protected static final Field TASK_AWAIT_ANSWER_TIMEOUT = Field.create(CONNECTOR_SPANNER_TASK_AWAIT_TASK_ANSWER_TIMEOUT_PROPERTY_NAME)
             .withDisplayName("Task await answer timeout")
             .withType(Type.INT)
-            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR, 16))
+            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR))
             .withWidth(Width.MEDIUM)
             .withImportance(Importance.LOW)
             .withDefault(120000)
@@ -611,7 +611,7 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
     protected static final Field PERCENTAGE_METRICS_CLEAR_INTERVAL = Field.create(PERCENTAGE_METRICS_CLEAR_INTERVAL_PROPERTY_NAME)
             .withDisplayName("Percentage metrics clear interval")
             .withType(Type.INT)
-            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR, 18))
+            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR))
             .withWidth(Width.SHORT)
             .withImportance(Importance.LOW)
             .withDefault(10000)
@@ -620,7 +620,7 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
     protected static final Field SYNC_TOPIC_MAX_MESSAGE_BYTES = Field.create(CONNECTOR_SPANNER_SYNC_TOPIC_MAX_MESSAGE_BYTES_PROPERTY_NAME)
             .withDisplayName("Sync topic max message size")
             .withType(Type.STRING)
-            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR, 19))
+            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR))
             .withWidth(Width.SHORT)
             .withImportance(Importance.HIGH)
             .withDefault("10485880")
@@ -632,12 +632,13 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
     public static final Field SPANNER_TYPE = Field.create(SPANNER_TYPE_PROPERTY_NAME)
             .withDisplayName("SpannerType")
             .withEnum(SpannerType.class, SpannerType.CLOUD)
+            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR))
             .withDescription("Type of Spanner to connect to. Valid values are CLOUD or OMNI. Default is CLOUD.");
 
     public static final Field SPANNER_OMNI_USE_PLAINTEXT = Field.create(SPANNER_OMNI_USE_PLAINTEXT_PROPERTY_NAME)
             .withDisplayName("SpannerOmniUsePlaintext")
             .withType(Type.BOOLEAN)
-            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR, 8))
+            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR))
             .withWidth(Width.SHORT)
             .withImportance(Importance.LOW)
             .withDescription("Whether to use plaintext for Spanner Omni connection");
@@ -645,7 +646,7 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
     public static final Field SPANNER_OMNI_CLIENT_KEY_PATH = Field.create(SPANNER_OMNI_CLIENT_KEY_PATH_PROPERTY_NAME)
             .withDisplayName("SpannerOmniClientKeyPath")
             .withType(Type.STRING)
-            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR, 9))
+            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR))
             .withWidth(Width.MEDIUM)
             .withImportance(Importance.LOW)
             .withDescription("Path to the client key file for Spanner Omni connection");
@@ -653,15 +654,18 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
     public static final Field SPANNER_OMNI_CLIENT_CERT_PATH = Field.create(SPANNER_OMNI_CLIENT_CERT_PATH_PROPERTY_NAME)
             .withDisplayName("SpannerOmniClientCertPath")
             .withType(Type.STRING)
-            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR, 10))
+            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR))
             .withWidth(Width.MEDIUM)
             .withImportance(Importance.LOW)
             .withDescription("Path to the client certificate file for Spanner Omni connection");
 
     protected static final ConfigDefinition CONFIG_DEFINITION = ConfigDefinition.editor()
             .name("Spanner")
-            .type(PROJECT_ID)
-            .connector(INSTANCE_ID,
+            .group(Field.Group.CONNECTOR,
+                    LOW_WATERMARK_ENABLED_FIELD,
+                    LOW_WATERMARK_UPDATE_PERIOD_MS_FIELD,
+                    PROJECT_ID,
+                    INSTANCE_ID,
                     DATABASE_ID,
                     DATABASE_ROLE,
                     CHANGE_STREAM_NAME,
@@ -678,17 +682,7 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
                     STREAM_EVENT_QUEUE_CAPACITY,
                     OFFSET_BATCH_RETRIEVAL_TIMEOUT_MS,
                     TASK_STATE_CHANGE_EVENT_QUEUE_CAPACITY,
-                    VALUE_CAPTURE_MODE,
-                    SPANNER_HEART_BEAT_INTERVAL,
                     TOPIC_DEFAULT_AUTO_CREATION_PARTITIONS_FIELD,
-
-                    MAX_BATCH_SIZE,
-                    MAX_QUEUE_SIZE,
-                    POLL_INTERVAL_MS,
-                    MAX_QUEUE_SIZE_IN_BYTES,
-                    SKIPPED_OPERATIONS,
-                    QUERY_FETCH_SIZE,
-
                     REBALANCING_TOPIC,
                     REBALANCING_POLL_DURATION,
                     REBALANCING_COMMIT_OFFSETS_TIMEOUT,
@@ -700,7 +694,7 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
                     CONNECTOR_SPANNER_PARTITION_FINISHING_AFTER_COMMIT_FIELD,
                     CONNECTOR_SPANNER_FINISHED_PARTITION_DELETION_DELAY_FIELD,
                     PERCENTAGE_METRICS_CLEAR_INTERVAL,
-
+                    SYNC_TOPIC_MAX_MESSAGE_BYTES,
                     SYNC_TOPIC,
                     SYNC_KAFKA_BOOTSTRAP_SERVERS,
                     SYNC_POLL_DURATION,
@@ -712,20 +706,34 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
                     SYNC_RETENTION_MS,
                     SYNC_SEGMENT_MS,
                     SYNC_MIN_CLEANABLE_DIRTY_RATIO,
-
                     MAX_TASKS,
                     MIN_TASKS,
                     DESIRED_PARTITIONS_TASKS,
                     TASKS_FAIL_OVERLOADED,
                     TASKS_FAIL_OVERLOADED_CHECK_INTERVAL,
                     SCALER_MONITOR_ENABLED,
-                    LOGGING_JSON_ENABLED)
-            .events(TABLE_EXCLUDE_LIST,
-                    TABLE_INCLUDE_LIST,
-                    CUSTOM_CONVERTERS,
+                    LOGGING_JSON_ENABLED,
                     TOMBSTONES_ON_DELETE,
-                    AbstractTopicNamingStrategy.TOPIC_HEARTBEAT_PREFIX,
                     SOURCE_INFO_STRUCT_MAKER)
+            .group(Field.Group.CONNECTION_ADVANCED,
+                    LOW_WATERMARK_STAMP_INTERVAL,
+                    MAX_MISSED_HEARTBEATS)
+            .group(Field.Group.CONNECTOR_ADVANCED,
+                    VALUE_CAPTURE_MODE,
+                    CUSTOM_CONVERTERS)
+            .group(Field.Group.ADVANCED_HEARTBEAT,
+                    SPANNER_HEART_BEAT_INTERVAL,
+                    AbstractTopicNamingStrategy.TOPIC_HEARTBEAT_PREFIX)
+            .group(Field.Group.ADVANCED,
+                    MAX_BATCH_SIZE,
+                    MAX_QUEUE_SIZE,
+                    POLL_INTERVAL_MS,
+                    MAX_QUEUE_SIZE_IN_BYTES,
+                    SKIPPED_OPERATIONS,
+                    QUERY_FETCH_SIZE)
+            .group(Field.Group.FILTERS,
+                    TABLE_EXCLUDE_LIST,
+                    TABLE_INCLUDE_LIST)
             .create();
     private static final int POLL_INTERVAL_IN_MS = 25;
 
