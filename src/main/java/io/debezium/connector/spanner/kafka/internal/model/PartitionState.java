@@ -5,6 +5,7 @@
  */
 package io.debezium.connector.spanner.kafka.internal.model;
 
+import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 
@@ -28,7 +29,7 @@ public class PartitionState implements Comparable<PartitionState> {
 
     private final MoveInState moveInState;
 
-    private final MoveOutState moveOutState;
+    private final List<MoveOutState> moveOutStates;
 
     private final Timestamp processedTimestamp;
 
@@ -44,22 +45,22 @@ public class PartitionState implements Comparable<PartitionState> {
     public PartitionState(final String token, final Timestamp startTimestamp,
                           final Timestamp endTimestamp, final PartitionStateEnum state,
                           final Set<String> parents, final String assigneeTaskUid, final Timestamp finishedTimestamp,
-                          final String originParent, final MoveInState moveInState, final MoveOutState moveOutState) {
-        this(token, startTimestamp, endTimestamp, state, parents, assigneeTaskUid, finishedTimestamp, originParent, moveInState, moveOutState, null, null);
+                          final String originParent, final MoveInState moveInState, final List<MoveOutState> moveOutStates) {
+        this(token, startTimestamp, endTimestamp, state, parents, assigneeTaskUid, finishedTimestamp, originParent, moveInState, moveOutStates, null, null);
     }
 
     public PartitionState(final String token, final Timestamp startTimestamp,
                           final Timestamp endTimestamp, final PartitionStateEnum state,
                           final Set<String> parents, final String assigneeTaskUid, final Timestamp finishedTimestamp,
-                          final String originParent, final MoveInState moveInState, final MoveOutState moveOutState,
+                          final String originParent, final MoveInState moveInState, final List<MoveOutState> moveOutStates,
                           final Timestamp processedTimestamp) {
-        this(token, startTimestamp, endTimestamp, state, parents, assigneeTaskUid, finishedTimestamp, originParent, moveInState, moveOutState, processedTimestamp, null);
+        this(token, startTimestamp, endTimestamp, state, parents, assigneeTaskUid, finishedTimestamp, originParent, moveInState, moveOutStates, processedTimestamp, null);
     }
 
     public PartitionState(final String token, final Timestamp startTimestamp,
                           final Timestamp endTimestamp, final PartitionStateEnum state,
                           final Set<String> parents, final String assigneeTaskUid, final Timestamp finishedTimestamp,
-                          final String originParent, final MoveInState moveInState, final MoveOutState moveOutState,
+                          final String originParent, final MoveInState moveInState, final List<MoveOutState> moveOutStates,
                           final Timestamp processedTimestamp, final String lastBoundaryRecordSequence) {
         this.token = token;
         this.startTimestamp = startTimestamp;
@@ -70,7 +71,7 @@ public class PartitionState implements Comparable<PartitionState> {
         this.finishedTimestamp = finishedTimestamp;
         this.originParent = originParent;
         this.moveInState = moveInState;
-        this.moveOutState = moveOutState;
+        this.moveOutStates = moveOutStates == null ? List.of() : moveOutStates;
         this.processedTimestamp = processedTimestamp;
         this.lastBoundaryRecordSequence = lastBoundaryRecordSequence;
     }
@@ -95,7 +96,7 @@ public class PartitionState implements Comparable<PartitionState> {
 
         private MoveInState moveInState;
 
-        private MoveOutState moveOutState;
+        private List<MoveOutState> moveOutStates;
 
         private Timestamp processedTimestamp;
 
@@ -149,8 +150,8 @@ public class PartitionState implements Comparable<PartitionState> {
             return this;
         }
 
-        public PartitionState.PartitionStateBuilder moveOutState(final MoveOutState moveOutState) {
-            this.moveOutState = moveOutState;
+        public PartitionState.PartitionStateBuilder moveOutStates(final List<MoveOutState> moveOutStates) {
+            this.moveOutStates = moveOutStates;
             return this;
         }
 
@@ -168,7 +169,7 @@ public class PartitionState implements Comparable<PartitionState> {
             return new PartitionState(this.token, this.startTimestamp,
                     this.endTimestamp, this.state, this.parents,
                     this.assigneeTaskUid, this.finishedTimestamp, this.originParent,
-                    this.moveInState, this.moveOutState, this.processedTimestamp,
+                    this.moveInState, this.moveOutStates, this.processedTimestamp,
                     this.lastBoundaryRecordSequence);
         }
 
@@ -189,7 +190,7 @@ public class PartitionState implements Comparable<PartitionState> {
                 .finishedTimestamp(this.finishedTimestamp)
                 .originParent(this.originParent)
                 .moveInState(this.moveInState)
-                .moveOutState(this.moveOutState)
+                .moveOutStates(this.moveOutStates)
                 .processedTimestamp(this.processedTimestamp)
                 .lastBoundaryRecordSequence(this.lastBoundaryRecordSequence);
     }
@@ -230,8 +231,8 @@ public class PartitionState implements Comparable<PartitionState> {
         return moveInState;
     }
 
-    public MoveOutState getMoveOutState() {
-        return moveOutState;
+    public List<MoveOutState> getMoveOutStates() {
+        return moveOutStates;
     }
 
     public Timestamp getProcessedTimestamp() {
@@ -279,7 +280,7 @@ public class PartitionState implements Comparable<PartitionState> {
                 ", finishedTimestamp=" + finishedTimestamp +
                 ", originParent='" + originParent + '\'' +
                 ", moveInState=" + moveInState +
-                ", moveOutState=" + moveOutState +
+                ", moveOutStates=" + moveOutStates +
                 ", processedTimestamp=" + processedTimestamp +
                 ", lastBoundaryRecordSequence='" + lastBoundaryRecordSequence + '\'' +
                 '}';

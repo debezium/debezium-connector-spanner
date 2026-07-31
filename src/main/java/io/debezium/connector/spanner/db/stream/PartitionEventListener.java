@@ -5,6 +5,8 @@
  */
 package io.debezium.connector.spanner.db.stream;
 
+import java.util.List;
+
 import com.google.cloud.Timestamp;
 
 import io.debezium.connector.spanner.db.model.Partition;
@@ -22,4 +24,6 @@ public interface PartitionEventListener {
     boolean onStuckPartition(String token) throws InterruptedException;
 
     void onWindowAdvanced(Partition partition, Timestamp windowEnd, String lastBoundaryRecordSequence) throws InterruptedException;
+
+    void onMoveIn(Partition partition, Timestamp commitTimestamp, String recordSequence, List<String> sourcePartitionTokens) throws InterruptedException;
 }

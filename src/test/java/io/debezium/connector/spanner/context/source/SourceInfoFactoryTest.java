@@ -56,7 +56,7 @@ class SourceInfoFactoryTest {
 
         DataChangeEvent dataChangeEvent = new DataChangeEvent("token", commitTimestamp,
                 "testId", true,
-                "1", "Table Name", rowType, new ArrayList<>(), ModType.INSERT,
+                "0000000000000000-00000001", "Table Name", rowType, new ArrayList<>(), ModType.INSERT,
                 ValueCaptureType.OLD_AND_NEW_VALUES, 1L, 1L,
                 "testTag=test", false, streamEventMetadata);
 
@@ -67,7 +67,7 @@ class SourceInfoFactoryTest {
 
         SourceInfo sourceInfo = sourceInfoFactory.getSourceInfo(0,
                 new DataChangeEvent("token", commitTimestamp, "testId",
-                        true, "1", "Table Name", rowType,
+                        true, "0000000000000000-00000001", "Table Name", rowType,
                         new ArrayList<>(), ModType.INSERT, ValueCaptureType.OLD_AND_NEW_VALUES, 1L,
                         1L, "testTag=test", false, streamEventMetadata));
 
@@ -108,7 +108,7 @@ class SourceInfoFactoryTest {
 
         DataChangeEvent dataChangeEvent = new DataChangeEvent("token", commitTimestamp,
                 "testId", true,
-                "1", "Table Name", rowType, new ArrayList<>(), ModType.INSERT,
+                "0000000000000000-00000001", "Table Name", rowType, new ArrayList<>(), ModType.INSERT,
                 ValueCaptureType.NEW_ROW_AND_OLD_VALUES, 1L, 1L,
                 "testTag=test", false, streamEventMetadata);
 
@@ -120,7 +120,7 @@ class SourceInfoFactoryTest {
 
         SourceInfo sourceInfo = sourceInfoFactory.getSourceInfo(0,
                 new DataChangeEvent("token", commitTimestamp, "testId",
-                        true, "1", "Table Name", rowType,
+                        true, "0000000000000000-00000001", "Table Name", rowType,
                         new ArrayList<>(), ModType.INSERT, ValueCaptureType.OLD_AND_NEW_VALUES, 1L,
                         1L, "testTag=test", false, streamEventMetadata));
 
@@ -161,7 +161,7 @@ class SourceInfoFactoryTest {
 
         DataChangeEvent dataChangeEvent = new DataChangeEvent("token", commitTimestamp,
                 "testId", true,
-                "1", "Table Name", rowType, new ArrayList<>(), ModType.INSERT,
+                "0000000000000000-00000001", "Table Name", rowType, new ArrayList<>(), ModType.INSERT,
                 ValueCaptureType.NEW_ROW, 1L, 1L,
                 "testTag=test", false, streamEventMetadata);
 
@@ -172,7 +172,7 @@ class SourceInfoFactoryTest {
 
         SourceInfo sourceInfo = sourceInfoFactory.getSourceInfo(0,
                 new DataChangeEvent("token", commitTimestamp, "testId",
-                        true, "1", "Table Name", rowType,
+                        true, "0000000000000000-00000001", "Table Name", rowType,
                         new ArrayList<>(), ModType.INSERT, ValueCaptureType.NEW_ROW, 1L,
                         1L, "testTag=test", false, streamEventMetadata));
 
@@ -214,7 +214,7 @@ class SourceInfoFactoryTest {
 
         DataChangeEvent dataChangeEvent = new DataChangeEvent("token", commitTimestamp,
                 "testId", true,
-                "1", "Table Name", rowType, new ArrayList<>(), ModType.INSERT,
+                "0000000000000000-00000001", "Table Name", rowType, new ArrayList<>(), ModType.INSERT,
                 ValueCaptureType.NEW_VALUES, 1L, 1L,
                 "testTag=test", false, streamEventMetadata);
 
@@ -226,7 +226,7 @@ class SourceInfoFactoryTest {
 
         SourceInfo sourceInfo = sourceInfoFactory.getSourceInfo(0,
                 new DataChangeEvent("token", commitTimestamp, "testId",
-                        true, "1", "Table Name", rowType,
+                        true, "0000000000000000-00000001", "Table Name", rowType,
                         new ArrayList<>(), ModType.INSERT, ValueCaptureType.NEW_VALUES, 1L,
                         1L, "testTag=test", false, streamEventMetadata));
 

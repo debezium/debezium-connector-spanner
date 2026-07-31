@@ -44,6 +44,12 @@ public class SpannerChangeStreamFactory {
 
     public SpannerChangeStream getStream(
                                          String changeStreamName, Duration heartbeatMillis, int maxMissedHeartbeats, int windowMinutes) {
+        return getStream(changeStreamName, heartbeatMillis, maxMissedHeartbeats, windowMinutes, true);
+    }
+
+    public SpannerChangeStream getStream(
+                                         String changeStreamName, Duration heartbeatMillis, int maxMissedHeartbeats, int windowMinutes,
+                                         boolean mutablePartitionOrderingEnabled) {
 
         ChangeStreamDao changeStreamDao = daoFactory.getStreamDao(
                 changeStreamName,
@@ -58,7 +64,8 @@ public class SpannerChangeStreamFactory {
                 databaseClientFactory.getDatabaseClient(), changeStreamDao.isMutableKeyRange());
 
         SpannerChangeStreamService streamService = new SpannerChangeStreamService(
-                taskUid, changeStreamDao, changeStreamRecordMapper, heartbeatMillis, metricsEventPublisher, windowMinutes);
+                taskUid, changeStreamDao, changeStreamRecordMapper, heartbeatMillis, metricsEventPublisher, windowMinutes,
+                mutablePartitionOrderingEnabled);
 
         return new SpannerChangeStream(
                 streamService, metricsEventPublisher, heartbeatMillis, maxMissedHeartbeats, taskUid, databaseClientFactory);

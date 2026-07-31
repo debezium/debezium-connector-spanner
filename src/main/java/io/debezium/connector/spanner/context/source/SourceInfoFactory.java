@@ -11,6 +11,7 @@ import io.debezium.connector.spanner.SpannerConnectorConfig;
 import io.debezium.connector.spanner.context.offset.LowWatermarkProvider;
 import io.debezium.connector.spanner.db.metadata.TableId;
 import io.debezium.connector.spanner.db.model.event.DataChangeEvent;
+import io.debezium.connector.spanner.db.model.event.RecordSequenceUtils;
 
 /**
  * Creates {@link SourceInfo} from the input {@link DataChangeEvent}
@@ -29,7 +30,7 @@ public class SourceInfoFactory {
         Instant recordTimestamp = dataChangeEvent.getRecordTimestamp().toSqlTimestamp().toInstant();
         Instant readAtTimestamp = dataChangeEvent.getMetadata().getRecordReadAt().toSqlTimestamp().toInstant();
         String serverTransactionId = dataChangeEvent.getServerTransactionId();
-        Long recordSequence = parseRecordSequence(dataChangeEvent.getRecordSequence());
+        Long recordSequence = RecordSequenceUtils.parseToComparableLong(dataChangeEvent.getRecordSequence());
         Long numberRecordInTransaction = dataChangeEvent.getNumberOfRecordsInTransaction();
         String transactionTag = dataChangeEvent.getTransactionTag();
         boolean systemTransaction = dataChangeEvent.isSystemTransaction();
@@ -48,29 +49,6 @@ public class SourceInfoFactory {
                 readAtTimestamp, serverTransactionId, recordSequence, lowWatermark, numberRecordInTransaction,
                 transactionTag, systemTransaction, valueCaptureType, partitionToken, modNumber,
                 isLastRecordInTransactionInPartition, numberOfPartitionsInTransaction);
-    }
-
-    private static Long parseRecordSequence(String sequence) {
-        if (sequence == null) {
-            return null;
-        }
-        try {
-            return Long.parseLong(sequence);
-        }
-        catch (NumberFormatException e) {
-            try {
-                if (sequence.contains("-")) {
-                    String[] parts = sequence.split("-", 2);
-                    long hi = Long.parseUnsignedLong(parts[0], 16) & 0xFFFFFFFFL;
-                    long lo = Long.parseUnsignedLong(parts[1], 16) & 0xFFFFFFFFL;
-                    return (hi << 32) | lo;
-                }
-                return Long.parseUnsignedLong(sequence, 16);
-            }
-            catch (NumberFormatException ex) {
-                return (long) sequence.hashCode();
-            }
-        }
     }
 
     public SourceInfo getSourceInfoForLowWatermarkStamp(TableId tableId) throws InterruptedException {

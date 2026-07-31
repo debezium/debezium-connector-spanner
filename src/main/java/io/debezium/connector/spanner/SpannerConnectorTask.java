@@ -178,7 +178,8 @@ public class SpannerConnectorTask extends SpannerBaseSourceTask {
                 connectorConfig.changeStreamName(),
                 connectorConfig.getHeartbeatInterval(),
                 connectorConfig.getMaxMissedHeartbeats(),
-                connectorConfig.getMutableWindowMinutes());
+                connectorConfig.getMutableWindowMinutes(),
+                connectorConfig.isMutablePartitionOrderingEnabled());
 
         final SourceInfoFactory sourceInfoFactory = new SourceInfoFactory(connectorConfig, lowWatermarkHolder);
 

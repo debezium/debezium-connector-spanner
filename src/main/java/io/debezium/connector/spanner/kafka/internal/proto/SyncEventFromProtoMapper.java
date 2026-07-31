@@ -9,6 +9,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import com.google.cloud.Timestamp;
 
@@ -80,13 +81,11 @@ public class SyncEventFromProtoMapper {
 
     private static PartitionState mapPartition(SyncEventProtos.PartitionState partitionState) {
 
-        MoveOutState moveOutState = null;
-        if (partitionState.hasMoveOutState()) {
-            SyncEventProtos.MoveOutState proto = partitionState.getMoveOutState();
-            moveOutState = new MoveOutState(
-                    Timestamp.fromProto(proto.getCommitTimestamp()),
-                    proto.getDestPartitionTokensList());
-        }
+        List<MoveOutState> moveOutStates = partitionState.getMoveOutStatesList().stream()
+                .map(proto -> new MoveOutState(
+                        Timestamp.fromProto(proto.getCommitTimestamp()),
+                        proto.getDestPartitionTokensList()))
+                .collect(Collectors.toList());
 
         MoveInState moveInState = null;
         if (partitionState.hasMoveInState()) {
@@ -123,7 +122,7 @@ public class SyncEventFromProtoMapper {
                         : null,
                 partitionState.getOriginParent(),
                 moveInState,
-                moveOutState,
+                moveOutStates,
                 processedTimestamp,
                 lastBoundaryRecordSequence);
     }

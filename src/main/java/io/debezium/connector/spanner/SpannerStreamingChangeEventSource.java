@@ -166,6 +166,18 @@ public class SpannerStreamingChangeEventSource implements CommittingRecordsStrea
                 public void onWindowAdvanced(Partition partition, Timestamp windowEnd, String lastBoundaryRecordSequence) throws InterruptedException {
                     partitionManager.updateProcessedTimestamp(partition.getToken(), windowEnd, lastBoundaryRecordSequence);
                 }
+
+                @Override
+                public void onMoveIn(Partition partition, Timestamp commitTimestamp, String recordSequence, List<String> sourcePartitionTokens)
+                        throws InterruptedException {
+                    if (!connectorConfig.isMutablePartitionOrderingEnabled()) {
+                        LOGGER.debug("Mutable ordering disabled; ignoring MoveIn pause for partition {}", partition.getToken());
+                        return;
+                    }
+                    LOGGER.info("Partition onMoveIn: {}, commitTimestamp={}, recordSequence={}, sources={}",
+                            partition.getToken(), commitTimestamp, recordSequence, sourcePartitionTokens);
+                    partitionManager.notifyMoveIn(partition.getToken(), commitTimestamp, recordSequence, sourcePartitionTokens);
+                }
             });
 
         }
@@ -387,7 +399,8 @@ public class SpannerStreamingChangeEventSource implements CommittingRecordsStrea
         if (!event.getDestinationPartitions().isEmpty()) {
             processMoveOutEvent(event); // MoveOut side — gated
         }
-        // MoveIn (sourcePartitions non-empty): full handling deferred to ordering step.
+        // MoveIn (sourcePartitions non-empty): handled by PartitionEventListener#onMoveIn,
+        // triggered directly from the partition streaming loop when the query is paused.
     }
 
     private void processMoveOutEvent(PartitionEventEvent event) throws InterruptedException {
