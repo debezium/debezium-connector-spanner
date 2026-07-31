@@ -9,6 +9,7 @@ import static io.debezium.connector.spanner.util.Database.isSpannerOmniEndpoint;
 import static org.awaitility.Awaitility.await;
 
 import java.time.Duration;
+import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
@@ -32,7 +33,12 @@ import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.Spanner;
 import com.google.cloud.spanner.SpannerOptions;
 import com.google.cloud.spanner.Statement;
+import com.google.protobuf.ListValue;
+import com.google.protobuf.Timestamp;
+import com.google.protobuf.Value;
 import com.google.spanner.admin.database.v1.CreateDatabaseMetadata;
+import com.google.spanner.admin.database.v1.DatabaseName;
+import com.google.spanner.admin.database.v1.SplitPoints;
 import com.google.spanner.admin.database.v1.UpdateDatabaseDdlMetadata;
 import com.google.spanner.admin.instance.v1.CreateInstanceMetadata;
 
@@ -131,6 +137,38 @@ public class Connection {
                 (tables.length == 0 ? "ALL" : String.join(",", tables)) +
                 " OPTIONS (partition_mode = 'MUTABLE_KEY_RANGE')"));
         await().atMost(Duration.ofSeconds(60)).until(() -> isStreamExist(changeStreamName));
+    }
+
+    /**
+     * Forces Spanner to split the key range of {@code tableName} at the given key value(s),
+     * triggering a mutable key range move (MoveOut/MoveIn) for change streams tracking the table.
+     * Requires a Spanner Omni backend that supports the {@code AddSplitPoints} admin API.
+     */
+    public void forceSplit(String tableName, String... keyParts) {
+        try (com.google.cloud.spanner.admin.database.v1.DatabaseAdminClient adminClient = spanner.createDatabaseAdminClient()) {
+            Instant expiry = Instant.now().plusSeconds(30 * 60);
+            Timestamp expireTime = Timestamp.newBuilder()
+                    .setSeconds(expiry.getEpochSecond())
+                    .setNanos(expiry.getNano())
+                    .build();
+
+            ListValue.Builder keyValues = ListValue.newBuilder();
+            for (String keyPart : keyParts) {
+                keyValues.addValues(Value.newBuilder().setStringValue(keyPart).build());
+            }
+
+            SplitPoints splitPoint = SplitPoints.newBuilder()
+                    .setTable(tableName)
+                    .setExpireTime(expireTime)
+                    .addKeys(SplitPoints.Key.newBuilder().setKeyParts(keyValues))
+                    .build();
+
+            adminClient.addSplitPoints(DatabaseName.of(projectId, instanceId, databaseId), List.of(splitPoint));
+            LOG.info("Forced split on table {} at key {}", tableName, List.of(keyParts));
+        }
+        catch (Exception e) {
+            throw new RuntimeException("Failed to force split for table " + tableName, e);
+        }
     }
 
     public void createChangeStreamNewValue(String changeStreamName, String... tables) throws ExecutionException,

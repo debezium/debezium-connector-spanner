@@ -23,6 +23,7 @@ import io.debezium.connector.spanner.task.operation.ChildPartitionOperation;
 import io.debezium.connector.spanner.task.operation.ClearSharedPartitionOperation;
 import io.debezium.connector.spanner.task.operation.ConnectorEndDetectionOperation;
 import io.debezium.connector.spanner.task.operation.FindPartitionForStreamingOperation;
+import io.debezium.connector.spanner.task.operation.MoveInStateUpdateOperation;
 import io.debezium.connector.spanner.task.operation.MoveOutStateUpdateOperation;
 import io.debezium.connector.spanner.task.operation.Operation;
 import io.debezium.connector.spanner.task.operation.PartitionStatusUpdateOperation;
@@ -30,6 +31,7 @@ import io.debezium.connector.spanner.task.operation.RemoveFinishedPartitionOpera
 import io.debezium.connector.spanner.task.operation.TakePartitionForStreamingOperation;
 import io.debezium.connector.spanner.task.operation.TakeSharedPartitionOperation;
 import io.debezium.connector.spanner.task.operation.WindowAdvancedOperation;
+import io.debezium.connector.spanner.task.state.MoveInNotificationEvent;
 import io.debezium.connector.spanner.task.state.MoveOutNotificationEvent;
 import io.debezium.connector.spanner.task.state.NewPartitionsEvent;
 import io.debezium.connector.spanner.task.state.PartitionStatusUpdateEvent;
@@ -96,6 +98,9 @@ public class TaskStateChangeEventHandler {
         else if (syncEvent instanceof MoveOutNotificationEvent) {
             processEvent((MoveOutNotificationEvent) syncEvent);
         }
+        else if (syncEvent instanceof MoveInNotificationEvent) {
+            processEvent((MoveInNotificationEvent) syncEvent);
+        }
         else if (syncEvent instanceof WindowAdvancedEvent) {
             processEvent((WindowAdvancedEvent) syncEvent);
         }
@@ -127,8 +132,19 @@ public class TaskStateChangeEventHandler {
     }
 
     private void processEvent(MoveOutNotificationEvent event) throws InterruptedException {
-        performOperation(new MoveOutStateUpdateOperation(
-                event.getToken(), event.getCommitTimestamp(), event.getDestinationTokens()));
+        performOperation(
+                new MoveOutStateUpdateOperation(
+                        event.getToken(), event.getCommitTimestamp(), event.getDestinationTokens()),
+                new FindPartitionForStreamingOperation(),
+                new TakePartitionForStreamingOperation(changeStream, partitionFactory));
+    }
+
+    private void processEvent(MoveInNotificationEvent event) throws InterruptedException {
+        performOperation(
+                new MoveInStateUpdateOperation(
+                        event.getToken(), event.getCommitTimestamp(), event.getRecordSequence(), event.getSourcePartitionTokens()),
+                new FindPartitionForStreamingOperation(),
+                new TakePartitionForStreamingOperation(changeStream, partitionFactory));
     }
 
     private void processEvent(WindowAdvancedEvent event) throws InterruptedException {

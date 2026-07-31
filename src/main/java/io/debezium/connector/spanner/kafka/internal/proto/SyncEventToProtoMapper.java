@@ -11,7 +11,6 @@ import java.util.List;
 
 import io.debezium.connector.spanner.kafka.event.proto.SyncEventProtos;
 import io.debezium.connector.spanner.kafka.internal.model.MoveInState;
-import io.debezium.connector.spanner.kafka.internal.model.MoveOutState;
 import io.debezium.connector.spanner.kafka.internal.model.PartitionState;
 import io.debezium.connector.spanner.kafka.internal.model.TaskSyncEvent;
 
@@ -80,13 +79,13 @@ public class SyncEventToProtoMapper {
             builder.setFinishedTimestamp(partitionState.getFinishedTimestamp().toString());
         }
 
-        MoveOutState moveOutState = partitionState.getMoveOutState();
-        if (moveOutState != null) {
-            SyncEventProtos.MoveOutState.Builder moveOutBuilder = SyncEventProtos.MoveOutState.newBuilder()
-                    .setCommitTimestamp(moveOutState.getTimestamp().toProto())
-                    .addAllDestPartitionTokens(moveOutState.getDestPartitionTokens());
-            builder.setMoveOutState(moveOutBuilder.build());
-        }
+        builder.addAllMoveOutStates(
+                partitionState.getMoveOutStates().stream()
+                        .map(moveOutState -> SyncEventProtos.MoveOutState.newBuilder()
+                                .setCommitTimestamp(moveOutState.getTimestamp().toProto())
+                                .addAllDestPartitionTokens(moveOutState.getDestPartitionTokens())
+                                .build())
+                        .collect(toList()));
 
         MoveInState moveInState = partitionState.getMoveInState();
         if (moveInState != null) {

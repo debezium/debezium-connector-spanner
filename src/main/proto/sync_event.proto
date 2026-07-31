@@ -59,7 +59,7 @@ message PartitionState {
   string originParent = 8;
 
   MoveInState moveInState = 9;
-  MoveOutState moveOutState = 10;
+  repeated MoveOutState moveOutStates = 10;
 
   string processedTimestamp = 11;
 
