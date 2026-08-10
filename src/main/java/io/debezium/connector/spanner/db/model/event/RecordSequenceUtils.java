@@ -32,10 +32,17 @@ public final class RecordSequenceUtils {
      * rather than a proper comparison. This packs {@code hi}'s lower 32 bits together with
      * {@code lo}'s lower 32 bits, which is lossy for a {@code hi} wider than 32 bits - use
      * {@link #compare} instead wherever correctness of ordering actually matters.
+     *
+     * <p>Falls back to {@link Long#parseLong} when {@code sequence} has no {@code "-"} (i.e. isn't
+     * the hyphenated hex {@code "<hi>-<lo>"} composite), e.g. a plain decimal sequence from a
+     * stream that isn't {@code MUTABLE_KEY_RANGE}.
      */
     public static Long parseToComparableLong(String sequence) {
         if (sequence == null) {
             return null;
+        }
+        if (!sequence.contains("-")) {
+            return Long.parseLong(sequence);
         }
         long[] hiLo = splitHiLo(sequence);
         return (hiLo[0] << 32) | (hiLo[1] & 0xFFFFFFFFL);

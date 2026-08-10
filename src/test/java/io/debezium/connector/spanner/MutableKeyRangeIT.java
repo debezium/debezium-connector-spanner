@@ -13,23 +13,43 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
-import org.junit.jupiter.api.*;
-import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assumptions;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import io.debezium.config.Configuration;
+import io.debezium.connector.spanner.util.Connection;
+import io.debezium.connector.spanner.util.Database;
 import io.debezium.util.Testing;
 
 /**
  * Integration tests for mutable key range change streams.
  *
- * <p>Requires a running Spanner Omni instance. Run with:
+ * <p>This test is {@link RealSpannerCompatible}: when {@code -Dspanner.test.real=true} is passed it
+ * runs against a real Cloud Spanner instance; otherwise it runs against the local emulator and is
+ * reported as <em>skipped</em> (not failed) because the emulator does not yet support
+ * {@code MUTABLE_KEY_RANGE} change streams.
+ *
+ * <p>Run the whole suite (old tests on the emulator, this test on real Spanner) with a single
+ * command:
+ * <pre>
+ *   mvn verify \
+ *     -Dspanner.test.real=true \
+ *     -Dgcp.spanner.project.id=YOUR_PROJECT \
+ *     -Dgcp.spanner.instance.id=YOUR_INSTANCE \
+ *     -Dgcp.spanner.credentials.path=/path/to/key.json
+ * </pre>
+ *
+ * <p>Run against Spanner Omni:
  * <pre>
  *   -Dspanner.type=OMNI
  *   -Dgcp.spanner.host=https://your-omni-host:15000
@@ -39,9 +59,33 @@ import io.debezium.util.Testing;
  * <p>WINDOW_MINUTES is set to 1 so the sliding-window processedTimestamp
  * test completes in ~2 minutes instead of the production 20-minute default.
  */
-@Disabled
-@EnabledIfSystemProperty(named = "spanner.type", matches = "(?i)OMNI")
+@RealSpannerCompatible
 public class MutableKeyRangeIT extends AbstractSpannerConnectorIT {
+
+    /**
+     * Override the inherited emulator connection/config with a real-Spanner pair when
+     * {@code -Dspanner.test.real=true} is supplied; otherwise keep the parent's emulator pair.
+     */
+    protected static final Connection databaseConnection = Connection.isRealSpanner()
+            ? RealSpannerTestSupport.getConnection(database)
+            : AbstractSpannerConnectorIT.databaseConnection;
+    protected static final Configuration baseConfig = Connection.isRealSpanner()
+            ? createBaseConfigBuilder(database, true).build()
+            : AbstractSpannerConnectorIT.baseConfig;
+
+    static {
+        // Real Cloud Spanner change-stream reads plus this connector's task-sync/leader-election
+        // bootstrap add latency the local emulator doesn't have, so the debezium-embedded defaults
+        // (30s wait for the first record, then up to 3 x 10s of additional polling) are sometimes
+        // too tight here. Raise the defaults for real-Spanner runs so the suite is stable without
+        // requiring extra -D flags on the command line; explicit -D overrides still win.
+        if (Connection.isRealSpanner()) {
+            System.setProperty("debezium.test.records.waittime",
+                    System.getProperty("debezium.test.records.waittime", "60"));
+            System.setProperty("debezium.test.records.waittime.after.nulls",
+                    System.getProperty("debezium.test.records.waittime.after.nulls", "5"));
+        }
+    }
 
     private static final String TABLE_CRUD = "mkr_crud_table";
     private static final String TABLE_RESTART = "mkr_restart_table";
@@ -59,17 +103,44 @@ public class MutableKeyRangeIT extends AbstractSpannerConnectorIT {
      */
     private static final int WINDOW_MINUTES = 1;
 
+    /**
+     * Heartbeats are what advance the committed offset once a window/period has no new data.
+     * The base config's 300s heartbeat is too slow for the short sliding window used here, so
+     * shorten it to make sure the offset can advance past a window boundary within the test.
+     */
+    private static final String HEARTBEAT_INTERVAL_MS = "5000";
+    private static final String OFFSET_FLUSH_INTERVAL_MS = "1000";
+
+    private static boolean setupSucceeded;
+
     @BeforeAll
-    static void setup() throws InterruptedException, ExecutionException {
-        databaseConnection.createTable(TABLE_CRUD + "(id INT64, name STRING(100)) PRIMARY KEY(id)");
-        databaseConnection.createTable(TABLE_RESTART + "(id INT64, name STRING(100)) PRIMARY KEY(id)");
-        databaseConnection.createTable(TABLE_WINDOW + "(id INT64, name STRING(100)) PRIMARY KEY(id)");
-        databaseConnection.createTable(TABLE_ORDER + "(id INT64, name STRING(100)) PRIMARY KEY(id)");
-        databaseConnection.createMutableKeyRangeChangeStream(STREAM_CRUD, TABLE_CRUD);
-        databaseConnection.createMutableKeyRangeChangeStream(STREAM_RESTART, TABLE_RESTART);
-        databaseConnection.createMutableKeyRangeChangeStream(STREAM_WINDOW, TABLE_WINDOW);
-        databaseConnection.createMutableKeyRangeChangeStream(STREAM_ORDER, TABLE_ORDER);
-        Testing.print("MutableKeyRangeIT is ready.");
+    static void setup() {
+        try {
+            databaseConnection.createTable(TABLE_CRUD + "(id INT64, name STRING(100)) PRIMARY KEY(id)");
+            databaseConnection.createTable(TABLE_RESTART + "(id INT64, name STRING(100)) PRIMARY KEY(id)");
+            databaseConnection.createTable(TABLE_WINDOW + "(id INT64, name STRING(100)) PRIMARY KEY(id)");
+            databaseConnection.createTable(TABLE_ORDER + "(id INT64, name STRING(100)) PRIMARY KEY(id)");
+            databaseConnection.createMutableKeyRangeChangeStream(STREAM_CRUD, TABLE_CRUD);
+            databaseConnection.createMutableKeyRangeChangeStream(STREAM_RESTART, TABLE_RESTART);
+            databaseConnection.createMutableKeyRangeChangeStream(STREAM_WINDOW, TABLE_WINDOW);
+            databaseConnection.createMutableKeyRangeChangeStream(STREAM_ORDER, TABLE_ORDER);
+            setupSucceeded = true;
+            Testing.print("MutableKeyRangeIT is ready.");
+        }
+        catch (Exception e) {
+            // The local emulator does not support MUTABLE_KEY_RANGE change streams. Swallow the setup
+            // failure here so a plain `mvn verify` stays green; @BeforeEach will then skip each method
+            // individually so they are reported as skipped (not silently ignored). Real Spanner and
+            // Omni backends are expected to support the DDL and should surface genuine failures.
+            if (!Connection.isRealSpanner() && !Database.isSpannerOmniEndpoint()) {
+                Testing.print("Skipping MutableKeyRangeIT: MUTABLE_KEY_RANGE change streams are not supported "
+                        + "by the local Spanner emulator (" + e.getMessage() + "). Run with -Dspanner.test.real=true or "
+                        + "-Dspanner.type=OMNI against a backend that supports it.");
+                setupSucceeded = false;
+                return;
+            }
+            throw new RuntimeException(e);
+        }
     }
 
     @AfterAll
@@ -86,6 +157,7 @@ public class MutableKeyRangeIT extends AbstractSpannerConnectorIT {
 
     @BeforeEach
     void initFramework() {
+        Assumptions.assumeTrue(setupSucceeded, "MutableKeyRangeIT setup did not complete; skipping tests");
         clearKafkaTopics();
         deleteOffsetFiles();
         initializeConnectorTestFramework();
@@ -115,11 +187,34 @@ public class MutableKeyRangeIT extends AbstractSpannerConnectorIT {
                 .with("gcp.spanner.mutable.window.minutes", WINDOW_MINUTES)
                 .with("offset.storage", "org.apache.kafka.connect.storage.FileOffsetBackingStore")
                 .with("offset.storage.file.filename", offsetFile(connectorName))
+                .with("heartbeat.interval.ms", HEARTBEAT_INTERVAL_MS)
+                .with("offset.flush.interval.ms", OFFSET_FLUSH_INTERVAL_MS)
                 .build();
     }
 
     private String op(List<SourceRecord> records, int index) {
         return (String) ((Struct) records.get(index).value()).get("op");
+    }
+
+    /**
+     * Polls for at least {@code minExpectedCount} records on {@code table}'s topic, accumulating
+     * across repeated short polls until the deadline elapses. A single {@code waitForAvailableRecords}
+     * + {@code consumeRecordsByTopic} call can race ahead of a real Cloud Spanner partition's
+     * discovery/streaming latency (which varies run to run), so retrying within the overall budget
+     * is more robust than a single one-shot wait.
+     */
+    private List<SourceRecord> consumeRecordsForTopic(Configuration config, String table, int minExpectedCount) throws InterruptedException {
+        List<SourceRecord> records = new ArrayList<>();
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(waitTimeForRecords());
+        do {
+            waitForAvailableRecords(5, TimeUnit.SECONDS);
+            List<SourceRecord> polled = consumeRecordsByTopic(minExpectedCount - records.size(), false)
+                    .recordsForTopic(getTopicName(config, table));
+            if (polled != null) {
+                records.addAll(polled);
+            }
+        } while (records.size() < minExpectedCount && System.nanoTime() < deadline);
+        return records;
     }
 
     /**
@@ -157,9 +252,7 @@ public class MutableKeyRangeIT extends AbstractSpannerConnectorIT {
         assertConnectorIsRunning();
 
         databaseConnection.executeUpdate("INSERT INTO " + TABLE_RESTART + " (id, name) VALUES (10, 'pre-restart')");
-        waitForAvailableRecords(waitTimeForRecords(), TimeUnit.SECONDS);
-        List<SourceRecord> before = consumeRecordsByTopic(5, false)
-                .recordsForTopic(getTopicName(config, TABLE_RESTART));
+        List<SourceRecord> before = consumeRecordsForTopic(config, TABLE_RESTART, 1);
         assertThat(before).as("Should have exactly 1 record before restart").hasSize(1);
         assertThat(op(before, 0)).isEqualTo("c");
 
@@ -170,9 +263,10 @@ public class MutableKeyRangeIT extends AbstractSpannerConnectorIT {
 
         start(SpannerConnector.class, config);
         assertConnectorIsRunning();
-        waitForAvailableRecords(waitTimeForRecords(), TimeUnit.SECONDS);
-        List<SourceRecord> after = consumeRecordsByTopic(5, false)
-                .recordsForTopic(getTopicName(config, TABLE_RESTART));
+        // At-least-once semantics mean the replayed id=10 record can legitimately arrive before
+        // id=11, so ask for up to 2 records: if id=10 is replayed we need both to see id=11; if it
+        // isn't, we'll only get 1 and simply wait out the remaining budget before returning it.
+        List<SourceRecord> after = consumeRecordsForTopic(config, TABLE_RESTART, 2);
 
         assertThat(after).as("Should have at least 1 record after restart").hasSizeGreaterThanOrEqualTo(1);
         for (SourceRecord r : after) {
@@ -210,7 +304,7 @@ public class MutableKeyRangeIT extends AbstractSpannerConnectorIT {
         start(SpannerConnector.class, config);
         assertConnectorIsRunning();
 
-        waitForAvailableRecords(5, TimeUnit.SECONDS);
+        waitForAvailableRecords(waitTimeForRecords(), TimeUnit.SECONDS);
         List<SourceRecord> replayed = consumeRecordsByTopic(5, false)
                 .recordsForTopic(getTopicName(config, TABLE_WINDOW));
 
@@ -227,7 +321,10 @@ public class MutableKeyRangeIT extends AbstractSpannerConnectorIT {
      * delivered in the exact order they were written: no gaps, no duplicates, no reordering across
      * the split boundary.
      *
-     * <p>Requires a Spanner Omni backend supporting the {@code AddSplitPoints} admin API.
+     * <p>Uses the {@code AddSplitPoints} admin API (see
+     * https://cloud.google.com/spanner/docs/create-manage-split-points), which requires the
+     * {@code spanner.databases.addSplitPoints} permission (granted by the
+     * {@code roles/spanner.databaseAdmin} IAM role).
      */
     @Test
     void shouldPreserveOrderAcrossForcedKeyRangeSplit() throws InterruptedException {

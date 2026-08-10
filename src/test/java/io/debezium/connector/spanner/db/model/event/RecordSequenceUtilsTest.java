@@ -66,4 +66,17 @@ class RecordSequenceUtilsTest {
     void returnsNullForNullInput() {
         assertEquals(null, RecordSequenceUtils.parseToComparableLong(null));
     }
+
+    /**
+     * Regression test: {@code record_sequence} values from streams that aren't
+     * {@code MUTABLE_KEY_RANGE} (e.g. from the Spanner emulator) can be plain decimal, with no
+     * {@code "-"} hi/lo separator. {@code parseToComparableLong} must fall back to
+     * {@link Long#parseLong} for these instead of throwing {@code ArrayIndexOutOfBoundsException}
+     * from the hyphenated hi/lo split.
+     */
+    @Test
+    void fallsBackToPlainDecimalParsingWhenSequenceHasNoHyphen() {
+        String sequence = "42";
+        assertEquals(42L, RecordSequenceUtils.parseToComparableLong(sequence));
+    }
 }
