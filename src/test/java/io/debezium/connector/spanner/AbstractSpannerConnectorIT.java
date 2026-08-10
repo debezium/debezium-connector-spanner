@@ -16,6 +16,17 @@ import io.debezium.connector.spanner.util.KafkaEnvironment;
 import io.debezium.embedded.async.AbstractAsyncEngineConnectorTest;
 import io.debezium.util.Testing;
 
+/**
+ * Base class for Spanner connector integration tests.
+ *
+ * <p>Subclasses are emulator-only by default: {@link #databaseConnection}, {@link #baseConfig} and
+ * {@link #basePgConfig} always point at the local Spanner emulator Docker container started by the
+ * build. Tests that are annotated with {@link RealSpannerCompatible} can opt into a real Cloud Spanner
+ * backend by overriding those fields (see {@link MutableKeyRangeIT} for an example) and using
+ * {@link RealSpannerTestSupport}. That way a single {@code mvn verify -Dspanner.test.real=true ...}
+ * command can run the full suite, with the old tests on the emulator and the annotated tests on real
+ * Spanner.
+ */
 public class AbstractSpannerConnectorIT extends AbstractAsyncEngineConnectorTest {
 
     private static final KafkaEnvironment KAFKA_ENVIRONMENT = new KafkaEnvironment(
@@ -34,13 +45,23 @@ public class AbstractSpannerConnectorIT extends AbstractAsyncEngineConnectorTest
         }
     }
 
-    protected static final Configuration baseConfig;
-    static {
+    protected static final Configuration baseConfig = createBaseConfigBuilder(database, false).build();
+    protected static final Configuration basePgConfig = Configuration.copy(baseConfig)
+            .with("gcp.spanner.instance.id", pgDatabase.getInstanceId())
+            .with("gcp.spanner.project.id", pgDatabase.getProjectId())
+            .with("gcp.spanner.database.id", pgDatabase.getDatabaseId())
+            .build();
+
+    /**
+     * Builds a connector {@link Configuration} for the given {@link Database}. {@code realSpanner}
+     * controls whether the config points at a real Cloud Spanner instance (using the credentials and
+     * endpoint passed via {@code -D} system properties) or at the local emulator.
+     */
+    protected static Configuration.Builder createBaseConfigBuilder(Database database, boolean realSpanner) {
         Configuration.Builder builder = Configuration.create()
                 .with("gcp.spanner.instance.id", database.getInstanceId())
                 .with("gcp.spanner.project.id", database.getProjectId())
                 .with("gcp.spanner.database.id", database.getDatabaseId())
-                .with("gcp.spanner.emulator.host", "http://localhost:9010")
                 .with("offset.storage", "org.apache.kafka.connect.storage.MemoryOffsetBackingStore")
                 .with("connector.spanner.sync.kafka.bootstrap.servers", KAFKA_ENVIRONMENT.kafkaBrokerApiOn().getAddress())
                 .with("internal.schema.history.kafka.bootstrap.servers", KAFKA_ENVIRONMENT.kafkaBrokerApiOn().getAddress())
@@ -48,10 +69,24 @@ public class AbstractSpannerConnectorIT extends AbstractAsyncEngineConnectorTest
                 .with("heartbeat.interval.ms", "300000")
                 .with("gcp.spanner.low-watermark.enabled", false)
                 .with("tasks.max", 3); // see DBZ-8428
+        if (realSpanner) {
+            if (System.getProperty("gcp.spanner.host") != null) {
+                builder.with("gcp.spanner.host", System.getProperty("gcp.spanner.host"));
+            }
+            if (System.getProperty("gcp.spanner.credentials.path") != null) {
+                builder.with("gcp.spanner.credentials.path", System.getProperty("gcp.spanner.credentials.path"));
+            }
+            if (System.getProperty("gcp.spanner.credentials.json") != null) {
+                builder.with("gcp.spanner.credentials.json", System.getProperty("gcp.spanner.credentials.json"));
+            }
+        }
+        else {
+            builder.with("gcp.spanner.emulator.host", "http://localhost:9010");
+        }
         if (System.getProperty(BaseSpannerConnectorConfig.SPANNER_TYPE_PROPERTY_NAME) != null) {
             builder.with(BaseSpannerConnectorConfig.SPANNER_TYPE_PROPERTY_NAME, System.getProperty(BaseSpannerConnectorConfig.SPANNER_TYPE_PROPERTY_NAME));
         }
-        if (System.getProperty("gcp.spanner.host") != null) {
+        if (!realSpanner && System.getProperty("gcp.spanner.host") != null) {
             builder.with("gcp.spanner.host", System.getProperty("gcp.spanner.host"));
         }
         if (System.getProperty("spanner.omni.use.plaintext") != null) {
@@ -61,14 +96,8 @@ public class AbstractSpannerConnectorIT extends AbstractAsyncEngineConnectorTest
             builder.with("spanner.omni.client.key.path", System.getProperty("spanner.omni.client.key.path"));
             builder.with("spanner.omni.client.cert.path", System.getProperty("spanner.omni.client.cert.path"));
         }
-        baseConfig = builder.build();
+        return builder;
     }
-
-    protected static final Configuration basePgConfig = Configuration.copy(baseConfig)
-            .with("gcp.spanner.instance.id", pgDatabase.getInstanceId())
-            .with("gcp.spanner.project.id", pgDatabase.getProjectId())
-            .with("gcp.spanner.database.id", pgDatabase.getDatabaseId())
-            .build();
 
     @BeforeAll
     public static void before() throws InterruptedException {

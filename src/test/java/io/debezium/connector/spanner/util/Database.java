@@ -14,8 +14,10 @@ import io.debezium.connector.spanner.db.DatabaseClientFactory;
 
 public class Database {
 
-    private static final String projectId = "test-project";
-    private static final String instanceId = "test-instance";
+    private static final String DEFAULT_PROJECT_ID = "test-project";
+    private static final String DEFAULT_INSTANCE_ID = "test-instance";
+    private static final String PROJECT_ID_PROPERTY = "gcp.spanner.project.id";
+    private static final String INSTANCE_ID_PROPERTY = "gcp.spanner.instance.id";
 
     private final String databaseId;
 
@@ -46,11 +48,17 @@ public class Database {
             .build();
 
     public String getProjectId() {
-        return isSpannerOmniEndpoint() ? DatabaseClientFactory.SPANNER_OMNI_DEFAULT_ID : projectId;
+        if (isSpannerOmniEndpoint()) {
+            return DatabaseClientFactory.SPANNER_OMNI_DEFAULT_ID;
+        }
+        return System.getProperty(PROJECT_ID_PROPERTY, DEFAULT_PROJECT_ID);
     }
 
     public String getInstanceId() {
-        return isSpannerOmniEndpoint() ? DatabaseClientFactory.SPANNER_OMNI_DEFAULT_ID : instanceId;
+        if (isSpannerOmniEndpoint()) {
+            return DatabaseClientFactory.SPANNER_OMNI_DEFAULT_ID;
+        }
+        return System.getProperty(INSTANCE_ID_PROPERTY, DEFAULT_INSTANCE_ID);
     }
 
     public String getDatabaseId() {
@@ -73,6 +81,22 @@ public class Database {
             Thread.currentThread().interrupt();
         }
         return this.connection;
+    }
+
+    /**
+     * Creates a new {@link Connection} explicitly targeting a real Cloud Spanner instance,
+     * regardless of the global {@code -Dspanner.test.real} system property. Useful for tests
+     * annotated with {@code @RealSpannerCompatible} that need a real backend while the rest of the
+     * suite continues to run against the emulator in the same JVM.
+     */
+    public Connection getRealConnection() {
+        try {
+            return new Connection(this, true).connect(dialect);
+        }
+        catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException("Interrupted while creating real Spanner connection", ex);
+        }
     }
 
     public static Builder builder() {

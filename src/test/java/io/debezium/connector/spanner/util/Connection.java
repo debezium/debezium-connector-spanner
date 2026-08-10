@@ -8,6 +8,9 @@ package io.debezium.connector.spanner.util;
 import static io.debezium.connector.spanner.util.Database.isSpannerOmniEndpoint;
 import static org.awaitility.Awaitility.await;
 
+import java.io.ByteArrayInputStream;
+import java.io.FileInputStream;
+import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Collections;
@@ -20,6 +23,8 @@ import org.slf4j.LoggerFactory;
 
 import com.google.api.client.util.Strings;
 import com.google.api.gax.longrunning.OperationFuture;
+import com.google.api.gax.rpc.ResourceExhaustedException;
+import com.google.auth.oauth2.GoogleCredentials;
 import com.google.cloud.NoCredentials;
 import com.google.cloud.spanner.DatabaseAdminClient;
 import com.google.cloud.spanner.DatabaseClient;
@@ -55,16 +60,31 @@ public class Connection {
     private final String databaseId;
     public static final String emulatorHost = "http://localhost:9010";
 
+    private static final String REAL_SPANNER_PROPERTY = "spanner.test.real";
+    private static final String CREDENTIALS_PATH_PROPERTY = "gcp.spanner.credentials.path";
+    private static final String CREDENTIALS_JSON_PROPERTY = "gcp.spanner.credentials.json";
+    private static final String HOST_PROPERTY = "gcp.spanner.host";
+
+    private static long ddlWaitTimeSeconds() {
+        return Long.parseLong(System.getProperty("debezium.test.spanner.ddl.waittime", "60"));
+    }
+
     public DatabaseClient databaseClient;
     private Spanner spanner;
     private SchemaDao schemaDao;
     private final Dialect dialect;
+    private final boolean realSpanner;
 
     protected Connection(Database database) {
+        this(database, false);
+    }
+
+    protected Connection(Database database, boolean realSpanner) {
         this.projectId = database.getProjectId();
         this.instanceId = database.getInstanceId();
         this.databaseId = database.getDatabaseId();
         this.dialect = database.getDialect();
+        this.realSpanner = realSpanner;
     }
 
     public ResultSet executeSelect(String query) {
@@ -128,7 +148,7 @@ public class Connection {
             InterruptedException {
         this.updateDDL(List.of("create change stream " + changeStreamName + " for " +
                 (tables.length == 0 ? "ALL" : String.join(",", tables))));
-        await().atMost(Duration.ofSeconds(60)).until(() -> isStreamExist(changeStreamName));
+        await().atMost(Duration.ofSeconds(ddlWaitTimeSeconds())).until(() -> isStreamExist(changeStreamName));
     }
 
     public void createMutableKeyRangeChangeStream(String changeStreamName, String... tables) throws ExecutionException,
@@ -136,38 +156,62 @@ public class Connection {
         this.updateDDL(List.of("create change stream " + changeStreamName + " for " +
                 (tables.length == 0 ? "ALL" : String.join(",", tables)) +
                 " OPTIONS (partition_mode = 'MUTABLE_KEY_RANGE')"));
-        await().atMost(Duration.ofSeconds(60)).until(() -> isStreamExist(changeStreamName));
+        await().atMost(Duration.ofSeconds(ddlWaitTimeSeconds())).until(() -> isStreamExist(changeStreamName));
     }
 
     /**
      * Forces Spanner to split the key range of {@code tableName} at the given key value(s),
      * triggering a mutable key range move (MoveOut/MoveIn) for change streams tracking the table.
-     * Requires a Spanner Omni backend that supports the {@code AddSplitPoints} admin API.
+     * Uses the {@code AddSplitPoints} admin API, which requires the
+     * {@code spanner.databases.addSplitPoints} permission (granted by the
+     * {@code roles/spanner.databaseAdmin} IAM role).
+     *
+     * <p>Cloud Spanner enforces a strict per-minute quota on the number of split points that can
+     * be processed (as low as 1/minute on small test instances), so calls are retried with a
+     * cooldown when the request is throttled with {@code RESOURCE_EXHAUSTED}.
      */
     public void forceSplit(String tableName, String... keyParts) {
-        try (com.google.cloud.spanner.admin.database.v1.DatabaseAdminClient adminClient = spanner.createDatabaseAdminClient()) {
-            Instant expiry = Instant.now().plusSeconds(30 * 60);
-            Timestamp expireTime = Timestamp.newBuilder()
-                    .setSeconds(expiry.getEpochSecond())
-                    .setNanos(expiry.getNano())
-                    .build();
+        int maxAttempts = 4;
+        for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+            try (com.google.cloud.spanner.admin.database.v1.DatabaseAdminClient adminClient = spanner.createDatabaseAdminClient()) {
+                Instant expiry = Instant.now().plusSeconds(30 * 60);
+                Timestamp expireTime = Timestamp.newBuilder()
+                        .setSeconds(expiry.getEpochSecond())
+                        .setNanos(expiry.getNano())
+                        .build();
 
-            ListValue.Builder keyValues = ListValue.newBuilder();
-            for (String keyPart : keyParts) {
-                keyValues.addValues(Value.newBuilder().setStringValue(keyPart).build());
+                ListValue.Builder keyValues = ListValue.newBuilder();
+                for (String keyPart : keyParts) {
+                    keyValues.addValues(Value.newBuilder().setStringValue(keyPart).build());
+                }
+
+                SplitPoints splitPoint = SplitPoints.newBuilder()
+                        .setTable(tableName)
+                        .setExpireTime(expireTime)
+                        .addKeys(SplitPoints.Key.newBuilder().setKeyParts(keyValues))
+                        .build();
+
+                adminClient.addSplitPoints(DatabaseName.of(projectId, instanceId, databaseId), List.of(splitPoint));
+                LOG.info("Forced split on table {} at key {}", tableName, List.of(keyParts));
+                return;
             }
-
-            SplitPoints splitPoint = SplitPoints.newBuilder()
-                    .setTable(tableName)
-                    .setExpireTime(expireTime)
-                    .addKeys(SplitPoints.Key.newBuilder().setKeyParts(keyValues))
-                    .build();
-
-            adminClient.addSplitPoints(DatabaseName.of(projectId, instanceId, databaseId), List.of(splitPoint));
-            LOG.info("Forced split on table {} at key {}", tableName, List.of(keyParts));
-        }
-        catch (Exception e) {
-            throw new RuntimeException("Failed to force split for table " + tableName, e);
+            catch (ResourceExhaustedException e) {
+                if (attempt == maxAttempts) {
+                    throw new RuntimeException("Failed to force split for table " + tableName
+                            + " after " + maxAttempts + " attempts (split point quota exhausted)", e);
+                }
+                LOG.warn("Split point quota exhausted for table {}, retrying in 65s (attempt {}/{})", tableName, attempt, maxAttempts);
+                try {
+                    Thread.sleep(65_000);
+                }
+                catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                    throw new RuntimeException("Interrupted while waiting to retry split for table " + tableName, interrupted);
+                }
+            }
+            catch (Exception e) {
+                throw new RuntimeException("Failed to force split for table " + tableName, e);
+            }
         }
     }
 
@@ -178,7 +222,7 @@ public class Connection {
                 " OPTIONS (\n" +
                 "            value_capture_type = 'NEW_VALUES'\n" +
                 "        ) "));
-        await().atMost(Duration.ofSeconds(60)).until(() -> isStreamExist(changeStreamName));
+        await().atMost(Duration.ofSeconds(ddlWaitTimeSeconds())).until(() -> isStreamExist(changeStreamName));
     }
 
     public void createChangeStreamNewRow(String changeStreamName, String... tables) throws ExecutionException,
@@ -188,7 +232,7 @@ public class Connection {
                 " OPTIONS (\n" +
                 "            value_capture_type = 'NEW_ROW'\n" +
                 "        ) "));
-        await().atMost(Duration.ofSeconds(60)).until(() -> isStreamExist(changeStreamName));
+        await().atMost(Duration.ofSeconds(ddlWaitTimeSeconds())).until(() -> isStreamExist(changeStreamName));
     }
 
     private String createInstance() {
@@ -196,14 +240,14 @@ public class Connection {
             return DatabaseClientFactory.SPANNER_OMNI_DEFAULT_ID;
         }
         for (Instance value : this.spanner.getInstanceAdminClient().listInstances().iterateAll()) {
-            if (value.getId().getInstance().equals("test-instance")) {
-                return "test-instance";
+            if (value.getId().getInstance().equals(instanceId)) {
+                return instanceId;
             }
         }
         String configId = "regional-us-central1";
         String displayName = "For IT";
         int nodeCount = 1;
-        InstanceInfo instanceInfo = InstanceInfo.newBuilder(InstanceId.of(projectId, "test-instance"))
+        InstanceInfo instanceInfo = InstanceInfo.newBuilder(InstanceId.of(projectId, instanceId))
                 .setInstanceConfigId(InstanceConfigId.of(projectId, configId))
                 .setNodeCount(nodeCount)
                 .setDisplayName(displayName)
@@ -217,7 +261,7 @@ public class Connection {
         catch (InterruptedException | ExecutionException e) {
             throw new RuntimeException(e);
         }
-        return "test-instance";
+        return instanceId;
     }
 
     private boolean isStreamExist(String streamName) {
@@ -322,7 +366,7 @@ public class Connection {
     }
 
     public void createDatabase(String databaseId, Dialect dialect) throws InterruptedException {
-        if (!isSpannerOmniEndpoint()) {
+        if (!isSpannerOmniEndpoint() && !realSpanner) {
             createInstance();
         }
         DatabaseAdminClient dbAdminClient = this.spanner.getDatabaseAdminClient();
@@ -361,13 +405,33 @@ public class Connection {
         return this;
     }
 
+    public static boolean isRealSpanner() {
+        return Boolean.parseBoolean(System.getProperty(REAL_SPANNER_PROPERTY, "false"));
+    }
+
+    private GoogleCredentials getCredentials() {
+        String credentialsPath = System.getProperty(CREDENTIALS_PATH_PROPERTY);
+        String credentialsJson = System.getProperty(CREDENTIALS_JSON_PROPERTY);
+        try {
+            if (!Strings.isNullOrEmpty(credentialsPath)) {
+                return GoogleCredentials.fromStream(new FileInputStream(credentialsPath));
+            }
+            if (!Strings.isNullOrEmpty(credentialsJson)) {
+                return GoogleCredentials.fromStream(new ByteArrayInputStream(credentialsJson.getBytes()));
+            }
+            return GoogleCredentials.getApplicationDefault();
+        }
+        catch (IOException e) {
+            throw new RuntimeException("Failed to load Google credentials for real Spanner tests", e);
+        }
+    }
+
     private void init() {
         SpannerOptions.Builder builder = SpannerOptions.newBuilder();
 
-        builder.setCredentials(NoCredentials.getInstance());
         builder.setProjectId(projectId);
         if (isSpannerOmniEndpoint()) {
-            builder.setExperimentalHost(System.getProperty("gcp.spanner.host"));
+            builder.setExperimentalHost(System.getProperty(HOST_PROPERTY));
             if (Boolean.parseBoolean(System.getProperty("spanner.omni.use.plaintext", "false"))) {
                 builder.setChannelConfigurator(ManagedChannelBuilder::usePlaintext);
             }
@@ -378,7 +442,15 @@ public class Connection {
             builder.setBuiltInMetricsEnabled(false)
                     .setCredentials(NoCredentials.getInstance());
         }
+        else if (realSpanner) {
+            builder.setCredentials(getCredentials());
+            String host = System.getProperty(HOST_PROPERTY);
+            if (!Strings.isNullOrEmpty(host)) {
+                builder.setHost(host);
+            }
+        }
         else {
+            builder.setCredentials(NoCredentials.getInstance());
             builder.setEmulatorHost(emulatorHost);
         }
 
