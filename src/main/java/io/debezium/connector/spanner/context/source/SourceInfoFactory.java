@@ -30,7 +30,7 @@ public class SourceInfoFactory {
         Instant recordTimestamp = dataChangeEvent.getRecordTimestamp().toSqlTimestamp().toInstant();
         Instant readAtTimestamp = dataChangeEvent.getMetadata().getRecordReadAt().toSqlTimestamp().toInstant();
         String serverTransactionId = dataChangeEvent.getServerTransactionId();
-        Long recordSequence = RecordSequenceUtils.parseToComparableLong(dataChangeEvent.getRecordSequence());
+        Long recordSequence = RecordSequenceUtils.parseSequenceNumber(dataChangeEvent.getRecordSequence());
         Long numberRecordInTransaction = dataChangeEvent.getNumberOfRecordsInTransaction();
         String transactionTag = dataChangeEvent.getTransactionTag();
         boolean systemTransaction = dataChangeEvent.isSystemTransaction();
