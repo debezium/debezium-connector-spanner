@@ -70,6 +70,10 @@ public class SpannerChangeStreamService {
         this.mutablePartitionOrderingEnabled = mutablePartitionOrderingEnabled;
     }
 
+    public boolean isMutableKeyRange() {
+        return changeStreamDao.isMutableKeyRange();
+    }
+
     public void getEvents(Partition partition, ChangeStreamEventConsumer changeStreamEventConsumer,
                           PartitionEventListener partitionEventListener)
             throws InterruptedException, Exception {
@@ -247,7 +251,9 @@ public class SpannerChangeStreamService {
                 isPartitionEnded = true;
             }
 
-            lastBoundaryRecordSequence = newBoundaryRecordSequence;
+            if (newBoundaryRecordSequence != null) {
+                lastBoundaryRecordSequence = newBoundaryRecordSequence;
+            }
             processedTimestamp = endTimestamp;
             partitionEventListener.onWindowAdvanced(partition, processedTimestamp, lastBoundaryRecordSequence);
         }
@@ -274,7 +280,7 @@ public class SpannerChangeStreamService {
         }
         List<ChangeStreamEvent> filtered = new ArrayList<>();
         for (ChangeStreamEvent event : events) {
-            if (windowStart.equals(event.getRecordTimestamp())
+            if (isBeforeOrEqual(event.getRecordTimestamp(), windowStart)
                     && event.getRecordSequence() != null
                     && RecordSequenceUtils.compare(event.getRecordSequence(), lastBoundaryRecordSequence) <= 0) {
                 LOGGER.debug("Task: {}, Skipping boundary duplicate event at {} seq {}",
