@@ -267,8 +267,12 @@ class SpannerStreamingChangeEventSourceTest {
     void testCommitOffset() {
         SynchronizedPartitionManager partitionManager = spy(new SynchronizedPartitionManager((BlockingConsumer<TaskStateChangeEvent>) mock(BlockingConsumer.class)));
 
+        Configuration configuration = mock(Configuration.class);
+        when(configuration.getString((Field) any())).thenReturn("String");
+        when(configuration.asProperties()).thenReturn(new Properties());
+
         SpannerStreamingChangeEventSource spannerStreamingChangeEventSource = new SpannerStreamingChangeEventSource(
-                null, null, null, null, null, partitionManager, new SchemaRegistry(
+                new SpannerConnectorConfig(configuration), null, null, null, null, partitionManager, new SchemaRegistry(
                         "Stream Name", new SchemaDao(mock(DatabaseClient.class)), mock(Runnable.class)),
                 null, true, mock(SpannerOffsetContextFactory.class));
 
@@ -281,8 +285,12 @@ class SpannerStreamingChangeEventSourceTest {
     void testCommitRecords() throws InterruptedException {
         SynchronizedPartitionManager partitionManager = new SynchronizedPartitionManager((BlockingConsumer<TaskStateChangeEvent>) mock(BlockingConsumer.class));
 
+        Configuration configuration = mock(Configuration.class);
+        when(configuration.getString((Field) any())).thenReturn("String");
+        when(configuration.asProperties()).thenReturn(new Properties());
+
         SpannerStreamingChangeEventSource spannerStreamingChangeEventSource = new SpannerStreamingChangeEventSource(
-                null, null, null, null, null, partitionManager, new SchemaRegistry(
+                new SpannerConnectorConfig(configuration), null, null, null, null, partitionManager, new SchemaRegistry(
                         "Stream Name", new SchemaDao(mock(DatabaseClient.class)), mock(Runnable.class)),
                 null, true, mock(SpannerOffsetContextFactory.class));
 

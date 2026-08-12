@@ -53,6 +53,7 @@ import io.debezium.connector.spanner.task.TaskUid;
 import io.debezium.heartbeat.DebeziumHeartbeatFactory;
 import io.debezium.pipeline.DataChangeEvent;
 import io.debezium.pipeline.ErrorHandler;
+import io.debezium.pipeline.monitor.OffsetActivityMonitorServiceProvider;
 import io.debezium.pipeline.notification.NotificationService;
 import io.debezium.pipeline.source.spi.EventMetadataProvider;
 import io.debezium.processors.PostProcessorRegistryServiceProvider;
@@ -339,5 +340,6 @@ public class SpannerConnectorTask extends SpannerBaseSourceTask {
         serviceRegistry.registerServiceProvider(new PostProcessorRegistryServiceProvider());
         serviceRegistry.registerServiceProvider(new DebeziumHeaderProducerProvider());
         serviceRegistry.registerServiceProvider(new QueueProviderServiceProvider());
+        serviceRegistry.registerServiceProvider(new OffsetActivityMonitorServiceProvider());
     }
 }

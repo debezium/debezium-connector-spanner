@@ -9,6 +9,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
@@ -37,6 +38,8 @@ import io.debezium.connector.spanner.metrics.event.ChildPartitionsMetricEvent;
 import io.debezium.connector.spanner.processor.SpannerChangeRecordEmitter;
 import io.debezium.connector.spanner.processor.SpannerEventDispatcher;
 import io.debezium.pipeline.ErrorHandler;
+import io.debezium.pipeline.monitor.OffsetActivityMonitor;
+import io.debezium.pipeline.monitor.OffsetActivityMonitorService;
 import io.debezium.util.Clock;
 
 /**
@@ -76,6 +79,10 @@ public class SpannerStreamingChangeEventSource implements CommittingRecordsStrea
 
     private final SpannerConnectorConfig connectorConfig;
 
+    private final OffsetActivityMonitorService offsetActivityMonitorService;
+
+    private OffsetActivityMonitor<SpannerPartition, SpannerOffsetContext> offsetActivityMonitor;
+
     private volatile Thread thread;
 
     public SpannerStreamingChangeEventSource(SpannerConnectorConfig connectorConfig,
@@ -105,6 +112,7 @@ public class SpannerStreamingChangeEventSource implements CommittingRecordsStrea
         this.finishPartitionStrategy = finishingAfterCommit
                 ? FinishPartitionStrategy.AFTER_COMMIT
                 : FinishPartitionStrategy.AFTER_STREAMING_FINISH;
+        this.offsetActivityMonitorService = OffsetActivityMonitorService.lookup(connectorConfig.getServiceRegistry());
     }
 
     @Override
@@ -270,6 +278,9 @@ public class SpannerStreamingChangeEventSource implements CommittingRecordsStrea
             boolean dispatched = spannerEventDispatcher.dispatchDataChangeEvent(partition, tableId,
                     new SpannerChangeRecordEmitter(recordUid, event.getModType(), mod, partition, offsetContext,
                             Clock.SYSTEM, connectorConfig));
+
+            pulseOffsetActivityMonitor(partition, offsetContext);
+
             if (dispatched) {
                 LOGGER.debug("DataChangeEvent has been dispatched form table {} with modification: {}, offset{}, event: {}", tableId.getTableName(), mod,
                         offsetContext.getOffset(), event);
@@ -287,6 +298,8 @@ public class SpannerStreamingChangeEventSource implements CommittingRecordsStrea
         SpannerPartition partition = new SpannerPartition(event.getMetadata().getPartitionToken());
 
         spannerEventDispatcher.alwaysDispatchHeartbeatEvent(partition, offsetContext);
+
+        pulseOffsetActivityMonitor(partition, offsetContext);
 
         LOGGER.debug("Dispatching heartbeat for event {} with partition {} and offset {}", event, partition, offsetContext.getOffset());
     }
@@ -319,8 +332,26 @@ public class SpannerStreamingChangeEventSource implements CommittingRecordsStrea
         this.partitionManager.newChildPartitions(childPartitionsToSend);
     }
 
+    /**
+     * Signals the offset activity monitor service that an event's offsets have been processed.
+     * <p>
+     * Invoked on the event-processing thread; the monitor is registered on the coordinator
+     * thread before streaming is started, so it is safely published by the thread start.
+     */
+    private void pulseOffsetActivityMonitor(SpannerPartition partition, SpannerOffsetContext offsetContext) {
+        offsetActivityMonitorService.pulse(partition, offsetContext);
+    }
+
     private void processFailure(Exception ex) {
         errorHandler.setProducerThrowable(ex);
+    }
+
+    @Override
+    public Optional<OffsetActivityMonitor<SpannerPartition, SpannerOffsetContext>> getOffsetActivityMonitor() {
+        if (offsetActivityMonitor == null) {
+            offsetActivityMonitor = new SpannerOffsetActivityMonitor(connectorConfig.getOffsetActivityMonitorInterval());
+        }
+        return Optional.of(offsetActivityMonitor);
     }
 
     @Override
