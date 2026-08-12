@@ -30,8 +30,14 @@ public class FindPartitionForStreamingOperation implements Operation {
     private static final Logger LOGGER = LoggerFactory.getLogger(FindPartitionForStreamingOperation.class);
 
     private boolean isRequiredPublishSyncEvent = false;
+    private final boolean isMutableKeyRange;
 
     public FindPartitionForStreamingOperation() {
+        this(false);
+    }
+
+    public FindPartitionForStreamingOperation(boolean isMutableKeyRange) {
+        this.isMutableKeyRange = isMutableKeyRange;
     }
 
     private TaskSyncContext takePartitionForStreaming(TaskSyncContext taskSyncContext) {
@@ -54,7 +60,7 @@ public class FindPartitionForStreamingOperation implements Operation {
                                         taskSyncContext.getTaskUid(), partitionState.getToken(), partitionState.getParents());
                             }
                         }
-                        else if (finishedPartitions.containsAll(partitionState.getParents())) {
+                        else if (finishedPartitions.containsAll(partitionState.getParents()) || isMutableKeyRange) {
                             takePartitionForStreaming = true;
                             LOGGER.info("Task takes partition for streaming, taskUid: {}, partition {}",
                                     taskSyncContext.getTaskUid(), partitionState.getToken());

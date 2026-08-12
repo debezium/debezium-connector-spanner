@@ -70,7 +70,7 @@ public class PartitionFactory {
                     .startTimestamp(startTime)
                     .endTimestamp(partitionState.getEndTimestamp())
                     .parentTokens(partitionState.getParents())
-                    .lastBoundaryRecordSequence(partitionState.getLastBoundaryRecordSequence())
+                    .lastBoundaryRecordSequence(resolveLastBoundaryRecordSequence(partitionState))
                     .build());
         }
         return partitionMap;
@@ -83,8 +83,18 @@ public class PartitionFactory {
                 .startTimestamp(resolveOffset(partitionState, offset))
                 .endTimestamp(partitionState.getEndTimestamp())
                 .parentTokens(partitionState.getParents())
-                .lastBoundaryRecordSequence(partitionState.getLastBoundaryRecordSequence())
+                .lastBoundaryRecordSequence(resolveLastBoundaryRecordSequence(partitionState))
                 .build();
+    }
+
+    private String resolveLastBoundaryRecordSequence(PartitionState partitionState) {
+        if (partitionState.getLastBoundaryRecordSequence() != null) {
+            return partitionState.getLastBoundaryRecordSequence();
+        }
+        if (partitionState.getMoveInState() != null) {
+            return partitionState.getMoveInState().getRecordSequence();
+        }
+        return null;
     }
 
     private Timestamp resolveOffset(PartitionState partitionState, Timestamp offset) {
@@ -111,6 +121,15 @@ public class PartitionFactory {
             LOGGER.info("No previous offset found, using startTimestamp {} for partition {}",
                     startTimestamp, partitionState.getToken());
             startTime = startTimestamp;
+        }
+
+        if (partitionState.getMoveInState() != null) {
+            Timestamp moveInTimestamp = partitionState.getMoveInState().getTimestamp();
+            if (startTime.compareTo(moveInTimestamp) < 0) {
+                LOGGER.info("Partition {} has MoveInState at {}, adjusting startTime from {} to moveInTimestamp",
+                        partitionState.getToken(), moveInTimestamp, startTime);
+                startTime = moveInTimestamp;
+            }
         }
 
         metricsEventPublisher.publishMetricEvent(PartitionOffsetLagMetricEvent.from(partitionState.getToken(), startTime));

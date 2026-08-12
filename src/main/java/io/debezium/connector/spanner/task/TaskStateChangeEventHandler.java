@@ -118,7 +118,7 @@ public class TaskStateChangeEventHandler {
         performOperation(
                 new PartitionStatusUpdateOperation(event.getToken(), event.getState()),
                 new ClearSharedPartitionOperation(),
-                new FindPartitionForStreamingOperation(),
+                new FindPartitionForStreamingOperation(changeStream.isMutableKeyRange()),
                 new TakePartitionForStreamingOperation(changeStream, partitionFactory));
     }
 
@@ -126,7 +126,7 @@ public class TaskStateChangeEventHandler {
         performOperation(
                 new ChildPartitionOperation(newPartitionsEvent.getPartitions()),
                 new ClearSharedPartitionOperation(),
-                new FindPartitionForStreamingOperation(),
+                new FindPartitionForStreamingOperation(changeStream.isMutableKeyRange()),
                 new TakePartitionForStreamingOperation(changeStream, partitionFactory),
                 new RemoveFinishedPartitionOperation(spannerEventDispatcher, connectorConfig));
     }
@@ -135,7 +135,7 @@ public class TaskStateChangeEventHandler {
         performOperation(
                 new MoveOutStateUpdateOperation(
                         event.getToken(), event.getCommitTimestamp(), event.getDestinationTokens()),
-                new FindPartitionForStreamingOperation(),
+                new FindPartitionForStreamingOperation(changeStream.isMutableKeyRange()),
                 new TakePartitionForStreamingOperation(changeStream, partitionFactory));
     }
 
@@ -143,7 +143,7 @@ public class TaskStateChangeEventHandler {
         performOperation(
                 new MoveInStateUpdateOperation(
                         event.getToken(), event.getCommitTimestamp(), event.getRecordSequence(), event.getSourcePartitionTokens()),
-                new FindPartitionForStreamingOperation(),
+                new FindPartitionForStreamingOperation(changeStream.isMutableKeyRange()),
                 new TakePartitionForStreamingOperation(changeStream, partitionFactory));
     }
 
@@ -156,7 +156,7 @@ public class TaskStateChangeEventHandler {
         TaskSyncContext taskSyncContext = performOperation(
                 new ClearSharedPartitionOperation(),
                 new TakeSharedPartitionOperation(),
-                new FindPartitionForStreamingOperation(),
+                new FindPartitionForStreamingOperation(changeStream.isMutableKeyRange()),
                 new TakePartitionForStreamingOperation(changeStream, partitionFactory),
                 new RemoveFinishedPartitionOperation(spannerEventDispatcher, connectorConfig),
                 new ConnectorEndDetectionOperation(finishingHandler, connectorConfig.endTime()));
