@@ -159,6 +159,12 @@ public class Connection {
         await().atMost(Duration.ofSeconds(ddlWaitTimeSeconds())).until(() -> isStreamExist(changeStreamName));
     }
 
+    private static final Duration DEFAULT_SPLIT_EXPIRY = Duration.ofMinutes(30);
+
+    public void forceSplit(String tableName, String... keyParts) {
+        forceSplit(tableName, DEFAULT_SPLIT_EXPIRY, keyParts);
+    }
+
     /**
      * Forces Spanner to split the key range of {@code tableName} at the given key value(s),
      * triggering a mutable key range move (MoveOut/MoveIn) for change streams tracking the table.
@@ -170,14 +176,14 @@ public class Connection {
      * be processed (as low as 1/minute on small test instances), so calls are retried with a
      * cooldown when the request is throttled with {@code RESOURCE_EXHAUSTED}.
      */
-    public void forceSplit(String tableName, String... keyParts) {
+    public void forceSplit(String tableName, Duration expiry, String... keyParts) {
         int maxAttempts = 4;
         for (int attempt = 1; attempt <= maxAttempts; attempt++) {
             try (com.google.cloud.spanner.admin.database.v1.DatabaseAdminClient adminClient = spanner.createDatabaseAdminClient()) {
-                Instant expiry = Instant.now().plusSeconds(30 * 60);
+                Instant expiryInstant = Instant.now().plus(expiry);
                 Timestamp expireTime = Timestamp.newBuilder()
-                        .setSeconds(expiry.getEpochSecond())
-                        .setNanos(expiry.getNano())
+                        .setSeconds(expiryInstant.getEpochSecond())
+                        .setNanos(expiryInstant.getNano())
                         .build();
 
                 ListValue.Builder keyValues = ListValue.newBuilder();
@@ -215,24 +221,125 @@ public class Connection {
         }
     }
 
-    public void createChangeStreamNewValue(String changeStreamName, String... tables) throws ExecutionException,
-            InterruptedException {
+    public void createChangeStreamNewValue(String changeStreamName, PartitionMode partitionMode, String... tables)
+            throws ExecutionException, InterruptedException {
+        createChangeStreamWithValueCaptureType(changeStreamName, "NEW_VALUES", partitionMode, tables);
+    }
+
+    public void createChangeStreamNewRow(String changeStreamName, PartitionMode partitionMode, String... tables)
+            throws ExecutionException, InterruptedException {
+        createChangeStreamWithValueCaptureType(changeStreamName, "NEW_ROW", partitionMode, tables);
+    }
+
+    public void createChangeStreamNewRowAndOldValues(String changeStreamName, PartitionMode partitionMode, String... tables)
+            throws ExecutionException, InterruptedException {
+        createChangeStreamWithValueCaptureType(changeStreamName, "NEW_ROW_AND_OLD_VALUES", partitionMode, tables);
+    }
+
+    private void createChangeStreamWithValueCaptureType(String changeStreamName, String valueCaptureType,
+                                                        PartitionMode partitionMode, String... tables)
+            throws ExecutionException, InterruptedException {
         this.updateDDL(List.of("create change stream " + changeStreamName + " for " +
                 (tables.length == 0 ? "ALL" : String.join(",", tables)) +
                 " OPTIONS (\n" +
-                "            value_capture_type = 'NEW_VALUES'\n" +
+                "            value_capture_type = '" + valueCaptureType + "',\n" +
+                "            partition_mode = '" + partitionMode.name() + "'\n" +
                 "        ) "));
         await().atMost(Duration.ofSeconds(ddlWaitTimeSeconds())).until(() -> isStreamExist(changeStreamName));
     }
 
-    public void createChangeStreamNewRow(String changeStreamName, String... tables) throws ExecutionException,
-            InterruptedException {
+    public void createChangeStreamExcludeDelete(String changeStreamName, PartitionMode partitionMode, String... tables)
+            throws ExecutionException, InterruptedException {
+        createChangeStreamWithBooleanOption(changeStreamName, "exclude_delete", partitionMode, tables);
+    }
+
+    public void createChangeStreamExcludeInsert(String changeStreamName, PartitionMode partitionMode, String... tables)
+            throws ExecutionException, InterruptedException {
+        createChangeStreamWithBooleanOption(changeStreamName, "exclude_insert", partitionMode, tables);
+    }
+
+    public void createChangeStreamExcludeUpdate(String changeStreamName, PartitionMode partitionMode, String... tables)
+            throws ExecutionException, InterruptedException {
+        createChangeStreamWithBooleanOption(changeStreamName, "exclude_update", partitionMode, tables);
+    }
+
+    public void createChangeStreamAllowTxnExclusion(String changeStreamName, PartitionMode partitionMode, String... tables)
+            throws ExecutionException, InterruptedException {
+        createChangeStreamWithBooleanOption(changeStreamName, "allow_txn_exclusion", partitionMode, tables);
+    }
+
+    private void createChangeStreamWithBooleanOption(String changeStreamName, String optionName,
+                                                     PartitionMode partitionMode, String... tables)
+            throws ExecutionException, InterruptedException {
         this.updateDDL(List.of("create change stream " + changeStreamName + " for " +
                 (tables.length == 0 ? "ALL" : String.join(",", tables)) +
                 " OPTIONS (\n" +
-                "            value_capture_type = 'NEW_ROW'\n" +
+                "            " + optionName + " = true,\n" +
+                "            partition_mode = '" + partitionMode.name() + "'\n" +
                 "        ) "));
         await().atMost(Duration.ofSeconds(ddlWaitTimeSeconds())).until(() -> isStreamExist(changeStreamName));
+    }
+
+    public void createChangeStreamExcludeTtlDeletes(String changeStreamName, PartitionMode partitionMode, String... tables)
+            throws ExecutionException, InterruptedException {
+        createChangeStreamWithBooleanOption(changeStreamName, "exclude_ttl_deletes", partitionMode, tables);
+    }
+
+    public void createChangeStream(String changeStreamName, PartitionMode partitionMode, String... tables)
+            throws ExecutionException, InterruptedException {
+        this.updateDDL(List.of("create change stream " + changeStreamName + " for " +
+                (tables.length == 0 ? "ALL" : String.join(",", tables)) +
+                " OPTIONS ( partition_mode = '" + partitionMode.name() + "' )"));
+        await().atMost(Duration.ofSeconds(60)).until(() -> isStreamExist(changeStreamName));
+    }
+
+    public void createPlacement(String placementName, String instancePartitionId) throws ExecutionException, InterruptedException {
+        if (!instancePartitionExists(instancePartitionId)) {
+            throw new IllegalStateException(
+                    "Instance partition '" + instancePartitionId + "' does not exist on instance '" + instanceId
+                            + "'. Provision it first - see doc/real-spanner-testing.md, e.g.:\n"
+                            + "  gcloud spanner instance-partitions create " + instancePartitionId
+                            + " --instance=" + instanceId + " --project=" + projectId + " --config=<config> --nodes=1");
+        }
+        this.updateDDL(List.of("create placement " + placementName +
+                " OPTIONS ( instance_partition = '" + instancePartitionId + "' )"));
+        await().atMost(Duration.ofSeconds(ddlWaitTimeSeconds())).until(() -> placementExists(placementName));
+    }
+
+    private boolean instancePartitionExists(String instancePartitionId) {
+        String name = String.format("projects/%s/instances/%s/instancePartitions/%s", projectId, instanceId, instancePartitionId);
+        try (com.google.cloud.spanner.admin.instance.v1.InstanceAdminClient adminClient = spanner.createInstanceAdminClient()) {
+            adminClient.getInstancePartition(name);
+            return true;
+        }
+
+        catch (com.google.api.gax.rpc.NotFoundException e) {
+            return false;
+        }
+    }
+
+    public boolean dropPlacement(String placementName) throws InterruptedException {
+        try {
+            if (!placementExists(placementName)) {
+                return false;
+            }
+            this.updateDDL(List.of("drop placement " + placementName));
+        }
+        catch (ExecutionException ex) {
+            LOG.warn("Can`t drop placement", ex);
+            return false;
+        }
+        return true;
+    }
+
+    private boolean placementExists(String placementName) {
+        Statement statement = Statement.newBuilder("select placement_name " +
+                "from information_schema.placements " +
+                "where placement_name = @placementName")
+                .bind("placementName").to(placementName).build();
+        try (ResultSet resultSet = this.executeSelect(statement)) {
+            return resultSet.next();
+        }
     }
 
     private String createInstance() {

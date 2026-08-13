@@ -5,6 +5,9 @@
  */
 package io.debezium.connector.spanner;
 
+import java.time.Instant;
+import java.time.format.DateTimeFormatter;
+
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 
@@ -13,6 +16,7 @@ import io.debezium.connector.spanner.config.BaseSpannerConnectorConfig;
 import io.debezium.connector.spanner.util.Connection;
 import io.debezium.connector.spanner.util.Database;
 import io.debezium.connector.spanner.util.KafkaEnvironment;
+import io.debezium.connector.spanner.util.PartitionMode;
 import io.debezium.embedded.async.AbstractAsyncEngineConnectorTest;
 import io.debezium.util.Testing;
 
@@ -97,6 +101,18 @@ public class AbstractSpannerConnectorIT extends AbstractAsyncEngineConnectorTest
             builder.with("spanner.omni.client.cert.path", System.getProperty("spanner.omni.client.cert.path"));
         }
         return builder;
+    }
+
+    protected static Configuration buildTestConfig(Configuration baseConfig, String changeStreamName,
+                                                   String tableName, PartitionMode partitionMode) {
+        Configuration.Builder configBuilder = Configuration.copy(baseConfig)
+                .with("gcp.spanner.change.stream", changeStreamName)
+                .with("name", tableName + "_test")
+                .with("gcp.spanner.start.time", DateTimeFormatter.ISO_INSTANT.format(Instant.now()));
+        if (partitionMode == PartitionMode.MUTABLE_KEY_RANGE) {
+            configBuilder.with("gcp.spanner.mutable.window.minutes", 1);
+        }
+        return configBuilder.build();
     }
 
     @BeforeAll
