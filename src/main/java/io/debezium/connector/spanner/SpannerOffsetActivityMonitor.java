@@ -8,21 +8,19 @@ package io.debezium.connector.spanner;
 import java.time.Duration;
 import java.util.Objects;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import com.google.cloud.Timestamp;
 
 import io.debezium.connector.spanner.context.offset.PartitionOffset;
 import io.debezium.connector.spanner.context.offset.SpannerOffsetContext;
 import io.debezium.pipeline.monitor.OffsetActivityMonitor;
+import io.debezium.pipeline.monitor.StaleOffsetsResult;
 
 /**
  * An {@link OffsetActivityMonitor} that tracks state changes to the connector's offsets.
  * <p>
  * The offset commit timestamp of the change stream partition being streamed is compared
  * against the value captured when that partition was last consulted, and when the timestamp
- * has not moved, a warning is logged. Spanner emits heartbeat records for every change
+ * has not moved, a stale result is reported. Spanner emits heartbeat records for every change
  * stream partition even when the captured tables are quiet, so a stationary commit timestamp
  * means the change stream is no longer delivering records for the partition rather than that
  * there are no changes.
@@ -36,8 +34,6 @@ import io.debezium.pipeline.monitor.OffsetActivityMonitor;
  */
 public class SpannerOffsetActivityMonitor implements OffsetActivityMonitor<SpannerPartition, SpannerOffsetContext> {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(SpannerOffsetActivityMonitor.class);
-
     private final Duration checkInterval;
 
     private SpannerPartition previousPartition;
@@ -48,22 +44,26 @@ public class SpannerOffsetActivityMonitor implements OffsetActivityMonitor<Spann
     }
 
     @Override
-    public void checkForStaleOffsets(SpannerPartition partition, SpannerOffsetContext offsetContext) {
+    public StaleOffsetsResult checkForStaleOffsets(SpannerPartition partition, SpannerOffsetContext offsetContext) {
         final Timestamp offset = PartitionOffset.extractOffset(offsetContext.getOffset());
 
         // Check for stale state
+        StaleOffsetsResult result = StaleOffsetsResult.fresh();
         if (offset != null
                 && Objects.equals(previousPartition, partition)
                 && Objects.equals(previousOffset, offset)) {
-            LOGGER.warn("Offset commit timestamp {} for partition token {} has not changed in {} milliseconds. " +
-                    "Spanner emits heartbeat records for every change stream partition even when idle, so this " +
-                    "may indicate the change stream is no longer delivering records for this partition.",
-                    offset, partition.getValue(), checkInterval.toMillis());
+            result = StaleOffsetsResult.stale(
+                    ("Offset commit timestamp %s for partition token %s has not changed in %d milliseconds. " +
+                            "Spanner emits heartbeat records for every change stream partition even when idle, so this " +
+                            "may indicate the change stream is no longer delivering records for this partition.")
+                            .formatted(offset, partition.getValue(), checkInterval.toMillis()));
         }
 
         // Update tracked stats
         previousPartition = partition;
         previousOffset = offset;
+
+        return result;
     }
 
 }
