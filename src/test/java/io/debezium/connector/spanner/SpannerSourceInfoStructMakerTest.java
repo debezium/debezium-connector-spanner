@@ -52,22 +52,22 @@ class SpannerSourceInfoStructMakerTest {
         assertEquals("com.google.spanner.connector.Source", schemaResult.name());
         assertFalse(schemaResult.isOptional());
         List<org.apache.kafka.connect.data.Field> fieldsResult = schemaResult.fields();
-        assertEquals(25, fieldsResult.size());
+        assertEquals(26, fieldsResult.size());
         assertNull(schemaResult.doc());
         org.apache.kafka.connect.data.Field getResult = fieldsResult.get(0);
         assertTrue(getResult.schema() instanceof ConnectSchema);
         org.apache.kafka.connect.data.Field getResult1 = fieldsResult.get(1);
         assertTrue(getResult1.schema() instanceof ConnectSchema);
-        org.apache.kafka.connect.data.Field getResult2 = fieldsResult.get(19);
+        org.apache.kafka.connect.data.Field getResult2 = fieldsResult.get(20);
         assertTrue(getResult2.schema() instanceof ConnectSchema);
-        assertEquals(19, getResult2.index());
+        assertEquals(20, getResult2.index());
         assertEquals(0, getResult.index());
         assertEquals("version", getResult.name());
         assertEquals("system_transaction", getResult2.name());
         assertEquals(1, getResult1.index());
         assertEquals("connector", getResult1.name());
-        org.apache.kafka.connect.data.Field getResult3 = fieldsResult.get(18);
-        assertEquals(18, getResult3.index());
+        org.apache.kafka.connect.data.Field getResult3 = fieldsResult.get(19);
+        assertEquals(19, getResult3.index());
         assertEquals("transaction_tag", getResult3.name());
     }
 
@@ -106,8 +106,10 @@ class SpannerSourceInfoStructMakerTest {
         Instant readAtTimestamp = atStartOfDayResult2.atZone(ZoneId.of("UTC")).toInstant();
         LocalDateTime atStartOfDayResult3 = LocalDate.of(1970, 1, 1).atStartOfDay();
         SourceInfo sourceInfo = new SourceInfo(connectorConfig, "Table Name", recordTimestamp, commitTimestamp,
-                readAtTimestamp, "42", 1L, atStartOfDayResult3.atZone(ZoneId.of("UTC")).toInstant(), 1L,
+                readAtTimestamp, "42", 1L, null, atStartOfDayResult3.atZone(ZoneId.of("UTC")).toInstant(), 1L,
                 "testTag=test", false, "UPDATE", "testToken", 0, false, 1L);
         assertThrows(IllegalStateException.class, () -> spannerSourceInfoStructMaker.struct(sourceInfo));
+        assertEquals(1L, sourceInfo.getRecordSequence());
+        assertNull(sourceInfo.getRecordSequencePrefix());
     }
 }

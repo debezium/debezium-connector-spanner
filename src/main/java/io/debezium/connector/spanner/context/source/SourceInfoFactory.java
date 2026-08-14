@@ -31,6 +31,7 @@ public class SourceInfoFactory {
         Instant readAtTimestamp = dataChangeEvent.getMetadata().getRecordReadAt().toSqlTimestamp().toInstant();
         String serverTransactionId = dataChangeEvent.getServerTransactionId();
         Long recordSequence = RecordSequenceUtils.parseSequenceNumber(dataChangeEvent.getRecordSequence());
+        String recordSequencePrefix = RecordSequenceUtils.parseSequencePrefix(dataChangeEvent.getRecordSequence());
         Long numberRecordInTransaction = dataChangeEvent.getNumberOfRecordsInTransaction();
         String transactionTag = dataChangeEvent.getTransactionTag();
         boolean systemTransaction = dataChangeEvent.isSystemTransaction();
@@ -46,7 +47,7 @@ public class SourceInfoFactory {
         }
 
         return new SourceInfo(connectorConfig, dataChangeEvent.getTableName(), recordTimestamp, commitTimestamp,
-                readAtTimestamp, serverTransactionId, recordSequence, lowWatermark, numberRecordInTransaction,
+                readAtTimestamp, serverTransactionId, recordSequence, recordSequencePrefix, lowWatermark, numberRecordInTransaction,
                 transactionTag, systemTransaction, valueCaptureType, partitionToken, modNumber,
                 isLastRecordInTransactionInPartition, numberOfPartitionsInTransaction);
     }
@@ -60,7 +61,7 @@ public class SourceInfoFactory {
         }
 
         return new SourceInfo(connectorConfig, tableId.getTableName(), null, null,
-                null, null, null, lowWatermark, null,
+                null, null, null, null, lowWatermark, null,
                 null, null, null, null, null,
                 null, null);
     }

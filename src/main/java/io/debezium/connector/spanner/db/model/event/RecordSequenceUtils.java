@@ -59,6 +59,23 @@ public final class RecordSequenceUtils {
     }
 
     /**
+     * Parses a {@code record_sequence} value into its {@code hi} component (the per-transaction
+     * discriminator) as a raw hex string, for the public {@code SourceInfo}
+     * "record_sequence_prefix" field. Returns {@code null} for the unseparated plain-hex format,
+     * which has no discriminator to extract.
+     */
+    public static String parseSequencePrefix(String sequence) {
+        if (sequence == null) {
+            return null;
+        }
+        int dashIndex = sequence.indexOf('-');
+        if (dashIndex < 0) {
+            return null;
+        }
+        return sequence.substring(0, dashIndex);
+    }
+
+    /**
      * Compares two non-null {@code record_sequence} values by comparing {@code hi} and
      * {@code lo} as an unsigned 64-bit tuple - {@code hi} first, then {@code lo} - rather than
      * packing them into a single value, which would require masking {@code hi} down to 32 bits

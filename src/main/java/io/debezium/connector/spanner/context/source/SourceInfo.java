@@ -30,6 +30,8 @@ public class SourceInfo extends BaseSourceInfo {
     public static final String READ_AT_TIMESTAMP_KEY = "read_at_timestamp";
     public static final String SERVER_TRANSACTIONAL_ID_KEY = "server_transaction_id";
 
+    public static final String RECORD_SEQUENCE_PREFIX_KEY = "record_sequence_prefix";
+
     public static final String NUMBER_OF_RECORDS_IN_TRANSACTION = "number_records_in_transaction";
 
     public static final String TRANSACTION_TAG = "transaction_tag";
@@ -62,6 +64,8 @@ public class SourceInfo extends BaseSourceInfo {
 
     private final Long recordSequence;
 
+    private final String recordSequencePrefix;
+
     private final Instant lowWatermark;
 
     private final Instant readAtTimestamp;
@@ -84,7 +88,7 @@ public class SourceInfo extends BaseSourceInfo {
 
     public SourceInfo(SpannerConnectorConfig connectorConfig, String tableName, Instant recordTimestamp,
                       Instant commitTimestamp, Instant readAtTimestamp, String serverTransactionId,
-                      Long recordSequence, Instant lowWatermark, Long numberRecordsInTransaction,
+                      Long recordSequence, String recordSequencePrefix, Instant lowWatermark, Long numberRecordsInTransaction,
                       String transactionTag, Boolean isSystemTransaction, String valueCaptureType, String partitionToken,
                       Integer modNumber, Boolean isLastRecordInTransactionInPartition, Long numberOfPartitionsInTransaction) {
         super(connectorConfig);
@@ -97,6 +101,7 @@ public class SourceInfo extends BaseSourceInfo {
         this.commitTimestamp = commitTimestamp;
         this.serverTransactionId = serverTransactionId;
         this.recordSequence = recordSequence;
+        this.recordSequencePrefix = recordSequencePrefix;
         this.lowWatermark = lowWatermark;
         this.readAtTimestamp = readAtTimestamp;
         this.numberRecordsInTransaction = numberRecordsInTransaction;
@@ -138,6 +143,10 @@ public class SourceInfo extends BaseSourceInfo {
 
     public Long getRecordSequence() {
         return recordSequence;
+    }
+
+    public String getRecordSequencePrefix() {
+        return recordSequencePrefix;
     }
 
     public String getTableName() {
