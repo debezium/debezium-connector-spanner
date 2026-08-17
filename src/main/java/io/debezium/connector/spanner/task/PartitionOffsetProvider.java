@@ -57,8 +57,8 @@ public class PartitionOffsetProvider {
 
         Map<String, ?> result = retrieveOffsetMap(spannerPartition);
         if (result == null) {
-            LOGGER.warn("Token {} returning start timestamp because no offset was retrieved", token);
-            return token.getStartTimestamp();
+            LOGGER.warn("Token {} no stored offset found", token);
+            return null;
         }
         LOGGER.info("Successfully retrieved offset {} for token {}", result, token);
         return PartitionOffset.extractOffset(result);

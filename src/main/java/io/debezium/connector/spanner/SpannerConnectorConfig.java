@@ -299,6 +299,14 @@ public class SpannerConnectorConfig extends BaseSpannerConnectorConfig {
         return getConfig().getBoolean(CONNECTOR_SPANNER_PARTITION_FINISHING_AFTER_COMMIT_FIELD);
     }
 
+    public boolean isMutablePartitionOrderingEnabled() {
+        return getConfig().getBoolean(MUTABLE_PARTITION_ORDERING_ENABLED);
+    }
+
+    public int getMutableWindowMinutes() {
+        return getConfig().getInteger(MUTABLE_WINDOW_MINUTES, (int) MUTABLE_WINDOW_MINUTES.defaultValue());
+    }
+
     public int taskStateChangeEventQueueCapacity() {
         return getConfig().getInteger(TASK_STATE_CHANGE_EVENT_QUEUE_CAPACITY,
                 (int) TASK_STATE_CHANGE_EVENT_QUEUE_CAPACITY.defaultValue());

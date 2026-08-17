@@ -7,19 +7,24 @@ package io.debezium.connector.spanner.db.stream;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.google.cloud.Timestamp;
+
 import io.debezium.connector.spanner.db.dao.ChangeStreamDao;
 import io.debezium.connector.spanner.db.dao.ChangeStreamResultSet;
 import io.debezium.connector.spanner.db.mapper.ChangeStreamRecordMapper;
+import io.debezium.connector.spanner.db.model.InitialPartition;
 import io.debezium.connector.spanner.db.model.Partition;
 import io.debezium.connector.spanner.db.model.event.ChangeStreamEvent;
 import io.debezium.connector.spanner.db.model.event.ChildPartitionsEvent;
 import io.debezium.connector.spanner.db.model.event.FinishPartitionEvent;
 import io.debezium.connector.spanner.db.model.event.HeartbeatEvent;
+import io.debezium.connector.spanner.db.model.event.PartitionEndEvent;
 import io.debezium.connector.spanner.db.stream.exception.ChangeStreamException;
 import io.debezium.connector.spanner.metrics.MetricsEventPublisher;
 import io.debezium.connector.spanner.metrics.event.DelayChangeStreamEventsMetricEvent;
@@ -38,18 +43,36 @@ public class SpannerChangeStreamService {
     private final Duration heartbeatMillis;
     private final MetricsEventPublisher metricsEventPublisher;
     private final String taskUid;
+    private final Duration windowDuration;
 
     public SpannerChangeStreamService(String taskUid, ChangeStreamDao changeStreamDao, ChangeStreamRecordMapper changeStreamRecordMapper,
                                       Duration heartbeatMillis, MetricsEventPublisher metricsEventPublisher) {
+        this(taskUid, changeStreamDao, changeStreamRecordMapper, heartbeatMillis, metricsEventPublisher, 20);
+    }
+
+    public SpannerChangeStreamService(String taskUid, ChangeStreamDao changeStreamDao, ChangeStreamRecordMapper changeStreamRecordMapper,
+                                      Duration heartbeatMillis, MetricsEventPublisher metricsEventPublisher, int windowMinutes) {
         this.changeStreamDao = changeStreamDao;
         this.changeStreamRecordMapper = changeStreamRecordMapper;
         this.heartbeatMillis = heartbeatMillis;
         this.metricsEventPublisher = metricsEventPublisher;
         this.taskUid = taskUid;
+        this.windowDuration = Duration.ofMinutes(windowMinutes);
     }
 
     public void getEvents(Partition partition, ChangeStreamEventConsumer changeStreamEventConsumer,
                           PartitionEventListener partitionEventListener)
+            throws InterruptedException, Exception {
+        if (changeStreamDao.isMutableKeyRange()) {
+            getEventsMutable(partition, changeStreamEventConsumer, partitionEventListener);
+        }
+        else {
+            getEventsImmutable(partition, changeStreamEventConsumer, partitionEventListener);
+        }
+    }
+
+    private void getEventsImmutable(Partition partition, ChangeStreamEventConsumer changeStreamEventConsumer,
+                                    PartitionEventListener partitionEventListener)
             throws InterruptedException, Exception {
         final String token = partition.getToken();
 
@@ -116,8 +139,144 @@ public class SpannerChangeStreamService {
         changeStreamEventConsumer.acceptChangeStreamEvent(new FinishPartitionEvent(partition));
     }
 
+    private void getEventsMutable(Partition partition, ChangeStreamEventConsumer changeStreamEventConsumer,
+                                  PartitionEventListener partitionEventListener)
+            throws InterruptedException, Exception {
+        final String token = partition.getToken();
+
+        partitionEventListener.onRun(partition);
+
+        LOGGER.info("Task: {}, Streaming mutable partition {} from {} to {}", taskUid, token,
+                partition.getStartTimestamp(), partition.getEndTimestamp());
+
+        Timestamp partitionEndTimestamp = partition.getEndTimestamp();
+
+        Timestamp processedTimestamp = partition.getStartTimestamp();
+        String lastBoundaryRecordSequence = partition.getLastBoundaryRecordSequence();
+        boolean isPartitionEnded = false;
+
+        while (!isPartitionEnded && (partitionEndTimestamp == null || isBeforeOrEqual(processedTimestamp, partitionEndTimestamp))) {
+            Timestamp endTimestamp = partitionEndTimestamp == null
+                    ? addMinutes(processedTimestamp, windowDuration)
+                    : minTimestamp(partitionEndTimestamp, addMinutes(processedTimestamp, windowDuration));
+            String newBoundaryRecordSequence = null;
+
+            try (ChangeStreamResultSet resultSet = changeStreamDao.streamQuery(token, processedTimestamp,
+                    endTimestamp, heartbeatMillis.toMillis())) {
+
+                long start = now();
+                while (resultSet.next()) {
+                    long delay = now() - start;
+
+                    List<ChangeStreamEvent> rawEvents = changeStreamRecordMapper.toChangeStreamEvents(
+                            partition,
+                            resultSet, resultSet.getMetadata());
+                    LOGGER.debug("Task: {}, Events receive from mutable stream: {}", taskUid, rawEvents);
+
+                    List<ChangeStreamEvent> events = filterBoundaryDuplicates(rawEvents, processedTimestamp, lastBoundaryRecordSequence);
+
+                    if (!events.isEmpty() && (events.get(0) instanceof HeartbeatEvent)) {
+                        var heartbeatEvent = (HeartbeatEvent) events.get(0);
+                        long heartbeatLag = System.currentTimeMillis() - heartbeatEvent.getRecordTimestamp().toSqlTimestamp().toInstant().toEpochMilli();
+                        if (heartbeatLag > 60_000) {
+                            LOGGER.warn("Task: {}, heartbeat has very old timestamp, lag: {}, token: {}, event: {}", taskUid, heartbeatLag,
+                                    heartbeatEvent.getMetadata().getPartitionToken(),
+                                    heartbeatEvent);
+                        }
+                    }
+
+                    for (ChangeStreamEvent event : events) {
+                        if (endTimestamp.equals(event.getRecordTimestamp()) && event.getRecordSequence() != null) {
+                            newBoundaryRecordSequence = event.getRecordSequence();
+                        }
+                    }
+
+                    processEvents(partition, events, changeStreamEventConsumer);
+
+                    for (ChangeStreamEvent event : events) {
+                        if (event instanceof PartitionEndEvent) {
+                            isPartitionEnded = true;
+                        }
+                    }
+
+                    if (!events.isEmpty() && !(events.get(0) instanceof HeartbeatEvent)) {
+                        metricsEventPublisher.publishMetricEvent(new DelayChangeStreamEventsMetricEvent((int) delay));
+                    }
+
+                    start = now();
+                }
+            }
+            catch (InterruptedException ex) {
+                LOGGER.info("task {}, Interrupting streaming mutable partition task with token {}", this.taskUid, partition.getToken());
+                Thread.currentThread().interrupt();
+                break;
+            }
+
+            if (partitionEndTimestamp != null && processedTimestamp.equals(partitionEndTimestamp)) {
+                isPartitionEnded = true;
+            }
+            if (InitialPartition.isInitialPartition(token)) {
+                isPartitionEnded = true;
+            }
+
+            lastBoundaryRecordSequence = newBoundaryRecordSequence;
+            processedTimestamp = endTimestamp;
+            partitionEventListener.onWindowAdvanced(partition, processedTimestamp, lastBoundaryRecordSequence);
+        }
+
+        partitionEventListener.onFinish(partition);
+        LOGGER.info("Task {}, Finished consuming mutable partition {}", taskUid, partition);
+
+        changeStreamEventConsumer.acceptChangeStreamEvent(new FinishPartitionEvent(partition));
+    }
+
+    private List<ChangeStreamEvent> filterBoundaryDuplicates(
+                                                             List<ChangeStreamEvent> events,
+                                                             Timestamp windowStart,
+                                                             String lastBoundaryRecordSequence) {
+        if (lastBoundaryRecordSequence == null) {
+            return events;
+        }
+        List<ChangeStreamEvent> filtered = new ArrayList<>();
+        for (ChangeStreamEvent event : events) {
+            if (windowStart.equals(event.getRecordTimestamp())
+                    && event.getRecordSequence() != null
+                    && event.getRecordSequence().compareTo(lastBoundaryRecordSequence) <= 0) {
+                LOGGER.debug("Task: {}, Skipping boundary duplicate event at {} seq {}",
+                        taskUid, windowStart, event.getRecordSequence());
+                continue;
+            }
+            filtered.add(event);
+        }
+        return filtered;
+    }
+
     private long now() {
         return Instant.now().toEpochMilli();
+    }
+
+    private Timestamp addMinutes(Timestamp timestamp, Duration duration) {
+        Instant result = Instant.ofEpochSecond(
+                timestamp.getSeconds(),
+                timestamp.getNanos()).plus(duration);
+
+        return Timestamp.ofTimeSecondsAndNanos(result.getEpochSecond(), result.getNano());
+    }
+
+    private Timestamp minTimestamp(Timestamp a, Timestamp b) {
+        int cmp = Long.compare(a.getSeconds(), b.getSeconds());
+        if (cmp == 0) {
+            cmp = Integer.compare(a.getNanos(), b.getNanos());
+        }
+        return cmp <= 0 ? a : b;
+    }
+
+    private boolean isBeforeOrEqual(Timestamp a, Timestamp b) {
+        int cmp = Long.compare(a.getSeconds(), b.getSeconds());
+        if (cmp == 0) {
+            cmp = Integer.compare(a.getNanos(), b.getNanos());
+        }
+        return cmp <= 0;
     }
 
     private void processEvents(Partition partition, List<ChangeStreamEvent> events,

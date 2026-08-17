@@ -26,10 +26,41 @@ public class PartitionState implements Comparable<PartitionState> {
 
     private final String originParent;
 
+    private final MoveInState moveInState;
+
+    private final MoveOutState moveOutState;
+
+    private final Timestamp processedTimestamp;
+
+    private final String lastBoundaryRecordSequence;
+
     public PartitionState(final String token, final Timestamp startTimestamp,
                           final Timestamp endTimestamp, final PartitionStateEnum state,
                           final Set<String> parents, final String assigneeTaskUid, final Timestamp finishedTimestamp,
                           final String originParent) {
+        this(token, startTimestamp, endTimestamp, state, parents, assigneeTaskUid, finishedTimestamp, originParent, null, null, null, null);
+    }
+
+    public PartitionState(final String token, final Timestamp startTimestamp,
+                          final Timestamp endTimestamp, final PartitionStateEnum state,
+                          final Set<String> parents, final String assigneeTaskUid, final Timestamp finishedTimestamp,
+                          final String originParent, final MoveInState moveInState, final MoveOutState moveOutState) {
+        this(token, startTimestamp, endTimestamp, state, parents, assigneeTaskUid, finishedTimestamp, originParent, moveInState, moveOutState, null, null);
+    }
+
+    public PartitionState(final String token, final Timestamp startTimestamp,
+                          final Timestamp endTimestamp, final PartitionStateEnum state,
+                          final Set<String> parents, final String assigneeTaskUid, final Timestamp finishedTimestamp,
+                          final String originParent, final MoveInState moveInState, final MoveOutState moveOutState,
+                          final Timestamp processedTimestamp) {
+        this(token, startTimestamp, endTimestamp, state, parents, assigneeTaskUid, finishedTimestamp, originParent, moveInState, moveOutState, processedTimestamp, null);
+    }
+
+    public PartitionState(final String token, final Timestamp startTimestamp,
+                          final Timestamp endTimestamp, final PartitionStateEnum state,
+                          final Set<String> parents, final String assigneeTaskUid, final Timestamp finishedTimestamp,
+                          final String originParent, final MoveInState moveInState, final MoveOutState moveOutState,
+                          final Timestamp processedTimestamp, final String lastBoundaryRecordSequence) {
         this.token = token;
         this.startTimestamp = startTimestamp;
         this.endTimestamp = endTimestamp;
@@ -38,6 +69,10 @@ public class PartitionState implements Comparable<PartitionState> {
         this.assigneeTaskUid = assigneeTaskUid;
         this.finishedTimestamp = finishedTimestamp;
         this.originParent = originParent;
+        this.moveInState = moveInState;
+        this.moveOutState = moveOutState;
+        this.processedTimestamp = processedTimestamp;
+        this.lastBoundaryRecordSequence = lastBoundaryRecordSequence;
     }
 
     public static class PartitionStateBuilder {
@@ -57,6 +92,14 @@ public class PartitionState implements Comparable<PartitionState> {
         private Timestamp finishedTimestamp;
 
         private String originParent;
+
+        private MoveInState moveInState;
+
+        private MoveOutState moveOutState;
+
+        private Timestamp processedTimestamp;
+
+        private String lastBoundaryRecordSequence;
 
         PartitionStateBuilder() {
         }
@@ -101,10 +144,32 @@ public class PartitionState implements Comparable<PartitionState> {
             return this;
         }
 
+        public PartitionState.PartitionStateBuilder moveInState(final MoveInState moveInState) {
+            this.moveInState = moveInState;
+            return this;
+        }
+
+        public PartitionState.PartitionStateBuilder moveOutState(final MoveOutState moveOutState) {
+            this.moveOutState = moveOutState;
+            return this;
+        }
+
+        public PartitionState.PartitionStateBuilder processedTimestamp(final Timestamp processedTimestamp) {
+            this.processedTimestamp = processedTimestamp;
+            return this;
+        }
+
+        public PartitionState.PartitionStateBuilder lastBoundaryRecordSequence(final String lastBoundaryRecordSequence) {
+            this.lastBoundaryRecordSequence = lastBoundaryRecordSequence;
+            return this;
+        }
+
         public PartitionState build() {
             return new PartitionState(this.token, this.startTimestamp,
                     this.endTimestamp, this.state, this.parents,
-                    this.assigneeTaskUid, this.finishedTimestamp, this.originParent);
+                    this.assigneeTaskUid, this.finishedTimestamp, this.originParent,
+                    this.moveInState, this.moveOutState, this.processedTimestamp,
+                    this.lastBoundaryRecordSequence);
         }
 
     }
@@ -122,7 +187,11 @@ public class PartitionState implements Comparable<PartitionState> {
                 .parents(this.parents)
                 .assigneeTaskUid(this.assigneeTaskUid)
                 .finishedTimestamp(this.finishedTimestamp)
-                .originParent(this.originParent);
+                .originParent(this.originParent)
+                .moveInState(this.moveInState)
+                .moveOutState(this.moveOutState)
+                .processedTimestamp(this.processedTimestamp)
+                .lastBoundaryRecordSequence(this.lastBoundaryRecordSequence);
     }
 
     public String getToken() {
@@ -155,6 +224,22 @@ public class PartitionState implements Comparable<PartitionState> {
 
     public String getOriginParent() {
         return originParent;
+    }
+
+    public MoveInState getMoveInState() {
+        return moveInState;
+    }
+
+    public MoveOutState getMoveOutState() {
+        return moveOutState;
+    }
+
+    public Timestamp getProcessedTimestamp() {
+        return processedTimestamp;
+    }
+
+    public String getLastBoundaryRecordSequence() {
+        return lastBoundaryRecordSequence;
     }
 
     @Override
@@ -193,6 +278,10 @@ public class PartitionState implements Comparable<PartitionState> {
                 ", assigneeTaskUid='" + assigneeTaskUid + '\'' +
                 ", finishedTimestamp=" + finishedTimestamp +
                 ", originParent='" + originParent + '\'' +
+                ", moveInState=" + moveInState +
+                ", moveOutState=" + moveOutState +
+                ", processedTimestamp=" + processedTimestamp +
+                ", lastBoundaryRecordSequence='" + lastBoundaryRecordSequence + '\'' +
                 '}';
     }
 }

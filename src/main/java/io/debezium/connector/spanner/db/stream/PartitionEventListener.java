@@ -5,6 +5,8 @@
  */
 package io.debezium.connector.spanner.db.stream;
 
+import com.google.cloud.Timestamp;
+
 import io.debezium.connector.spanner.db.model.Partition;
 
 /**
@@ -18,4 +20,6 @@ public interface PartitionEventListener {
     void onException(Partition partition, Exception ex) throws InterruptedException;
 
     boolean onStuckPartition(String token) throws InterruptedException;
+
+    void onWindowAdvanced(Partition partition, Timestamp windowEnd, String lastBoundaryRecordSequence) throws InterruptedException;
 }

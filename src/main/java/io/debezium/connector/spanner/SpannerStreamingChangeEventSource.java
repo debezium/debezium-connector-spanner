@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
@@ -22,6 +23,7 @@ import io.debezium.connector.spanner.context.offset.SpannerOffsetContext;
 import io.debezium.connector.spanner.context.offset.SpannerOffsetContextFactory;
 import io.debezium.connector.spanner.db.metadata.SchemaRegistry;
 import io.debezium.connector.spanner.db.metadata.TableId;
+import io.debezium.connector.spanner.db.model.ChildPartition;
 import io.debezium.connector.spanner.db.model.InitialPartition;
 import io.debezium.connector.spanner.db.model.Mod;
 import io.debezium.connector.spanner.db.model.Partition;
@@ -30,6 +32,8 @@ import io.debezium.connector.spanner.db.model.event.ChildPartitionsEvent;
 import io.debezium.connector.spanner.db.model.event.DataChangeEvent;
 import io.debezium.connector.spanner.db.model.event.FinishPartitionEvent;
 import io.debezium.connector.spanner.db.model.event.HeartbeatEvent;
+import io.debezium.connector.spanner.db.model.event.PartitionEventEvent;
+import io.debezium.connector.spanner.db.model.event.PartitionStartEvent;
 import io.debezium.connector.spanner.db.stream.ChangeStream;
 import io.debezium.connector.spanner.db.stream.PartitionEventListener;
 import io.debezium.connector.spanner.exception.FinishingPartitionTimeout;
@@ -157,6 +161,11 @@ public class SpannerStreamingChangeEventSource implements CommittingRecordsStrea
                     }
                     return false;
                 }
+
+                @Override
+                public void onWindowAdvanced(Partition partition, Timestamp windowEnd, String lastBoundaryRecordSequence) throws InterruptedException {
+                    partitionManager.updateProcessedTimestamp(partition.getToken(), windowEnd, lastBoundaryRecordSequence);
+                }
             });
 
         }
@@ -244,6 +253,20 @@ public class SpannerStreamingChangeEventSource implements CommittingRecordsStrea
                         else if (finishPartitionStrategy.equals(FinishPartitionStrategy.AFTER_STREAMING_FINISH)) {
                             finishingPartitionManager.forceFinish(event.getMetadata().getPartitionToken());
                         }
+                    }
+                    else if (event instanceof PartitionStartEvent) {
+
+                        PartitionStartEvent partitionStartEvent = (PartitionStartEvent) event;
+
+                        processPartitionStartEvent(partitionStartEvent);
+
+                    }
+                    else if (event instanceof PartitionEventEvent) {
+
+                        PartitionEventEvent partitionEventEvent = (PartitionEventEvent) event;
+
+                        processPartitionEventEvent(partitionEventEvent);
+
                     }
                     else {
                         // ignore event
@@ -340,6 +363,43 @@ public class SpannerStreamingChangeEventSource implements CommittingRecordsStrea
      */
     private void pulseOffsetActivityMonitor(SpannerPartition partition, SpannerOffsetContext offsetContext) {
         offsetActivityMonitorService.pulse(partition, offsetContext);
+    }
+
+    private void processPartitionStartEvent(PartitionStartEvent event) throws InterruptedException {
+        LOGGER.info("Received PartitionStartEvent: schedulingPartitions={} from sourceToken={}",
+                event.getPartitionTokens(), event.getMetadata().getPartitionToken());
+        // Mutable key range: destination partitions are scheduled with EMPTY parents.
+        // PartitionStartRecord has no parent_partition_tokens field (unlike immutable child_partitions_record).
+        // Source partition A continues streaming after a partial move-out — it never emits PartitionEndRecord —
+        // so gating D on A.state == FINISHED would deadlock permanently.
+        // The A→D dependency is established later when D's own stream hits PartitionEventRecord::MoveInEvent.
+        List<ChildPartition> children = event.getPartitionTokens().stream()
+                .map(t -> new ChildPartition(t, Set.of()))
+                .collect(Collectors.toList());
+        ChildPartitionsEvent synthetic = new ChildPartitionsEvent(
+                event.getStartTimestamp(), event.getRecordSequence(), children, event.getMetadata());
+        processChildPartitionsEvent(Collections.singletonList(synthetic));
+    }
+
+    private void processPartitionEventEvent(PartitionEventEvent event) throws InterruptedException {
+        LOGGER.info("Received PartitionEventEvent: token={}, sources={}, destinations={}",
+                event.getPartitionToken(), event.getSourcePartitions(), event.getDestinationPartitions());
+        if (!event.getDestinationPartitions().isEmpty()) {
+            processMoveOutEvent(event); // MoveOut side — gated
+        }
+        // MoveIn (sourcePartitions non-empty): full handling deferred to ordering step.
+    }
+
+    private void processMoveOutEvent(PartitionEventEvent event) throws InterruptedException {
+        if (!connectorConfig.isMutablePartitionOrderingEnabled()) {
+            LOGGER.debug("Mutable ordering disabled; skipping MoveOut notification for partition {}",
+                    event.getPartitionToken());
+            return;
+        }
+        partitionManager.notifyMoveOut(
+                event.getPartitionToken(),
+                event.getCommitTimestamp(),
+                event.getDestinationPartitions());
     }
 
     private void processFailure(Exception ex) {

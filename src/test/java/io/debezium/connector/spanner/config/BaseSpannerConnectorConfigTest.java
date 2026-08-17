@@ -19,9 +19,13 @@ import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.stream.Stream;
 
 import org.apache.kafka.common.config.ConfigDef;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import io.debezium.config.Configuration;
 import io.debezium.config.Field;
@@ -32,7 +36,7 @@ class BaseSpannerConnectorConfigTest {
     void testConfigDef() {
         ConfigDef actualConfigDefResult = BaseSpannerConnectorConfig.configDef();
         Map<String, ConfigDef.ConfigKey> configKeysResult = actualConfigDefResult.configKeys();
-        assertEquals(67, configKeysResult.size());
+        assertEquals(69, configKeysResult.size());
         List<String> groupsResult = actualConfigDefResult.groups();
         assertEquals(6, groupsResult.size());
         assertEquals("CONNECTOR", groupsResult.get(0));
@@ -384,5 +388,47 @@ class BaseSpannerConnectorConfigTest {
         when(configuration.getString(anyString())).thenReturn("String");
         when(configuration.asProperties()).thenReturn(new Properties());
         assertEquals(1000L, new SpannerConnectorConfig(configuration).getLowWatermarkUpdatePeriodMs());
+    }
+
+    @Test
+    void testIsMutablePartitionOrderingEnabledDefaultTrue() {
+        Configuration configuration = mock(Configuration.class);
+        when(configuration.getString((Field) any())).thenReturn("String");
+        when(configuration.getString(anyString())).thenReturn("String");
+        when(configuration.asProperties()).thenReturn(new Properties());
+        assertTrue(new SpannerConnectorConfig(configuration).isMutablePartitionOrderingEnabled());
+    }
+
+    @Test
+    void testMutablePartitionOrderingEnabledConfigKey() {
+        ConfigDef actualConfigDefResult = BaseSpannerConnectorConfig.configDef();
+        Map<String, ConfigDef.ConfigKey> configKeys = actualConfigDefResult.configKeys();
+        assertTrue(configKeys.containsKey("gcp.spanner.mutable.partition.ordering.enabled"));
+        ConfigDef.ConfigKey key = configKeys.get("gcp.spanner.mutable.partition.ordering.enabled");
+        assertEquals(ConfigDef.Type.BOOLEAN, key.type);
+        assertEquals(ConfigDef.Importance.MEDIUM, key.importance);
+        assertEquals(true, key.defaultValue);
+    }
+
+    private static Stream<Arguments> mutableWindowMinutesProvider() {
+        return Stream.of(
+                Arguments.of(1, 0),
+                Arguments.of(20, 0),
+                Arguments.of(30, 0),
+                Arguments.of(0, 1),
+                Arguments.of(31, 1));
+    }
+
+    @ParameterizedTest
+    @MethodSource("mutableWindowMinutesProvider")
+    void testMutableWindowMinutesValidation(int minutes, int expectedProblems) {
+        Configuration configuration = mock(Configuration.class);
+        when(configuration.getInteger((Field) any(), any(Integer.class))).thenReturn(minutes);
+
+        Field.ValidationOutput problems = mock(Field.ValidationOutput.class);
+
+        int result = BaseSpannerConnectorConfig.validateMutableWindowMinutes(
+                configuration, Field.create("gcp.spanner.mutable.window.minutes"), problems);
+        assertEquals(expectedProblems, result);
     }
 }

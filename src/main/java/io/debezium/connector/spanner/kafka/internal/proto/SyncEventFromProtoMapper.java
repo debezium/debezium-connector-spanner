@@ -14,6 +14,8 @@ import com.google.cloud.Timestamp;
 
 import io.debezium.connector.spanner.kafka.event.proto.SyncEventProtos;
 import io.debezium.connector.spanner.kafka.internal.model.MessageTypeEnum;
+import io.debezium.connector.spanner.kafka.internal.model.MoveInState;
+import io.debezium.connector.spanner.kafka.internal.model.MoveOutState;
 import io.debezium.connector.spanner.kafka.internal.model.PartitionState;
 import io.debezium.connector.spanner.kafka.internal.model.PartitionStateEnum;
 import io.debezium.connector.spanner.kafka.internal.model.TaskState;
@@ -78,6 +80,35 @@ public class SyncEventFromProtoMapper {
 
     private static PartitionState mapPartition(SyncEventProtos.PartitionState partitionState) {
 
+        MoveOutState moveOutState = null;
+        if (partitionState.hasMoveOutState()) {
+            SyncEventProtos.MoveOutState proto = partitionState.getMoveOutState();
+            moveOutState = new MoveOutState(
+                    Timestamp.fromProto(proto.getCommitTimestamp()),
+                    proto.getDestPartitionTokensList());
+        }
+
+        MoveInState moveInState = null;
+        if (partitionState.hasMoveInState()) {
+            SyncEventProtos.MoveInState proto = partitionState.getMoveInState();
+            String seq = proto.getRecordSequence() != null && !proto.getRecordSequence().isEmpty()
+                    ? proto.getRecordSequence()
+                    : null;
+            moveInState = new MoveInState(
+                    Timestamp.fromProto(proto.getCommitTimestamp()),
+                    seq,
+                    proto.getSourcePartitionTokensList());
+        }
+
+        Timestamp processedTimestamp = partitionState.getProcessedTimestamp() != null && !partitionState.getProcessedTimestamp().isEmpty()
+                ? Timestamp.parseTimestamp(partitionState.getProcessedTimestamp())
+                : null;
+
+        String lastBoundaryRecordSequence = partitionState.getLastBoundaryRecordSequence() != null
+                && !partitionState.getLastBoundaryRecordSequence().isEmpty()
+                        ? partitionState.getLastBoundaryRecordSequence()
+                        : null;
+
         return new PartitionState(
                 partitionState.getToken(),
                 Timestamp.parseTimestamp(partitionState.getStartTimestamp()),
@@ -90,6 +121,10 @@ public class SyncEventFromProtoMapper {
                 partitionState.getFinishedTimestamp() != null && !partitionState.getFinishedTimestamp().isEmpty()
                         ? Timestamp.parseTimestamp(partitionState.getFinishedTimestamp())
                         : null,
-                partitionState.getOriginParent());
+                partitionState.getOriginParent(),
+                moveInState,
+                moveOutState,
+                processedTimestamp,
+                lastBoundaryRecordSequence);
     }
 }

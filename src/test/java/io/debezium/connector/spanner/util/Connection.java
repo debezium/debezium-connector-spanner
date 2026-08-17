@@ -125,6 +125,14 @@ public class Connection {
         await().atMost(Duration.ofSeconds(60)).until(() -> isStreamExist(changeStreamName));
     }
 
+    public void createMutableKeyRangeChangeStream(String changeStreamName, String... tables) throws ExecutionException,
+            InterruptedException {
+        this.updateDDL(List.of("create change stream " + changeStreamName + " for " +
+                (tables.length == 0 ? "ALL" : String.join(",", tables)) +
+                " OPTIONS (partition_mode = 'MUTABLE_KEY_RANGE')"));
+        await().atMost(Duration.ofSeconds(60)).until(() -> isStreamExist(changeStreamName));
+    }
+
     public void createChangeStreamNewValue(String changeStreamName, String... tables) throws ExecutionException,
             InterruptedException {
         this.updateDDL(List.of("create change stream " + changeStreamName + " for " +

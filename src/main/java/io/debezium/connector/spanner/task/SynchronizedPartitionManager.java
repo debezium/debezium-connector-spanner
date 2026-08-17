@@ -7,12 +7,16 @@ package io.debezium.connector.spanner.task;
 
 import java.util.List;
 
+import com.google.cloud.Timestamp;
+
 import io.debezium.connector.spanner.PartitionManager;
 import io.debezium.connector.spanner.db.model.Partition;
 import io.debezium.connector.spanner.kafka.internal.model.PartitionStateEnum;
+import io.debezium.connector.spanner.task.state.MoveOutNotificationEvent;
 import io.debezium.connector.spanner.task.state.NewPartitionsEvent;
 import io.debezium.connector.spanner.task.state.PartitionStatusUpdateEvent;
 import io.debezium.connector.spanner.task.state.TaskStateChangeEvent;
+import io.debezium.connector.spanner.task.state.WindowAdvancedEvent;
 import io.debezium.function.BlockingConsumer;
 
 /**
@@ -51,6 +55,16 @@ public class SynchronizedPartitionManager implements PartitionManager {
     @Override
     public void updateToReadyForStreaming(String token) throws InterruptedException {
         syncEventPublisher.accept(new PartitionStatusUpdateEvent(token, PartitionStateEnum.READY_FOR_STREAMING));
+    }
+
+    @Override
+    public void notifyMoveOut(String token, Timestamp commitTimestamp, List<String> destinationTokens) throws InterruptedException {
+        syncEventPublisher.accept(new MoveOutNotificationEvent(token, commitTimestamp, destinationTokens));
+    }
+
+    @Override
+    public void updateProcessedTimestamp(String token, Timestamp processedTimestamp, String lastBoundaryRecordSequence) throws InterruptedException {
+        syncEventPublisher.accept(new WindowAdvancedEvent(token, processedTimestamp, lastBoundaryRecordSequence));
     }
 
 }
