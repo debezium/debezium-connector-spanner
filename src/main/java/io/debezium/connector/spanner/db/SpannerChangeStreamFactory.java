@@ -8,6 +8,9 @@ package io.debezium.connector.spanner.db;
 import java.time.Duration;
 import java.util.UUID;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.google.cloud.spanner.Options;
 
 import io.debezium.connector.spanner.db.dao.ChangeStreamDao;
@@ -18,6 +21,8 @@ import io.debezium.connector.spanner.metrics.MetricsEventPublisher;
 
 /** Factory for {@code SpannerChangeStream} */
 public class SpannerChangeStreamFactory {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(SpannerChangeStreamFactory.class);
 
     private static final String JOB_NAME = "SpannerChangeStream_Kafka";
 
@@ -38,19 +43,22 @@ public class SpannerChangeStreamFactory {
     }
 
     public SpannerChangeStream getStream(
-                                         String changeStreamName, Duration heartbeatMillis, int maxMissedHeartbeats) {
+                                         String changeStreamName, Duration heartbeatMillis, int maxMissedHeartbeats, int windowMinutes) {
 
         ChangeStreamDao changeStreamDao = daoFactory.getStreamDao(
                 changeStreamName,
                 Options.RpcPriority.MEDIUM,
                 JOB_NAME + "_" + connectorName + "_" + UUID.randomUUID());
 
-        // TODO: populate isMutableKeyRange from ChangeStreamDao.
+        if (changeStreamDao.isMutableKeyRange()) {
+            LOGGER.info("Connection to mutable key range change stream '{}' was successful", changeStreamDao.getChangeStreamName());
+        }
+
         ChangeStreamRecordMapper changeStreamRecordMapper = new ChangeStreamRecordMapper(
-                databaseClientFactory.getDatabaseClient(), false);
+                databaseClientFactory.getDatabaseClient(), changeStreamDao.isMutableKeyRange());
 
         SpannerChangeStreamService streamService = new SpannerChangeStreamService(
-                taskUid, changeStreamDao, changeStreamRecordMapper, heartbeatMillis, metricsEventPublisher);
+                taskUid, changeStreamDao, changeStreamRecordMapper, heartbeatMillis, metricsEventPublisher, windowMinutes);
 
         return new SpannerChangeStream(
                 streamService, metricsEventPublisher, heartbeatMillis, maxMissedHeartbeats, taskUid, databaseClientFactory);

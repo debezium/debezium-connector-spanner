@@ -82,6 +82,10 @@ public class AbstractSpannerConnectorIT extends AbstractAsyncEngineConnectorTest
         Testing.print("Cleaning complete!");
     }
 
+    protected static void clearKafkaTopics() {
+        KAFKA_ENVIRONMENT.clearTopics();
+    }
+
     public static int waitTimeForRecords() {
         return Integer.parseInt(System.getProperty(TEST_PROPERTY_PREFIX + "records.waittime", "30"));
     }

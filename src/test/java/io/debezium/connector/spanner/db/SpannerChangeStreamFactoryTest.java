@@ -36,7 +36,7 @@ class SpannerChangeStreamFactoryTest {
                 "taskUid", daoFactory, new MetricsEventPublisher(), "test-connector",
                 databaseClientFactory);
         SpannerChangeStream stream = spannerChangeStreamFactory.getStream("stream1",
-                Duration.ofMillis(100), 1);
+                Duration.ofMillis(100), 1, 20);
         assertNotNull(stream);
     }
 }

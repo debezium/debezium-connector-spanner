@@ -93,4 +93,38 @@ class PartitionFactoryTest {
         assertEquals(1, result.size());
         assertEquals(START, result.get("token1").getStartTimestamp());
     }
+
+    @Test
+    void testCommittedOffsetTakesPrecedenceOverNewerProcessedTimestamp() {
+        // Simulates a crash after processedTimestamp was published to the sync topic but before
+        // Kafka Connect committed the offset: the offset (older, but durable) must win so no
+        // scanned-but-uncommitted records are skipped on restart.
+        Timestamp processedTimestamp = Timestamp.parseTimestamp("2026-01-01T00:10:00Z");
+        Map<Map<String, String>, Map<String, Object>> offsets = new HashMap<>();
+        offsets.put(Map.of("partitionToken", "token1"), Map.of("offset", OFFSET.toString()));
+
+        PartitionFactory factory = buildFactory(offsets);
+
+        PartitionState state = buildPartitionState("token1").toBuilder()
+                .processedTimestamp(processedTimestamp)
+                .build();
+        Map<String, Partition> result = factory.getPartitions(List.of(state));
+
+        assertEquals(1, result.size());
+        assertEquals(OFFSET, result.get("token1").getStartTimestamp());
+    }
+
+    @Test
+    void testProcessedTimestampUsedWhenNoCommittedOffsetExists() {
+        Timestamp processedTimestamp = Timestamp.parseTimestamp("2026-01-01T00:10:00Z");
+        PartitionFactory factory = buildFactory(new HashMap<>());
+
+        PartitionState state = buildPartitionState("token1").toBuilder()
+                .processedTimestamp(processedTimestamp)
+                .build();
+        Map<String, Partition> result = factory.getPartitions(List.of(state));
+
+        assertEquals(1, result.size());
+        assertEquals(processedTimestamp, result.get("token1").getStartTimestamp());
+    }
 }

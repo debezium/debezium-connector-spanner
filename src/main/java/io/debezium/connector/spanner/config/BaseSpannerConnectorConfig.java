@@ -143,6 +143,29 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
 
     private static final String CONNECTOR_SPANNER_SYNC_TOPIC_MAX_MESSAGE_BYTES_PROPERTY_NAME = "connector.spanner.sync.max.message.bytes";
 
+    private static final String MUTABLE_PARTITION_ORDERING_ENABLED_PROPERTY_NAME = "gcp.spanner.mutable.partition.ordering.enabled";
+
+    public static final String MUTABLE_WINDOW_MINUTES_PROPERTY_NAME = "gcp.spanner.mutable.window.minutes";
+
+    public static final Field MUTABLE_PARTITION_ORDERING_ENABLED = Field.create(MUTABLE_PARTITION_ORDERING_ENABLED_PROPERTY_NAME)
+            .withDisplayName("Mutable partition move-in/move-out ordering enabled")
+            .withType(Type.BOOLEAN)
+            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR))
+            .withWidth(Width.SHORT)
+            .withImportance(Importance.MEDIUM)
+            .withDefault(true)
+            .withDescription("When true, enables move-in/move-out ordering for mutable key range change streams. Default true.");
+
+    public static final Field MUTABLE_WINDOW_MINUTES = Field.create(MUTABLE_WINDOW_MINUTES_PROPERTY_NAME)
+            .withDisplayName("Mutable key range sliding window size (minutes)")
+            .withType(Type.INT)
+            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR))
+            .withWidth(Width.SHORT)
+            .withImportance(Importance.LOW)
+            .withDefault(20)
+            .withValidation(BaseSpannerConnectorConfig::validateMutableWindowMinutes)
+            .withDescription("Size in minutes of each sliding query window for mutable key range change streams. Must be between 1 and 30. Default 20.");
+
     protected static final Field LOW_WATERMARK_ENABLED_FIELD = Field.create(LOW_WATERMARK_ENABLED)
             .withDisplayName(LOW_WATERMARK_ENABLED)
             .withType(Type.BOOLEAN)
@@ -713,6 +736,8 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
                     TASKS_FAIL_OVERLOADED_CHECK_INTERVAL,
                     SCALER_MONITOR_ENABLED,
                     LOGGING_JSON_ENABLED,
+                    MUTABLE_PARTITION_ORDERING_ENABLED,
+                    MUTABLE_WINDOW_MINUTES,
                     TOMBSTONES_ON_DELETE,
                     SOURCE_INFO_STRUCT_MAKER)
             .group(Field.Group.CONNECTION_ADVANCED,
@@ -751,5 +776,14 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
 
     public static ConfigDef configDef() {
         return CONFIG_DEFINITION.configDef();
+    }
+
+    static int validateMutableWindowMinutes(Configuration config, Field field, Field.ValidationOutput problems) {
+        int value = config.getInteger(field, 20);
+        if (value < 1 || value > 30) {
+            problems.accept(field, value, "Must be between 1 and 30 minutes (inclusive). Got: " + value);
+            return 1;
+        }
+        return 0;
     }
 }

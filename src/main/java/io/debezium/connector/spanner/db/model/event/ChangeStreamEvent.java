@@ -16,4 +16,8 @@ public interface ChangeStreamEvent {
     Timestamp getRecordTimestamp();
 
     StreamEventMetadata getMetadata();
+
+    default String getRecordSequence() {
+        return null;
+    }
 }

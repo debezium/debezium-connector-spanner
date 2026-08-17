@@ -23,15 +23,19 @@ import io.debezium.connector.spanner.task.operation.ChildPartitionOperation;
 import io.debezium.connector.spanner.task.operation.ClearSharedPartitionOperation;
 import io.debezium.connector.spanner.task.operation.ConnectorEndDetectionOperation;
 import io.debezium.connector.spanner.task.operation.FindPartitionForStreamingOperation;
+import io.debezium.connector.spanner.task.operation.MoveOutStateUpdateOperation;
 import io.debezium.connector.spanner.task.operation.Operation;
 import io.debezium.connector.spanner.task.operation.PartitionStatusUpdateOperation;
 import io.debezium.connector.spanner.task.operation.RemoveFinishedPartitionOperation;
 import io.debezium.connector.spanner.task.operation.TakePartitionForStreamingOperation;
 import io.debezium.connector.spanner.task.operation.TakeSharedPartitionOperation;
+import io.debezium.connector.spanner.task.operation.WindowAdvancedOperation;
+import io.debezium.connector.spanner.task.state.MoveOutNotificationEvent;
 import io.debezium.connector.spanner.task.state.NewPartitionsEvent;
 import io.debezium.connector.spanner.task.state.PartitionStatusUpdateEvent;
 import io.debezium.connector.spanner.task.state.SyncEvent;
 import io.debezium.connector.spanner.task.state.TaskStateChangeEvent;
+import io.debezium.connector.spanner.task.state.WindowAdvancedEvent;
 
 /**
  * This class processes all types of TaskStateChangeEvents (i.e. LastCommitTimestampUpdateEvent,
@@ -89,6 +93,12 @@ public class TaskStateChangeEventHandler {
             processSyncEvent();
 
         }
+        else if (syncEvent instanceof MoveOutNotificationEvent) {
+            processEvent((MoveOutNotificationEvent) syncEvent);
+        }
+        else if (syncEvent instanceof WindowAdvancedEvent) {
+            processEvent((WindowAdvancedEvent) syncEvent);
+        }
         else {
             throw new IllegalStateException("Unknown event");
         }
@@ -114,6 +124,16 @@ public class TaskStateChangeEventHandler {
                 new FindPartitionForStreamingOperation(),
                 new TakePartitionForStreamingOperation(changeStream, partitionFactory),
                 new RemoveFinishedPartitionOperation(spannerEventDispatcher, connectorConfig));
+    }
+
+    private void processEvent(MoveOutNotificationEvent event) throws InterruptedException {
+        performOperation(new MoveOutStateUpdateOperation(
+                event.getToken(), event.getCommitTimestamp(), event.getDestinationTokens()));
+    }
+
+    private void processEvent(WindowAdvancedEvent event) throws InterruptedException {
+        performOperation(new WindowAdvancedOperation(
+                event.getToken(), event.getProcessedTimestamp(), event.getLastBoundaryRecordSequence()));
     }
 
     private void processSyncEvent() throws InterruptedException {

@@ -93,4 +93,12 @@ public class ChangeStreamDao {
     public boolean isPostgres() {
         return this.databaseClient.getDialect() == Dialect.POSTGRESQL;
     }
+
+    public String getChangeStreamName() {
+        return changeStreamName;
+    }
+
+    public boolean isMutableKeyRange() {
+        return isMutableKeyRange;
+    }
 }
