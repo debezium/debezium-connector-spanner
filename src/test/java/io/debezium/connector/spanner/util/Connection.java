@@ -153,9 +153,10 @@ public class Connection {
 
     public void createMutableKeyRangeChangeStream(String changeStreamName, String... tables) throws ExecutionException,
             InterruptedException {
+        String optionsClause = schemaDao.isPostgres() ? "WITH" : "OPTIONS";
         this.updateDDL(List.of("create change stream " + changeStreamName + " for " +
                 (tables.length == 0 ? "ALL" : String.join(",", tables)) +
-                " OPTIONS (partition_mode = 'MUTABLE_KEY_RANGE')"));
+                " " + optionsClause + " (partition_mode = 'MUTABLE_KEY_RANGE')"));
         await().atMost(Duration.ofSeconds(ddlWaitTimeSeconds())).until(() -> isStreamExist(changeStreamName));
     }
 
