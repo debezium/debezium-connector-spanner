@@ -26,10 +26,13 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
+
+import com.google.cloud.spanner.Dialect;
 
 import io.debezium.config.Configuration;
 import io.debezium.connector.spanner.util.Connection;
-import io.debezium.connector.spanner.util.Database;
 import io.debezium.util.Testing;
 
 /**
@@ -136,17 +139,23 @@ public class MutableKeyRangeIT extends AbstractSpannerConnectorIT {
      * and a MUTABLE_KEY_RANGE change stream over it, for a single test's own setup.
      */
     private void createMutableKeyRangeTableAndStream(String table, String stream) {
+        createMutableKeyRangeTableAndStream(databaseConnection, Dialect.GOOGLE_STANDARD_SQL, table, stream);
+    }
+
+    /**
+     * Dialect-aware variant of {@link #createMutableKeyRangeTableAndStream(String, String)}, used by
+     * tests parameterized over {@link Dialect} so the same scenario can run against both a GoogleSQL-
+     * and a PostgreSQL-dialect database.
+     */
+    private void createMutableKeyRangeTableAndStream(Connection connection, Dialect dialect, String table, String stream) {
         try {
-            databaseConnection.createTable(table + "(id INT64, name STRING(100)) PRIMARY KEY(id)");
-            databaseConnection.createMutableKeyRangeChangeStream(stream, table);
+            String tableDefinition = dialect == Dialect.POSTGRESQL
+                    ? table + "(id bigint, name varchar(100), PRIMARY KEY (id))"
+                    : table + "(id INT64, name STRING(100)) PRIMARY KEY(id)";
+            connection.createTable(tableDefinition);
+            connection.createMutableKeyRangeChangeStream(stream, table);
         }
         catch (Exception e) {
-            if (!Connection.isRealSpanner() && !Database.isSpannerOmniEndpoint()) {
-                Assumptions.assumeTrue(false,
-                        "Skipping: MUTABLE_KEY_RANGE change streams are not supported by the local Spanner "
-                                + "emulator (" + e.getMessage() + "). Run with -Dspanner.test.real=true or "
-                                + "-Dspanner.type=OMNI against a backend that supports it.");
-            }
             throw new RuntimeException(e);
         }
     }
@@ -166,7 +175,10 @@ public class MutableKeyRangeIT extends AbstractSpannerConnectorIT {
     }
 
     private static void deleteOffsetFiles() {
-        for (String name : new String[]{ TABLE_CRUD + "_connector", TABLE_RESTART + "_connector", TABLE_WINDOW + "_connector", TABLE_ORDER + "_connector",
+        for (String name : new String[]{
+                TABLE_CRUD + "_" + Dialect.GOOGLE_STANDARD_SQL.name().toLowerCase() + "_connector",
+                TABLE_CRUD + "_" + Dialect.POSTGRESQL.name().toLowerCase() + "_connector",
+                TABLE_RESTART + "_connector", TABLE_WINDOW + "_connector", TABLE_ORDER + "_connector",
                 TABLE_MID_WINDOW_STOP + "_connector", TABLE_MID_WINDOW_DELETE + "_connector", TABLE_QUIET_WINDOW + "_connector",
                 TABLE_HISTORICAL_START + "_connector", TABLE_SCHEMA_CHANGE + "_connector", TABLE_SCHEMA_CHANGE_MID_STREAM + "_connector",
                 TABLE_LARGE_TRANSACTION + "_connector",
@@ -190,7 +202,16 @@ public class MutableKeyRangeIT extends AbstractSpannerConnectorIT {
     }
 
     private Configuration buildConfig(String connectorName, String stream, int windowMinutes) {
-        return Configuration.copy(baseConfig)
+        return buildConfig(baseConfig, connectorName, stream, windowMinutes);
+    }
+
+    /**
+     * Dialect-aware variant that builds the config from an arbitrary base {@code Configuration}
+     * (e.g. {@link #basePgConfig} for PostgreSQL-dialect tests), instead of always the GoogleSQL
+     * {@link #baseConfig}.
+     */
+    private Configuration buildConfig(Configuration base, String connectorName, String stream, int windowMinutes) {
+        return Configuration.copy(base)
                 .with("gcp.spanner.change.stream", stream)
                 .with("name", connectorName)
                 .with("gcp.spanner.start.time", DateTimeFormatter.ISO_INSTANT.format(Instant.now()))
@@ -228,21 +249,32 @@ public class MutableKeyRangeIT extends AbstractSpannerConnectorIT {
     }
 
     /**
-     * Verifies that INSERT / UPDATE / DELETE produce c / u / d / tombstone records in order.
+     * Verifies that INSERT / UPDATE / DELETE produce c / u / d / tombstone records in order, for a
+     * MUTABLE_KEY_RANGE change stream on both a GoogleSQL- and a PostgreSQL-dialect database.
      */
-    @Test
-    void shouldStreamCrudEventsToKafka() throws InterruptedException, ExecutionException {
-        createMutableKeyRangeTableAndStream(TABLE_CRUD, STREAM_CRUD);
+    @ParameterizedTest
+    @EnumSource(Dialect.class)
+    void shouldStreamCrudEventsToKafka(Dialect dialect) throws InterruptedException, ExecutionException {
+        // TODO: remove this skip once PostgreSQL MUTABLE_KEY_RANGE support is fully implemented
+        // and verified end-to-end.
+        Assumptions.assumeTrue(dialect != Dialect.POSTGRESQL,
+                "Skipping: PostgreSQL MUTABLE_KEY_RANGE support is still being implemented.");
+        Connection connection = dialect == Dialect.POSTGRESQL ? pgDatabaseConnection : databaseConnection;
+        Configuration base = dialect == Dialect.POSTGRESQL ? basePgConfig : baseConfig;
+        String table = TABLE_CRUD + "_" + dialect.name().toLowerCase();
+        String stream = STREAM_CRUD + dialect.name();
+
+        createMutableKeyRangeTableAndStream(connection, dialect, table, stream);
         try {
-            Configuration config = buildConfig(TABLE_CRUD + "_connector", STREAM_CRUD);
+            Configuration config = buildConfig(base, table + "_connector", stream, WINDOW_MINUTES);
             start(SpannerConnector.class, config);
             assertConnectorIsRunning();
 
-            databaseConnection.executeUpdate("INSERT INTO " + TABLE_CRUD + " (id, name) VALUES (1, 'alpha')");
-            databaseConnection.executeUpdate("UPDATE " + TABLE_CRUD + " SET name = 'beta' WHERE id = 1");
-            databaseConnection.executeUpdate("DELETE FROM " + TABLE_CRUD + " WHERE id = 1");
+            connection.executeUpdate("INSERT INTO " + table + " (id, name) VALUES (1, 'alpha')");
+            connection.executeUpdate("UPDATE " + table + " SET name = 'beta' WHERE id = 1");
+            connection.executeUpdate("DELETE FROM " + table + " WHERE id = 1");
 
-            List<SourceRecord> records = consumeRecordsForTopic(config, TABLE_CRUD, 4);
+            List<SourceRecord> records = consumeRecordsForTopic(config, table, 4);
 
             assertThat(records).as("Expected 4 records: c / u / d / tombstone").hasSize(4);
             assertThat(op(records, 0)).as("First record should be INSERT").isEqualTo("c");
@@ -251,8 +283,8 @@ public class MutableKeyRangeIT extends AbstractSpannerConnectorIT {
             assertThat(records.get(3).value()).as("Fourth record should be tombstone").isNull();
         }
         finally {
-            databaseConnection.dropChangeStream(STREAM_CRUD);
-            databaseConnection.dropTable(TABLE_CRUD);
+            connection.dropChangeStream(stream);
+            connection.dropTable(table);
         }
     }
 
@@ -850,9 +882,6 @@ public class MutableKeyRangeIT extends AbstractSpannerConnectorIT {
      */
     @Test
     void shouldPickUpSchemaChangeMidStream() throws InterruptedException, ExecutionException {
-        Assumptions.assumeFalse(Database.isSpannerOmniEndpoint(),
-                "Reproducible Omni gap: an UPDATE to a pre-existing row is dropped once the table has a "
-                        + "third column of type INT64. Run against real Spanner instead (-Preal-spanner)");
         createMutableKeyRangeTableAndStream(TABLE_SCHEMA_CHANGE, STREAM_SCHEMA_CHANGE);
         try {
             Configuration config = buildConfig(TABLE_SCHEMA_CHANGE + "_connector", STREAM_SCHEMA_CHANGE);

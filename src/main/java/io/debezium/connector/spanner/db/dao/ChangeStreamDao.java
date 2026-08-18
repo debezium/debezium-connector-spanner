@@ -42,12 +42,13 @@ public class ChangeStreamDao {
         String query;
         Statement statement;
         if (this.isPostgres()) {
+            String normalizedChangeStreamName = changeStreamName.toLowerCase();
             if (this.isMutableKeyRange) {
-                query = "SELECT * FROM \"spanner\".\"read_proto_bytes_" + changeStreamName
+                query = "SELECT * FROM \"spanner\".\"read_proto_bytes_" + normalizedChangeStreamName
                         + "\"($1, $2, $3, $4, null)";
             }
             else {
-                query = "SELECT * FROM \"spanner\".\"read_json_" + changeStreamName
+                query = "SELECT * FROM \"spanner\".\"read_json_" + normalizedChangeStreamName
                         + "\"($1, $2, $3, $4, null)";
             }
             statement = Statement.newBuilder(query)
