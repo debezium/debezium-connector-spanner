@@ -178,6 +178,9 @@ public class Connection {
      * cooldown when the request is throttled with {@code RESOURCE_EXHAUSTED}.
      */
     public void forceSplit(String tableName, Duration expiry, String... keyParts) {
+        // PostgreSQL-dialect Spanner folds unquoted identifiers to lowercase, so the table name
+        // stored internally (and required by the AddSplitPoints admin API) is the lowercase form.
+        String normalizedTableName = dialect == Dialect.POSTGRESQL ? tableName.toLowerCase() : tableName;
         int maxAttempts = 4;
         for (int attempt = 1; attempt <= maxAttempts; attempt++) {
             try (com.google.cloud.spanner.admin.database.v1.DatabaseAdminClient adminClient = spanner.createDatabaseAdminClient()) {
@@ -193,31 +196,31 @@ public class Connection {
                 }
 
                 SplitPoints splitPoint = SplitPoints.newBuilder()
-                        .setTable(tableName)
+                        .setTable(normalizedTableName)
                         .setExpireTime(expireTime)
                         .addKeys(SplitPoints.Key.newBuilder().setKeyParts(keyValues))
                         .build();
 
                 adminClient.addSplitPoints(DatabaseName.of(projectId, instanceId, databaseId), List.of(splitPoint));
-                LOG.info("Forced split on table {} at key {}", tableName, List.of(keyParts));
+                LOG.info("Forced split on table {} at key {}", normalizedTableName, List.of(keyParts));
                 return;
             }
             catch (ResourceExhaustedException e) {
                 if (attempt == maxAttempts) {
-                    throw new RuntimeException("Failed to force split for table " + tableName
+                    throw new RuntimeException("Failed to force split for table " + normalizedTableName
                             + " after " + maxAttempts + " attempts (split point quota exhausted)", e);
                 }
-                LOG.warn("Split point quota exhausted for table {}, retrying in 65s (attempt {}/{})", tableName, attempt, maxAttempts);
+                LOG.warn("Split point quota exhausted for table {}, retrying in 65s (attempt {}/{})", normalizedTableName, attempt, maxAttempts);
                 try {
                     Thread.sleep(65_000);
                 }
                 catch (InterruptedException interrupted) {
                     Thread.currentThread().interrupt();
-                    throw new RuntimeException("Interrupted while waiting to retry split for table " + tableName, interrupted);
+                    throw new RuntimeException("Interrupted while waiting to retry split for table " + normalizedTableName, interrupted);
                 }
             }
             catch (Exception e) {
-                throw new RuntimeException("Failed to force split for table " + tableName, e);
+                throw new RuntimeException("Failed to force split for table " + normalizedTableName, e);
             }
         }
     }
