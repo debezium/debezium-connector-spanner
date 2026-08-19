@@ -1669,6 +1669,179 @@ class ChangeStreamRecordMapperTest {
                 changeStreamRecordMapper.toChangeStreamEvents(partition, resultSet, resultSetMetadata));
     }
 
+    // PostgreSQL + MUTABLE_KEY_RANGE change streams are read via the "spanner"."read_proto_bytes_<name>"
+    // function, which (like GoogleSQL's READ_<name> TVF for mutable key range) returns a serialized
+    // google.spanner.v1.ChangeStreamRecord proto. The following tests mirror the GoogleSQL-mutable
+    // proto tests above, but with the PostgreSQL dialect client, to confirm the same proto -> event
+    // mapping is used regardless of dialect.
+
+    @Test
+    void testDataChangeRecordProtoToStreamEventPostgres() {
+        ChangeStreamRecordMapper changeStreamRecordMapper = new ChangeStreamRecordMapper(psqlDatabaseClient, true);
+        final DataChangeEvent dataChangeRecord = new DataChangeEvent(
+                "partitionToken",
+                Timestamp.ofTimeSecondsAndNanos(1L, 1000),
+                "serverTxId",
+                true,
+                "00000000001",
+                "tableName",
+                Arrays.asList(
+                        new Column("column1", ColumnTypeParser.parse("{\"code\":\"INT64\"}"), true,
+                                1L, false),
+                        new Column("column2", ColumnTypeParser.parse("{\"code\":\"STRING\"}"),
+                                false,
+                                2L, true)),
+                Collections.singletonList(
+                        new Mod(0, MapperUtils.getJsonNode("{\"column1\":\"1\"}"),
+                                MapperUtils.getJsonNode(
+                                        "{\"column2\":\"oldValue\"}"),
+                                MapperUtils.getJsonNode(
+                                        "{\"column2\":\"newValue\"}"))),
+                ModType.INSERT,
+                ValueCaptureType.OLD_AND_NEW_VALUES,
+                1,
+                1,
+                "tag",
+                true,
+                changeStreamRecordMapper.streamEventMetadataFrom(partition,
+                        Timestamp.ofTimeSecondsAndNanos(1L, 1000), resultSetMetadata));
+
+        ChangeStreamResultSet resultSet = mock(ChangeStreamResultSet.class);
+        com.google.spanner.v1.ChangeStreamRecord record = com.google.spanner.v1.ChangeStreamRecord
+                .newBuilder()
+                .setDataChangeRecord(com.google.spanner.v1.ChangeStreamRecord.DataChangeRecord.newBuilder()
+                        .setCommitTimestamp(com.google.protobuf.Timestamp.newBuilder()
+                                .setSeconds(1L)
+                                .setNanos(1000)
+                                .build())
+                        .setRecordSequence("00000000001")
+                        .setServerTransactionId("serverTxId")
+                        .setIsLastRecordInTransactionInPartition(true)
+                        .setTable("tableName")
+                        .addAllColumnMetadata(List.of(
+                                com.google.spanner.v1.ChangeStreamRecord.DataChangeRecord.ColumnMetadata.newBuilder()
+                                        .setName("column1")
+                                        .setType(com.google.spanner.v1.Type.newBuilder()
+                                                .setCode(com.google.spanner.v1.TypeCode.INT64).build())
+                                        .setIsPrimaryKey(true)
+                                        .setOrdinalPosition(1)
+                                        .build(),
+                                com.google.spanner.v1.ChangeStreamRecord.DataChangeRecord.ColumnMetadata.newBuilder()
+                                        .setName("column2")
+                                        .setType(com.google.spanner.v1.Type.newBuilder()
+                                                .setCode(com.google.spanner.v1.TypeCode.STRING).build())
+                                        .setIsPrimaryKey(false)
+                                        .setOrdinalPosition(2)
+                                        .build()))
+                        .addMods(
+                                com.google.spanner.v1.ChangeStreamRecord.DataChangeRecord.Mod.newBuilder()
+                                        .addKeys(
+                                                com.google.spanner.v1.ChangeStreamRecord.DataChangeRecord.ModValue
+                                                        .newBuilder()
+                                                        .setColumnMetadataIndex(0)
+                                                        .setValue(com.google.protobuf.Value.newBuilder()
+                                                                .setStringValue("1")
+                                                                .build())
+                                                        .build())
+                                        .addNewValues(
+                                                com.google.spanner.v1.ChangeStreamRecord.DataChangeRecord.ModValue
+                                                        .newBuilder()
+                                                        .setColumnMetadataIndex(1)
+                                                        .setValue(com.google.protobuf.Value.newBuilder()
+                                                                .setStringValue("newValue")
+                                                                .build()))
+                                        .addOldValues(
+                                                com.google.spanner.v1.ChangeStreamRecord.DataChangeRecord.ModValue
+                                                        .newBuilder()
+                                                        .setColumnMetadataIndex(1)
+                                                        .setValue(com.google.protobuf.Value.newBuilder()
+                                                                .setStringValue("oldValue")
+                                                                .build())
+                                                        .build())
+                                        .build())
+                        .setModType(com.google.spanner.v1.ChangeStreamRecord.DataChangeRecord.ModType.INSERT)
+                        .setValueCaptureTypeValue(
+                                com.google.spanner.v1.ChangeStreamRecord.DataChangeRecord.ValueCaptureType.OLD_AND_NEW_VALUES_VALUE)
+                        .setNumberOfRecordsInTransaction(1)
+                        .setNumberOfPartitionsInTransaction(1)
+                        .setTransactionTag("tag")
+                        .setIsSystemTransaction(true))
+                .build();
+
+        when(resultSet.getProtoChangeStreamRecord(anyInt())).thenReturn(record);
+
+        assertEquals(
+                Collections.singletonList(dataChangeRecord),
+                changeStreamRecordMapper.toChangeStreamEvents(partition, resultSet, resultSetMetadata));
+    }
+
+    @Test
+    void testHeartbeatRecordProtoToStreamEventPostgres() {
+        ChangeStreamRecordMapper changeStreamRecordMapper = new ChangeStreamRecordMapper(psqlDatabaseClient, true);
+        final HeartbeatEvent heartbeatEvent = new HeartbeatEvent(
+                Timestamp.ofTimeSecondsAndNanos(1L, 1000),
+                changeStreamRecordMapper.streamEventMetadataFrom(partition,
+                        Timestamp.ofTimeSecondsAndNanos(1L, 1000), resultSetMetadata));
+
+        ChangeStreamResultSet resultSet = mock(ChangeStreamResultSet.class);
+        com.google.spanner.v1.ChangeStreamRecord record = com.google.spanner.v1.ChangeStreamRecord
+                .newBuilder()
+                .setHeartbeatRecord(com.google.spanner.v1.ChangeStreamRecord.HeartbeatRecord.newBuilder()
+                        .setTimestamp(com.google.protobuf.Timestamp.newBuilder()
+                                .setSeconds(1L)
+                                .setNanos(1000)
+                                .build()))
+                .build();
+
+        when(resultSet.getProtoChangeStreamRecord(anyInt())).thenReturn(record);
+
+        assertEquals(
+                Collections.singletonList(heartbeatEvent),
+                changeStreamRecordMapper.toChangeStreamEvents(partition, resultSet, resultSetMetadata));
+    }
+
+    @Test
+    void testPartitionEventRecordProtoToStreamEventPostgres() {
+        ChangeStreamRecordMapper changeStreamRecordMapper = new ChangeStreamRecordMapper(psqlDatabaseClient, true);
+        final PartitionEventEvent partitionEventEvent = new PartitionEventEvent(
+                Timestamp.ofTimeSecondsAndNanos(1L, 1000),
+                "00000000001",
+                "token0",
+                List.of("token1"),
+                List.of("token2"),
+                changeStreamRecordMapper.streamEventMetadataFrom(partition,
+                        Timestamp.ofTimeSecondsAndNanos(1L, 1000), resultSetMetadata));
+
+        ChangeStreamResultSet resultSet = mock(ChangeStreamResultSet.class);
+        com.google.spanner.v1.ChangeStreamRecord record = com.google.spanner.v1.ChangeStreamRecord
+                .newBuilder()
+                .setPartitionEventRecord(com.google.spanner.v1.ChangeStreamRecord.PartitionEventRecord
+                        .newBuilder()
+                        .setCommitTimestamp(com.google.protobuf.Timestamp.newBuilder()
+                                .setSeconds(1L)
+                                .setNanos(1000)
+                                .build())
+                        .setRecordSequence("00000000001")
+                        .setPartitionToken("token0")
+                        .addAllMoveInEvents(
+                                List.of(com.google.spanner.v1.ChangeStreamRecord.PartitionEventRecord.MoveInEvent
+                                        .newBuilder()
+                                        .setSourcePartitionToken("token1")
+                                        .build()))
+                        .addAllMoveOutEvents(List.of(
+                                com.google.spanner.v1.ChangeStreamRecord.PartitionEventRecord.MoveOutEvent.newBuilder()
+                                        .setDestinationPartitionToken("token2")
+                                        .build()))
+                        .build())
+                .build();
+
+        when(resultSet.getProtoChangeStreamRecord(anyInt())).thenReturn(record);
+
+        assertEquals(
+                Collections.singletonList(partitionEventEvent),
+                changeStreamRecordMapper.toChangeStreamEvents(partition, resultSet, resultSetMetadata));
+    }
+
     @Test
     void testProtoToHearbeatEvent() {
         when(gsqlDatabaseClient.getDialect()).thenReturn(Dialect.GOOGLE_STANDARD_SQL);
