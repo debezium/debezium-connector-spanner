@@ -152,12 +152,12 @@ class OrderedMoveInMoveOutScenarioTest {
         // MoveOut history).
         assertEquals(1, partition("P1").getMoveOutStates().size());
         assertEquals(TS0, partition("P1").getMoveOutStates().get(0).getTimestamp());
-        assertEquals(List.of("P0"), partition("P1").getMoveOutStates().get(0).getDestPartitionTokens());
+        assertEquals(Set.of("P0"), partition("P1").getMoveOutStates().get(0).getDestPartitionTokens());
         assertEquals(1, partition("P2").getMoveOutStates().size());
         assertEquals(TS0, partition("P2").getMoveOutStates().get(0).getTimestamp());
-        assertEquals(List.of("P0"), partition("P2").getMoveOutStates().get(0).getDestPartitionTokens());
+        assertEquals(Set.of("P0"), partition("P2").getMoveOutStates().get(0).getDestPartitionTokens());
         assertEquals(2, partition("P3").getMoveOutStates().size());
         assertEquals(TS1, partition("P3").getMoveOutStates().get(1).getTimestamp());
-        assertEquals(List.of("P4"), partition("P3").getMoveOutStates().get(1).getDestPartitionTokens());
+        assertEquals(Set.of("P4"), partition("P3").getMoveOutStates().get(1).getDestPartitionTokens());
     }
 }

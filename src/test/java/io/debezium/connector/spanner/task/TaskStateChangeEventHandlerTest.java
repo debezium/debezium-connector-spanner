@@ -148,7 +148,7 @@ class TaskStateChangeEventHandlerTest {
 
         assertEquals(1, updatedSource.getMoveOutStates().size());
         assertEquals(moveTimestamp, updatedSource.getMoveOutStates().get(0).getTimestamp());
-        assertEquals(List.of("dst"), updatedSource.getMoveOutStates().get(0).getDestPartitionTokens());
+        assertEquals(Set.of("dst"), updatedSource.getMoveOutStates().get(0).getDestPartitionTokens());
         assertEquals(PartitionStateEnum.SCHEDULED, updatedDest.getState(),
                 "destination partition must be found and scheduled for streaming in the same pass as the MoveOut, not just have its moveOutState recorded");
     }
