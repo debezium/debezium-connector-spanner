@@ -73,6 +73,7 @@ class SpannerStreamingChangeEventSourceTest {
     void testExecute() throws InterruptedException {
         Configuration configuration = mock(Configuration.class);
         when(configuration.getString((Field) any())).thenReturn("String");
+        when(configuration.getString((String) any())).thenReturn("String");
         when(configuration.asProperties()).thenReturn(new Properties());
         SpannerConnectorConfig connectorConfig = new SpannerConnectorConfig(configuration);
         ChangeEventQueue<?> changeEventQueue = (ChangeEventQueue<?>) mock(ChangeEventQueue.class);
@@ -269,6 +270,7 @@ class SpannerStreamingChangeEventSourceTest {
 
         Configuration configuration = mock(Configuration.class);
         when(configuration.getString((Field) any())).thenReturn("String");
+        when(configuration.getString((String) any())).thenReturn("String");
         when(configuration.asProperties()).thenReturn(new Properties());
 
         SpannerStreamingChangeEventSource spannerStreamingChangeEventSource = new SpannerStreamingChangeEventSource(
@@ -287,6 +289,7 @@ class SpannerStreamingChangeEventSourceTest {
 
         Configuration configuration = mock(Configuration.class);
         when(configuration.getString((Field) any())).thenReturn("String");
+        when(configuration.getString((String) any())).thenReturn("String");
         when(configuration.asProperties()).thenReturn(new Properties());
 
         SpannerStreamingChangeEventSource spannerStreamingChangeEventSource = new SpannerStreamingChangeEventSource(
