@@ -507,22 +507,24 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
             .withDefault(5000)
             .withDescription("Interval in milliseconds to check whether the task is overloaded by partitions");
 
-    protected static final Field MAX_TASKS = Field.create(MAX_TASKS_PROPERTY_NAME)
+    public static final Field MAX_TASKS = Field.create(MAX_TASKS_PROPERTY_NAME)
             .withDisplayName("Max Tasks")
             .withType(Type.INT)
             .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR))
             .withWidth(Width.SHORT)
             .withImportance(Importance.HIGH)
             .withDefault(10)
+            .withValidation(Field::isPositiveInteger)
             .withDescription("Maximum number of tasks in connector");
 
-    protected static final Field MIN_TASKS = Field.create(MIN_TASKS_PROPERTY_NAME)
+    public static final Field MIN_TASKS = Field.create(MIN_TASKS_PROPERTY_NAME)
             .withDisplayName("Min Tasks")
             .withType(Type.INT)
             .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR))
             .withWidth(Width.SHORT)
             .withImportance(Importance.HIGH)
             .withDefault(2)
+            .withValidation(Field::isPositiveInteger)
             .withDescription("Minimum number of tasks in connector");
 
     protected static final Field DESIRED_PARTITIONS_TASKS = Field.create(DESIRED_PARTITIONS_TASKS_PROPERTY_NAME)
