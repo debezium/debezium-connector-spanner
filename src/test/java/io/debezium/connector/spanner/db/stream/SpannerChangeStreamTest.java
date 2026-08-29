@@ -5,6 +5,7 @@
  */
 package io.debezium.connector.spanner.db.stream;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -195,5 +196,27 @@ class SpannerChangeStreamTest {
                 .until(() -> spannerChangeStream.submitPartition(partition));
 
         verify(metricsEventPublisher, times(2)).publishMetricEvent(any());
+    }
+
+    @Test
+    void testPartitionStreamFailureWithoutChildPartitions() {
+        SpannerChangeStreamService streamService = mock(SpannerChangeStreamService.class);
+        MetricsEventPublisher metricsEventPublisher = mock(MetricsEventPublisher.class);
+        DatabaseClientFactory databaseClientFactory = mock(DatabaseClientFactory.class);
+
+        HashSet<String> parentTokens = new HashSet<>();
+        Timestamp startTimestamp = Timestamp.ofTimeMicroseconds(1L);
+        Partition partition = new Partition("partitionToken", parentTokens, startTimestamp, null, "originParent");
+
+        SpannerChangeStream spannerChangeStream = new SpannerChangeStream(streamService, metricsEventPublisher, Duration.ofSeconds(60), 3, "taskuid",
+                databaseClientFactory);
+
+        ChangeStreamException ex = new ChangeStreamException("Partition partitionToken stream ended without child partitions.");
+        ChangeStreamException streamException = spannerChangeStream.getStreamException(partition, ex);
+
+        assertTrue(streamException instanceof ChangeStreamException);
+        assertFalse(streamException instanceof FailureChangeStreamException);
+        assertEquals(ex, streamException);
+        assertFalse(spannerChangeStream.onError(partition, ex));
     }
 }

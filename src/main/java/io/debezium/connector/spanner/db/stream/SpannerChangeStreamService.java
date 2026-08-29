@@ -12,6 +12,8 @@ import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.google.cloud.Timestamp;
+
 import io.debezium.connector.spanner.db.dao.ChangeStreamDao;
 import io.debezium.connector.spanner.db.dao.ChangeStreamResultSet;
 import io.debezium.connector.spanner.db.mapper.ChangeStreamRecordMapper;
@@ -20,6 +22,7 @@ import io.debezium.connector.spanner.db.model.event.ChangeStreamEvent;
 import io.debezium.connector.spanner.db.model.event.ChildPartitionsEvent;
 import io.debezium.connector.spanner.db.model.event.FinishPartitionEvent;
 import io.debezium.connector.spanner.db.model.event.HeartbeatEvent;
+import io.debezium.connector.spanner.db.stream.exception.ChangeStreamException;
 import io.debezium.connector.spanner.metrics.MetricsEventPublisher;
 import io.debezium.connector.spanner.metrics.event.DelayChangeStreamEventsMetricEvent;
 
@@ -55,6 +58,8 @@ public class SpannerChangeStreamService {
         partitionEventListener.onRun(partition);
 
         LOGGER.info("Task: {}, Streaming {} from {} to {}", taskUid, token, partition.getStartTimestamp(), partition.getEndTimestamp());
+        Timestamp lastReceivedTimestamp = null;
+        boolean receivedChildPartitions = false;
         try (ChangeStreamResultSet resultSet = changeStreamDao.streamQuery(token, partition.getStartTimestamp(),
                 partition.getEndTimestamp(), heartbeatMillis.toMillis())) {
 
@@ -66,6 +71,17 @@ public class SpannerChangeStreamService {
                         partition,
                         resultSet, resultSet.getMetadata());
                 LOGGER.debug("Task: {}, Events receive from stream: {}", taskUid, events);
+
+                for (ChangeStreamEvent event : events) {
+                    if (event instanceof ChildPartitionsEvent) {
+                        receivedChildPartitions = true;
+                    }
+                    if (event.getRecordTimestamp() != null) {
+                        if (lastReceivedTimestamp == null || event.getRecordTimestamp().compareTo(lastReceivedTimestamp) > 0) {
+                            lastReceivedTimestamp = event.getRecordTimestamp();
+                        }
+                    }
+                }
 
                 if (!events.isEmpty() && (events.get(0) instanceof HeartbeatEvent)) {
                     var heartbeatEvent = (HeartbeatEvent) events.get(0);
@@ -89,6 +105,21 @@ public class SpannerChangeStreamService {
         catch (InterruptedException ex) {
             LOGGER.info("task {}, Interrupting streaming partition task with token {}", this.taskUid, partition.getToken());
             Thread.currentThread().interrupt();
+            return;
+        }
+
+        boolean reachedEnd = receivedChildPartitions
+                || (partition.getEndTimestamp() != null
+                        && lastReceivedTimestamp != null
+                        && lastReceivedTimestamp.compareTo(partition.getEndTimestamp()) >= 0);
+
+        if (!reachedEnd) {
+            LOGGER.error(
+                    "Task: {}, Partition {} stream ended without delivering child partition records or reaching end timestamp {} (last received timestamp: {})! Retrying partition stream.",
+                    taskUid, token, partition.getEndTimestamp(), lastReceivedTimestamp);
+            throw new ChangeStreamException(
+                    "Partition " + token + " stream ended without child partitions or reaching end timestamp "
+                            + partition.getEndTimestamp() + ". Retrying partition stream.");
         }
 
         partitionEventListener.onFinish(partition);

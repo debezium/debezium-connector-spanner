@@ -227,6 +227,10 @@ public class SpannerChangeStream implements ChangeStream {
 
     @VisibleForTesting
     ChangeStreamException getStreamException(Partition partition, Exception ex) {
+        if (ex instanceof ChangeStreamException) {
+            return (ChangeStreamException) ex;
+        }
+
         if (ex instanceof SpannerException) {
             SpannerException spannerException = (SpannerException) ex;
 
