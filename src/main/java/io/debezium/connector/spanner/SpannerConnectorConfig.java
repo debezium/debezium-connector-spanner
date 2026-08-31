@@ -107,6 +107,10 @@ public class SpannerConnectorConfig extends BaseSpannerConnectorConfig {
         return getConfig().getInteger(MAX_MISSED_HEARTBEATS);
     }
 
+    public Duration getHeartbeatLagWarnThreshold() {
+        return Duration.ofMillis(getConfig().getLong(HEARTBEAT_LAG_WARN_THRESHOLD_MS));
+    }
+
     public Duration getLowWatermarkStampInterval() {
         return getConfig().getDuration(LOW_WATERMARK_STAMP_INTERVAL, ChronoUnit.MILLIS);
     }

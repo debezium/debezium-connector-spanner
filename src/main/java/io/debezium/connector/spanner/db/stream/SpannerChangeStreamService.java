@@ -39,6 +39,8 @@ public class SpannerChangeStreamService {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(SpannerChangeStreamService.class);
 
+    public static final Duration DEFAULT_HEARTBEAT_LAG_WARN_THRESHOLD = Duration.ofSeconds(60);
+
     private final ChangeStreamDao changeStreamDao;
     private final ChangeStreamRecordMapper changeStreamRecordMapper;
 
@@ -47,6 +49,7 @@ public class SpannerChangeStreamService {
     private final String taskUid;
     private final Duration windowDuration;
     private final boolean mutablePartitionOrderingEnabled;
+    private final Duration heartbeatLagWarnThreshold;
 
     public SpannerChangeStreamService(String taskUid, ChangeStreamDao changeStreamDao, ChangeStreamRecordMapper changeStreamRecordMapper,
                                       Duration heartbeatMillis, MetricsEventPublisher metricsEventPublisher) {
@@ -61,6 +64,13 @@ public class SpannerChangeStreamService {
     public SpannerChangeStreamService(String taskUid, ChangeStreamDao changeStreamDao, ChangeStreamRecordMapper changeStreamRecordMapper,
                                       Duration heartbeatMillis, MetricsEventPublisher metricsEventPublisher, int windowMinutes,
                                       boolean mutablePartitionOrderingEnabled) {
+        this(taskUid, changeStreamDao, changeStreamRecordMapper, heartbeatMillis, metricsEventPublisher, windowMinutes,
+                mutablePartitionOrderingEnabled, DEFAULT_HEARTBEAT_LAG_WARN_THRESHOLD);
+    }
+
+    public SpannerChangeStreamService(String taskUid, ChangeStreamDao changeStreamDao, ChangeStreamRecordMapper changeStreamRecordMapper,
+                                      Duration heartbeatMillis, MetricsEventPublisher metricsEventPublisher, int windowMinutes,
+                                      boolean mutablePartitionOrderingEnabled, Duration heartbeatLagWarnThreshold) {
         this.changeStreamDao = changeStreamDao;
         this.changeStreamRecordMapper = changeStreamRecordMapper;
         this.heartbeatMillis = heartbeatMillis;
@@ -68,6 +78,7 @@ public class SpannerChangeStreamService {
         this.taskUid = taskUid;
         this.windowDuration = Duration.ofMinutes(windowMinutes);
         this.mutablePartitionOrderingEnabled = mutablePartitionOrderingEnabled;
+        this.heartbeatLagWarnThreshold = heartbeatLagWarnThreshold;
     }
 
     public boolean isMutableKeyRange() {
@@ -115,7 +126,7 @@ public class SpannerChangeStreamService {
                 if (!events.isEmpty() && (events.get(0) instanceof HeartbeatEvent)) {
                     var heartbeatEvent = (HeartbeatEvent) events.get(0);
                     long heartbeatLag = System.currentTimeMillis() - heartbeatEvent.getRecordTimestamp().toSqlTimestamp().toInstant().toEpochMilli();
-                    if (heartbeatLag > 60_000) {
+                    if (heartbeatLag > heartbeatLagWarnThreshold.toMillis()) {
                         LOGGER.warn("Task: {}, heartbeat has very old timestamp, lag: {}, token: {}, event: {}", taskUid, heartbeatLag,
                                 heartbeatEvent.getMetadata().getPartitionToken(),
                                 heartbeatEvent);
@@ -195,7 +206,7 @@ public class SpannerChangeStreamService {
                     if (!events.isEmpty() && (events.get(0) instanceof HeartbeatEvent)) {
                         var heartbeatEvent = (HeartbeatEvent) events.get(0);
                         long heartbeatLag = System.currentTimeMillis() - heartbeatEvent.getRecordTimestamp().toSqlTimestamp().toInstant().toEpochMilli();
-                        if (heartbeatLag > 60_000) {
+                        if (heartbeatLag > heartbeatLagWarnThreshold.toMillis()) {
                             LOGGER.warn("Task: {}, heartbeat has very old timestamp, lag: {}, token: {}, event: {}", taskUid, heartbeatLag,
                                     heartbeatEvent.getMetadata().getPartitionToken(),
                                     heartbeatEvent);

@@ -50,6 +50,13 @@ public class SpannerChangeStreamFactory {
     public SpannerChangeStream getStream(
                                          String changeStreamName, Duration heartbeatMillis, int maxMissedHeartbeats, int windowMinutes,
                                          boolean mutablePartitionOrderingEnabled) {
+        return getStream(changeStreamName, heartbeatMillis, maxMissedHeartbeats, windowMinutes,
+                mutablePartitionOrderingEnabled, SpannerChangeStreamService.DEFAULT_HEARTBEAT_LAG_WARN_THRESHOLD);
+    }
+
+    public SpannerChangeStream getStream(
+                                         String changeStreamName, Duration heartbeatMillis, int maxMissedHeartbeats, int windowMinutes,
+                                         boolean mutablePartitionOrderingEnabled, Duration heartbeatLagWarnThreshold) {
 
         ChangeStreamDao changeStreamDao = daoFactory.getStreamDao(
                 changeStreamName,
@@ -65,7 +72,7 @@ public class SpannerChangeStreamFactory {
 
         SpannerChangeStreamService streamService = new SpannerChangeStreamService(
                 taskUid, changeStreamDao, changeStreamRecordMapper, heartbeatMillis, metricsEventPublisher, windowMinutes,
-                mutablePartitionOrderingEnabled);
+                mutablePartitionOrderingEnabled, heartbeatLagWarnThreshold);
 
         return new SpannerChangeStream(
                 streamService, metricsEventPublisher, heartbeatMillis, maxMissedHeartbeats, taskUid, databaseClientFactory);

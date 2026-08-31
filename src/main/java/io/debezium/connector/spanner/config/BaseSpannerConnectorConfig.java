@@ -123,6 +123,8 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
 
     private static final String MAX_MISSED_HEARTBEATS_PROPERTY_NAME = "connector.spanner.max.missed.heartbeats";
 
+    private static final String HEARTBEAT_LAG_WARN_THRESHOLD_MS_PROPERTY_NAME = "connector.spanner.heartbeat.lag.warn.threshold.ms";
+
     private static final String MAX_TASKS_PROPERTY_NAME = "tasks.max";
     private static final String MIN_TASKS_PROPERTY_NAME = "tasks.min";
     private static final String DESIRED_PARTITIONS_TASKS_PROPERTY_NAME = "tasks.desired.partitions";
@@ -342,6 +344,15 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
             .withDescription("Maximum missed heartbeats to identify that partition gets stuck")
             .withDefault(10)
             .withValidation(Field::isNonNegativeInteger);
+
+    protected static final Field HEARTBEAT_LAG_WARN_THRESHOLD_MS = Field.createInternal(HEARTBEAT_LAG_WARN_THRESHOLD_MS_PROPERTY_NAME)
+            .withDisplayName("Heartbeat lag warning threshold (milli-seconds)")
+            .withType(Type.LONG)
+            .withWidth(Width.SHORT)
+            .withImportance(Importance.LOW)
+            .withDescription("Lag, in milliseconds, between the current time and a heartbeat event's timestamp above which a warning is logged")
+            .withDefault(60_000L)
+            .withValidation(Field::isNonNegativeLong);
 
     private static final Field VALUE_CAPTURE_MODE = Field.create(VALUE_CAPTURE_MODE_PROPERTY_NAME)
             .withDisplayName("Value capture mode")
