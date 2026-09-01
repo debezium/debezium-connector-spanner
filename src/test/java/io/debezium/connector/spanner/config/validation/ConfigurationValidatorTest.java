@@ -28,6 +28,21 @@ import io.debezium.config.Configuration;
 
 class ConfigurationValidatorTest {
 
+    private static Map<String, String> validConfig(String startTime, String endTime) {
+        Map<String, String> config = new HashMap<>();
+        config.put("gcp.spanner.project.id", "boxwood-weaver-353315");
+        config.put("gcp.spanner.instance.id", "kafka-connector");
+        config.put("gcp.spanner.database.id", "kafkaspan");
+        config.put("gcp.spanner.database.role", "test-role");
+        config.put("gcp.spanner.change.stream", "TestStream");
+        config.put("gcp.spanner.start.time", startTime);
+        config.put("gcp.spanner.end.time", endTime);
+        config.put("heartbeat.interval.ms", "300000");
+        config.put("gcp.spanner.credentials.path", "no_path");
+        config.put("heartbeat.topics.prefix", "heartbeat");
+        return config;
+    }
+
     private static Stream<Arguments> configProvider() {
         String startTime = Instant.ofEpochMilli(Instant.now().toEpochMilli() - 10000).toString();
 
@@ -63,7 +78,39 @@ class ConfigurationValidatorTest {
                                 "The 'gcp.spanner.instance.id' value is invalid: The field is not specified",
                                 "The 'gcp.spanner.project.id' value is invalid: The field is not specified",
                                 "The 'gcp.spanner.change.stream' value is invalid: The field is not specified",
-                                "The 'gcp.spanner.database.id' value is invalid: The field is not specified")));
+                                "The 'gcp.spanner.database.id' value is invalid: The field is not specified")),
+                Arguments.of(
+                        withTasks(validConfig(startTime, endTime), "10", "2"),
+                        List.of(
+                                "The 'gcp.spanner.credentials.path' value is invalid: path field is incorrect",
+                                "tasks.min must be less than or equal to tasks.max",
+                                "tasks.min must be less than or equal to tasks.max")),
+                Arguments.of(
+                        withTasks(validConfig(startTime, endTime), "0", "10"),
+                        List.of(
+                                "The 'gcp.spanner.credentials.path' value is invalid: path field is incorrect",
+                                "The 'tasks.min' value is invalid: A positive, non-zero integer value is expected")),
+                Arguments.of(
+                        withTasks(validConfig(startTime, endTime), "-1", "10"),
+                        List.of(
+                                "The 'gcp.spanner.credentials.path' value is invalid: path field is incorrect",
+                                "The 'tasks.min' value is invalid: A positive, non-zero integer value is expected")),
+                Arguments.of(
+                        withTasks(validConfig(startTime, endTime), "2", "0"),
+                        List.of(
+                                "The 'gcp.spanner.credentials.path' value is invalid: path field is incorrect",
+                                "The 'tasks.max' value is invalid: A positive, non-zero integer value is expected")),
+                Arguments.of(
+                        withTasks(validConfig(startTime, endTime), "2", "-1"),
+                        List.of(
+                                "The 'gcp.spanner.credentials.path' value is invalid: path field is incorrect",
+                                "The 'tasks.max' value is invalid: A positive, non-zero integer value is expected")));
+    }
+
+    private static Map<String, String> withTasks(Map<String, String> config, String tasksMin, String tasksMax) {
+        config.put("tasks.min", tasksMin);
+        config.put("tasks.max", tasksMax);
+        return config;
     }
 
     @ParameterizedTest
