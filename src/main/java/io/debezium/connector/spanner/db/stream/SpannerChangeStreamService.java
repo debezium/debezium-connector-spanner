@@ -12,8 +12,6 @@ import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.cloud.Timestamp;
-
 import io.debezium.connector.spanner.db.dao.ChangeStreamDao;
 import io.debezium.connector.spanner.db.dao.ChangeStreamResultSet;
 import io.debezium.connector.spanner.db.mapper.ChangeStreamRecordMapper;
@@ -58,7 +56,6 @@ public class SpannerChangeStreamService {
         partitionEventListener.onRun(partition);
 
         LOGGER.info("Task: {}, Streaming {} from {} to {}", taskUid, token, partition.getStartTimestamp(), partition.getEndTimestamp());
-        Timestamp lastReceivedTimestamp = null;
         boolean receivedChildPartitions = false;
         try (ChangeStreamResultSet resultSet = changeStreamDao.streamQuery(token, partition.getStartTimestamp(),
                 partition.getEndTimestamp(), heartbeatMillis.toMillis())) {
@@ -75,11 +72,6 @@ public class SpannerChangeStreamService {
                 for (ChangeStreamEvent event : events) {
                     if (event instanceof ChildPartitionsEvent) {
                         receivedChildPartitions = true;
-                    }
-                    if (event.getRecordTimestamp() != null) {
-                        if (lastReceivedTimestamp == null || event.getRecordTimestamp().compareTo(lastReceivedTimestamp) > 0) {
-                            lastReceivedTimestamp = event.getRecordTimestamp();
-                        }
                     }
                 }
 
