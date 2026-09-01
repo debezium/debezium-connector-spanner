@@ -108,18 +108,14 @@ public class SpannerChangeStreamService {
             return;
         }
 
-        boolean reachedEnd = receivedChildPartitions
-                || (partition.getEndTimestamp() != null
-                        && lastReceivedTimestamp != null
-                        && lastReceivedTimestamp.compareTo(partition.getEndTimestamp()) >= 0);
+        boolean reachedEnd = receivedChildPartitions || partition.getEndTimestamp() != null;
 
         if (!reachedEnd) {
             LOGGER.error(
-                    "Task: {}, Partition {} stream ended without delivering child partition records or reaching end timestamp {} (last received timestamp: {})! Retrying partition stream.",
-                    taskUid, token, partition.getEndTimestamp(), lastReceivedTimestamp);
+                    "Task: {}, Partition {} stream ended without delivering child partition records! Retrying partition stream.",
+                    taskUid, token);
             throw new ChangeStreamException(
-                    "Partition " + token + " stream ended without child partitions or reaching end timestamp "
-                            + partition.getEndTimestamp() + ". Retrying partition stream.");
+                    "Partition " + token + " stream ended without child partitions. Retrying partition stream.");
         }
 
         partitionEventListener.onFinish(partition);

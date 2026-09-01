@@ -106,13 +106,13 @@ class SpannerChangeStreamServiceTest {
     }
 
     @Test
-    void testBoundedStreamEndingBeforeEndTimestampThrowsException() throws Exception {
+    void testBoundedStreamFinishesCleanlyWithoutChildPartitions() throws Exception {
         ChangeStreamDao changeStreamDao = mock(ChangeStreamDao.class);
         ChangeStreamResultSet changeStreamResultSet = mock(ChangeStreamResultSet.class);
         ChangeStreamRecordMapper mapper = mock(ChangeStreamRecordMapper.class);
         MetricsEventPublisher metricsEventPublisher = mock(MetricsEventPublisher.class);
 
-        // Stream cut off at timestamp 50L, but partition endTimestamp is 100L
+        // Bounded stream ending at timestamp 50L (< partition endTimestamp 100L)
         Timestamp eventTimestamp = Timestamp.ofTimeMicroseconds(50L);
         HeartbeatEvent heartbeatEvent = new HeartbeatEvent(eventTimestamp, mock(StreamEventMetadata.class));
         when(changeStreamResultSet.next()).thenReturn(true, false);
@@ -130,15 +130,13 @@ class SpannerChangeStreamServiceTest {
         ChangeStreamEventConsumer changeStreamEventConsumer = mock(ChangeStreamEventConsumer.class);
         PartitionEventListener partitionEventListener = mock(PartitionEventListener.class);
         doNothing().when(partitionEventListener).onRun(any());
+        doNothing().when(partitionEventListener).onFinish(any());
 
-        ChangeStreamException thrown = assertThrows(ChangeStreamException.class, () -> {
-            spannerChangeStreamService.getEvents(partition, changeStreamEventConsumer, partitionEventListener);
-        });
+        spannerChangeStreamService.getEvents(partition, changeStreamEventConsumer, partitionEventListener);
 
-        assertTrue(thrown.getMessage().contains("reaching end timestamp"));
-        verify(partitionEventListener, times(1)).onRun(partition);
-        verify(partitionEventListener, never()).onFinish(partition);
-        verify(changeStreamEventConsumer, never()).acceptChangeStreamEvent(any(FinishPartitionEvent.class));
+        verify(changeStreamEventConsumer).acceptChangeStreamEvent(heartbeatEvent);
+        verify(changeStreamEventConsumer).acceptChangeStreamEvent(any(FinishPartitionEvent.class));
+        verify(partitionEventListener).onFinish(partition);
     }
 
     @Test
