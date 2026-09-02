@@ -20,6 +20,9 @@ import static org.mockito.Mockito.when;
 import java.time.Duration;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.junit.jupiter.api.Test;
 
@@ -37,7 +40,9 @@ import io.debezium.connector.spanner.db.model.event.HeartbeatEvent;
 import io.debezium.connector.spanner.db.model.event.PartitionEndEvent;
 import io.debezium.connector.spanner.db.model.event.PartitionEventEvent;
 import io.debezium.connector.spanner.db.stream.exception.ChangeStreamException;
+import io.debezium.connector.spanner.kafka.internal.model.TaskState;
 import io.debezium.connector.spanner.metrics.MetricsEventPublisher;
+import io.debezium.connector.spanner.task.TaskSyncContext;
 
 class SpannerChangeStreamServiceTest {
 
@@ -483,7 +488,8 @@ class SpannerChangeStreamServiceTest {
         when(mapper.toChangeStreamEvents(any(), any(), any())).thenReturn(List.of(moveInEvent));
 
         SpannerChangeStreamService service = new SpannerChangeStreamService(
-                "TaskUid", changeStreamDao, mapper, Duration.ofMillis(1000), metricsEventPublisher, 20, false);
+                "TaskUid", changeStreamDao, mapper, Duration.ofMillis(1000), metricsEventPublisher,
+                20, MutableStreamOptions.orderingDisabled());
 
         Partition partition = new Partition("dst", new HashSet<>(), start, start, "origin");
 
@@ -520,9 +526,176 @@ class SpannerChangeStreamServiceTest {
         PartitionEventListener listener = mock(PartitionEventListener.class);
         doNothing().when(listener).onRun(any());
 
+        assertThrows(ChangeStreamException.class, () -> service.getEvents(partition, consumer, listener));
+
+        verify(consumer, never()).acceptChangeStreamEvent(any(FinishPartitionEvent.class));
+        verify(changeStreamDao, times(1)).streamQuery(any(), any(), any(), anyLong());
+    }
+
+    /**
+     * When the post-window spin-wait exceeds {@code moveInGateTimeoutMs} the streaming thread
+     * must stop waiting and fall back to the close/reopen path (i.e. call
+     * {@link PartitionEventListener#onMoveIn} and return without calling
+     * {@link PartitionEventListener#onFinish}).
+     *
+     * <p>Setup: one MoveIn event is seen inside the result-set window; the source is never
+     * confirmed (empty context), so the gate never drains.  A 50 ms timeout with a 2 ms poll
+     * interval keeps the test fast while still exercising the real sleep loop.
+     */
+    @Test
+    void testGetEventsMutableGateTimesOutAndFallsBackToCloseReopenPath() throws Exception {
+        ChangeStreamDao changeStreamDao = mock(ChangeStreamDao.class);
+        ChangeStreamResultSet resultSet = mock(ChangeStreamResultSet.class);
+        ChangeStreamRecordMapper mapper = mock(ChangeStreamRecordMapper.class);
+        MetricsEventPublisher metricsEventPublisher = mock(MetricsEventPublisher.class);
+
+        when(changeStreamDao.isMutableKeyRange()).thenReturn(true);
+        when(changeStreamDao.streamQuery(any(), any(), any(), anyLong())).thenReturn(resultSet);
+        // One event (the MoveIn), then result-set exhausted → triggers spin-wait.
+        when(resultSet.next()).thenReturn(true, false);
+
+        Timestamp start = Timestamp.ofTimeSecondsAndNanos(0, 0);
+        Timestamp end = Timestamp.ofTimeSecondsAndNanos(0, 0);
+        Timestamp commitTimestamp = Timestamp.ofTimeSecondsAndNanos(0, 0);
+        StreamEventMetadata meta = StreamEventMetadata.newBuilder().withPartitionToken("dst").build();
+        PartitionEventEvent moveInEvent = new PartitionEventEvent(
+                commitTimestamp, "00001", "dst", List.of("src1"), List.of(), meta);
+        when(mapper.toChangeStreamEvents(any(), any(), any())).thenReturn(List.of(moveInEvent));
+
+        // Context where src1 is never confirmed → gate will never drain.
+        TaskState emptyTaskState = mock(TaskState.class);
+        when(emptyTaskState.getPartitions()).thenReturn(List.of());
+        when(emptyTaskState.getSharedPartitions()).thenReturn(List.of());
+        TaskSyncContext neverConfirmedCtx = mock(TaskSyncContext.class);
+        when(neverConfirmedCtx.getCurrentTaskState()).thenReturn(emptyTaskState);
+        when(neverConfirmedCtx.getTaskStates()).thenReturn(Map.of());
+
+        SpannerChangeStreamService service = new SpannerChangeStreamService(
+                "TaskUid", changeStreamDao, mapper, Duration.ofMillis(1000), metricsEventPublisher,
+                20, MutableStreamOptions.of(
+                        () -> neverConfirmedCtx,
+                        5000, // buffer max events — large so we don't overflow
+                        2, // gate check interval ms — fast polling
+                        50)); // gate timeout ms — short so the test completes quickly
+
+        Partition partition = new Partition("dst", new HashSet<>(), start, end, "origin");
+        ChangeStreamEventConsumer consumer = mock(ChangeStreamEventConsumer.class);
+        PartitionEventListener listener = mock(PartitionEventListener.class);
+        doNothing().when(listener).onRun(any());
+
         service.getEvents(partition, consumer, listener);
 
-        verify(consumer).acceptChangeStreamEvent(any(FinishPartitionEvent.class));
-        verify(changeStreamDao, times(1)).streamQuery(any(), any(), any(), anyLong());
+        // Timeout must trigger the close/reopen fallback: onMoveIn is called with the
+        // accumulated sources and onFinish is never called.
+        verify(listener).onMoveIn(partition, commitTimestamp, "00001", List.of("src1"));
+        verify(listener, never()).onFinish(any());
+        verify(consumer, never()).acceptChangeStreamEvent(any(FinishPartitionEvent.class));
+    }
+
+    /**
+     * Regression test for the deferred interrupt restore.
+     *
+     * <p>When the streaming thread is interrupted while the {@code MoveInBufferGate} spin-wait
+     * is running, the old code restored {@code Thread.currentThread().interrupt()} immediately.
+     * That caused {@code BlockingQueue.put()} (reached via {@code onMoveIn →
+     * notifyMoveIn → queue.put()}) to fail with {@link InterruptedException} via
+     * {@code lockInterruptibly()} before the notification was enqueued — silently losing
+     * the MoveIn state transition and leaving the partition stuck in CREATED.
+     *
+     * <p>The fix defers the interrupt restore until the {@code finally} block that wraps
+     * {@code onMoveIn()}.  This test verifies that:
+     * <ol>
+     *   <li>{@code onMoveIn} is called even when the thread is interrupted mid-spin-wait.</li>
+     *   <li>The interrupt flag is clear when {@code onMoveIn} is entered (deferred restore).</li>
+     *   <li>The interrupt flag is re-set on the streaming thread after {@code onMoveIn} returns.</li>
+     * </ol>
+     */
+    @Test
+    void testGetEventsMutableInterruptDuringGateSpinWaitStillDeliversOnMoveIn() throws Exception {
+        ChangeStreamDao changeStreamDao = mock(ChangeStreamDao.class);
+        ChangeStreamResultSet resultSet = mock(ChangeStreamResultSet.class);
+        ChangeStreamRecordMapper mapper = mock(ChangeStreamRecordMapper.class);
+        MetricsEventPublisher metricsEventPublisher = mock(MetricsEventPublisher.class);
+
+        when(changeStreamDao.isMutableKeyRange()).thenReturn(true);
+        when(changeStreamDao.streamQuery(any(), any(), any(), anyLong())).thenReturn(resultSet);
+        when(resultSet.next()).thenReturn(true, false);
+
+        Timestamp start = Timestamp.ofTimeSecondsAndNanos(0, 0);
+        Timestamp end = Timestamp.ofTimeSecondsAndNanos(0, 0);
+        Timestamp commitTimestamp = Timestamp.ofTimeSecondsAndNanos(0, 0);
+        StreamEventMetadata meta = StreamEventMetadata.newBuilder().withPartitionToken("dst").build();
+        PartitionEventEvent moveInEvent = new PartitionEventEvent(
+                commitTimestamp, "00001", "dst", List.of("src1"), List.of(), meta);
+        when(mapper.toChangeStreamEvents(any(), any(), any())).thenReturn(List.of(moveInEvent));
+
+        // src1 is never confirmed — the gate never drains on its own.
+        TaskState emptyTaskState = mock(TaskState.class);
+        when(emptyTaskState.getPartitions()).thenReturn(List.of());
+        when(emptyTaskState.getSharedPartitions()).thenReturn(List.of());
+        TaskSyncContext neverConfirmedCtx = mock(TaskSyncContext.class);
+        when(neverConfirmedCtx.getCurrentTaskState()).thenReturn(emptyTaskState);
+        when(neverConfirmedCtx.getTaskStates()).thenReturn(Map.of());
+
+        // Check interval of Integer.MAX_VALUE ms means the spin-wait will block in
+        // Thread.sleep() until interrupted — no timeout needed.
+        SpannerChangeStreamService service = new SpannerChangeStreamService(
+                "TaskUid", changeStreamDao, mapper, Duration.ofMillis(1000), metricsEventPublisher,
+                20, MutableStreamOptions.of(
+                        () -> neverConfirmedCtx,
+                        5000, // buffer max — won't overflow
+                        Integer.MAX_VALUE, // check interval so large the thread blocks; interrupted instead
+                        60_000));
+
+        // Latch opened by the streaming thread just before it enters Thread.sleep() in the
+        // spin-wait, signalling that the thread is safely blocked and ready to be interrupted.
+        CountDownLatch spinWaitEntered = new CountDownLatch(1);
+
+        Partition partition = new Partition("dst", new HashSet<>(), start, end, "origin");
+        ChangeStreamEventConsumer consumer = mock(ChangeStreamEventConsumer.class);
+        PartitionEventListener listener = mock(PartitionEventListener.class);
+        doNothing().when(listener).onRun(any());
+
+        // Capture the interrupt flag at the moment onMoveIn is entered to verify the deferred
+        // restore — the flag must be CLEAR here so that any downstream BlockingQueue.put()
+        // would succeed without throwing InterruptedException via lockInterruptibly().
+        AtomicReference<Boolean> interruptFlagDuringOnMoveIn = new AtomicReference<>();
+        org.mockito.Mockito.doAnswer(inv -> {
+            interruptFlagDuringOnMoveIn.set(Thread.currentThread().isInterrupted());
+            return null;
+        }).when(listener).onMoveIn(any(), any(), any(), any());
+
+        // Capture the interrupt flag AFTER getEvents() returns, from inside the streaming
+        // thread (t.isInterrupted() is unreliable once the thread has died).
+        AtomicReference<Boolean> interruptFlagAfterGetEvents = new AtomicReference<>(false);
+
+        Thread t = new Thread(() -> {
+            spinWaitEntered.countDown(); // fires before getEvents(); 50ms slack lets the thread reach sleep()
+            try {
+                service.getEvents(partition, consumer, listener);
+            }
+            catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+            finally {
+                interruptFlagAfterGetEvents.set(Thread.currentThread().isInterrupted());
+            }
+        });
+        t.start();
+
+        // Wait until the thread has started, then give it ~50ms to reach Thread.sleep().
+        // All steps before the sleep are synchronous and mocked, so this is ample time.
+        spinWaitEntered.await();
+        Thread.sleep(50);
+        t.interrupt();
+        t.join(5_000);
+
+        // 1. onMoveIn must have been called despite the interruption.
+        verify(listener).onMoveIn(partition, commitTimestamp, "00001", List.of("src1"));
+        // 2. The interrupt flag must have been CLEAR when onMoveIn was entered (deferred restore).
+        assertEquals(Boolean.FALSE, interruptFlagDuringOnMoveIn.get());
+        // 3. The interrupt flag must be re-set after onMoveIn returns (finally block fires).
+        assertEquals(Boolean.TRUE, interruptFlagAfterGetEvents.get());
+        verify(listener, never()).onFinish(any());
     }
 }

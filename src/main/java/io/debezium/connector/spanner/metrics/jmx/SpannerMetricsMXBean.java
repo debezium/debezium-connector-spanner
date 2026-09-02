@@ -76,6 +76,39 @@ public interface SpannerMetricsMXBean extends StreamingChangeEventSourceMetricsM
     Double getDelayChangeStreamEventsP99MilliSeconds();
 
     /**
+     * Staleness of a MoveIn boundary event before the connector even issued the
+     * query that read it. Large/growing values indicate connector-side backlog
+     * from repeatedly reopening the query on every boundary (actionable),
+     * not a Spanner delivery problem.
+     */
+    Double getMoveInCommitToQueryLatencyP50MilliSeconds();
+
+    Double getMoveInCommitToQueryLatencyP95MilliSeconds();
+
+    Double getMoveInCommitToQueryLatencyP99MilliSeconds();
+
+    /**
+     * Time spent waiting inside an already-open stream before a MoveIn boundary
+     * event became available. Large values here (with a small
+     * commitToQueryLatency) would indicate a genuine Spanner-side delivery delay.
+     */
+    Double getMoveInStreamLatencyP50MilliSeconds();
+
+    Double getMoveInStreamLatencyP95MilliSeconds();
+
+    Double getMoveInStreamLatencyP99MilliSeconds();
+
+    /**
+     * Total staleness of a MoveIn boundary event at read time
+     * (commitToQueryLatency + queryToStreamStart + streamLatency).
+     */
+    Double getMoveInTotalLatencyP50MilliSeconds();
+
+    Double getMoveInTotalLatencyP95MilliSeconds();
+
+    Double getMoveInTotalLatencyP99MilliSeconds();
+
+    /**
      * The total number of Runtime errors
      */
     int getErrorCount();

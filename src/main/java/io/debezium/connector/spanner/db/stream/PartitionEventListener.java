@@ -26,4 +26,26 @@ public interface PartitionEventListener {
     void onWindowAdvanced(Partition partition, Timestamp windowEnd, String lastBoundaryRecordSequence) throws InterruptedException;
 
     void onMoveIn(Partition partition, Timestamp commitTimestamp, String recordSequence, List<String> sourcePartitionTokens) throws InterruptedException;
+
+    /**
+     * Called by the streaming thread when a MoveIn event is handled via the buffer-gate
+     * path rather than the standard close/reopen path.  The partition does NOT transition
+     * to {@code CREATED}; the streaming thread stays alive and self-gates.  The call
+     * publishes {@code MoveInState} to the sync topic for cross-task visibility and
+     * crash-recovery purposes.
+     *
+     * <p>A default no-op is provided so that existing anonymous-class implementations in
+     * tests and other callsites do not need to be updated.
+     *
+     * @param isFirstMoveIn {@code true} for the first MoveIn in a buffer sequence;
+     *                      {@code false} for subsequent MoveIn events at later timestamps.
+     *                      Only the first event's timestamp / record sequence are used to
+     *                      pin {@code processedTimestamp} for boundary deduplication on
+     *                      crash-recovery.
+     */
+    default void onMoveInPublishOnly(Partition partition, Timestamp commitTimestamp, String recordSequence,
+                                     List<String> sourcePartitionTokens, boolean isFirstMoveIn)
+            throws InterruptedException {
+        // no-op by default; overridden by SpannerStreamingChangeEventSource
+    }
 }

@@ -311,6 +311,18 @@ public class SpannerConnectorConfig extends BaseSpannerConnectorConfig {
         return getConfig().getInteger(MUTABLE_WINDOW_MINUTES, (int) MUTABLE_WINDOW_MINUTES.defaultValue());
     }
 
+    public int getMutableMoveInBufferMaxEvents() {
+        return getConfig().getInteger(MUTABLE_MOVE_IN_BUFFER_MAX_EVENTS, (int) MUTABLE_MOVE_IN_BUFFER_MAX_EVENTS.defaultValue());
+    }
+
+    public int getMutableMoveInGateCheckIntervalMs() {
+        return getConfig().getInteger(MUTABLE_MOVE_IN_GATE_CHECK_INTERVAL_MS, (int) MUTABLE_MOVE_IN_GATE_CHECK_INTERVAL_MS.defaultValue());
+    }
+
+    public int getMutableMoveInGateTimeoutMs() {
+        return getConfig().getInteger(MUTABLE_MOVE_IN_GATE_TIMEOUT_MS, (int) MUTABLE_MOVE_IN_GATE_TIMEOUT_MS.defaultValue());
+    }
+
     public int taskStateChangeEventQueueCapacity() {
         return getConfig().getInteger(TASK_STATE_CHANGE_EVENT_QUEUE_CAPACITY,
                 (int) TASK_STATE_CHANGE_EVENT_QUEUE_CAPACITY.defaultValue());

@@ -178,6 +178,19 @@ public class SpannerStreamingChangeEventSource implements CommittingRecordsStrea
                             partition.getToken(), commitTimestamp, recordSequence, sourcePartitionTokens);
                     partitionManager.notifyMoveIn(partition.getToken(), commitTimestamp, recordSequence, sourcePartitionTokens);
                 }
+
+                @Override
+                public void onMoveInPublishOnly(Partition partition, Timestamp commitTimestamp, String recordSequence,
+                                                List<String> sourcePartitionTokens, boolean isFirstMoveIn)
+                        throws InterruptedException {
+                    if (!connectorConfig.isMutablePartitionOrderingEnabled()) {
+                        return;
+                    }
+                    LOGGER.info("Partition onMoveInPublishOnly (buffer-gate): {}, commitTimestamp={}, recordSequence={}, sources={}, isFirst={}",
+                            partition.getToken(), commitTimestamp, recordSequence, sourcePartitionTokens, isFirstMoveIn);
+                    partitionManager.publishMoveInStateOnly(
+                            partition.getToken(), commitTimestamp, recordSequence, sourcePartitionTokens, isFirstMoveIn);
+                }
             });
 
         }
@@ -413,6 +426,18 @@ public class SpannerStreamingChangeEventSource implements CommittingRecordsStrea
                 event.getPartitionToken(),
                 event.getCommitTimestamp(),
                 event.getDestinationPartitions());
+
+        // A partition under heavy MoveOut churn can emit thousands of these events per window with
+        // no DataChangeEvent/HeartbeatEvent in between (see SpannerChangeStreamService's per-window
+        // dataEvents/heartbeatEvents counters). Only those two event types previously advanced the
+        // Kafka Connect-committed offset, so this partition's offset — and the low watermark, which
+        // falls back to it when no fresher offset exists — stayed frozen at the window start despite
+        // real, continuous progress, only catching up once the outer window boundary closed (up to
+        // mutable.window.minutes late). Dispatch the MoveOut event's own commit timestamp the same
+        // way a heartbeat is dispatched so this progress is reflected immediately.
+        SpannerOffsetContext offsetContext = offsetContextFactory.getOffsetContextFromPartitionEventEvent(event);
+        SpannerPartition partition = new SpannerPartition(event.getPartitionToken());
+        spannerEventDispatcher.alwaysDispatchHeartbeatEvent(partition, offsetContext);
     }
 
     private void processFailure(Exception ex) {

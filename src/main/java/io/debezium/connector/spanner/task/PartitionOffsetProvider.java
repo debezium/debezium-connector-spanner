@@ -15,8 +15,10 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 import org.apache.kafka.connect.storage.OffsetStorageReader;
@@ -38,6 +40,15 @@ import io.debezium.connector.spanner.metrics.event.OffsetReceivingTimeMetricEven
 public class PartitionOffsetProvider {
     private static final Logger LOGGER = LoggerFactory.getLogger(PartitionOffsetProvider.class);
 
+    // Offset lookups are short-lived, I/O-bound calls against Kafka Connect's offset backing
+    // store. A small fixed pool bounds how many threads can ever be pinned by a stuck
+    // OffsetStorageReader call (see shutdown() javadoc), instead of the unbounded growth that
+    // Executors.newCachedThreadPool() allows when future.cancel(true) fails to actually
+    // interrupt a stuck call.
+    private static final int EXECUTOR_POOL_SIZE = 2;
+
+    private static final AtomicInteger THREAD_COUNTER = new AtomicInteger(0);
+
     private final OffsetStorageReader offsetStorageReader;
     private final MetricsEventPublisher metricsEventPublisher;
     private final long batchRetrievalTimeoutMs;
@@ -49,7 +60,49 @@ public class PartitionOffsetProvider {
         this.offsetStorageReader = offsetStorageReader;
         this.metricsEventPublisher = metricsEventPublisher;
         this.batchRetrievalTimeoutMs = batchRetrievalTimeoutMs;
-        this.executor = Executors.newCachedThreadPool();
+        this.executor = Executors.newFixedThreadPool(EXECUTOR_POOL_SIZE, new PartitionOffsetProviderThreadFactory());
+    }
+
+    /**
+     * Shuts down the offset-retrieval executor. Should be called once when the owning task is
+     * torn down, after all consumers of this provider (LowWatermarkCalculationJob, PartitionFactory)
+     * have already been stopped, so no in-flight callers race with the shutdown.
+     *
+     * <p>Uses the standard two-phase shutdown idiom: first ask in-flight tasks to finish naturally
+     * ({@code shutdown()}), then forcibly interrupt anything still running ({@code shutdownNow()})
+     * if it doesn't complete within a short grace period.
+     */
+    public void shutdown() {
+        executor.shutdown();
+        try {
+            if (!executor.awaitTermination(5, TimeUnit.SECONDS)) {
+                LOGGER.warn("PartitionOffsetProvider executor did not terminate cleanly within timeout, forcing shutdown");
+                executor.shutdownNow();
+                if (!executor.awaitTermination(5, TimeUnit.SECONDS)) {
+                    LOGGER.warn("PartitionOffsetProvider executor did not terminate even after forced shutdown");
+                }
+                else {
+                    LOGGER.info("PartitionOffsetProvider executor forcibly shut down");
+                }
+            }
+            else {
+                LOGGER.info("PartitionOffsetProvider executor shut down cleanly");
+            }
+        }
+        catch (InterruptedException e) {
+            LOGGER.warn("Interrupted while waiting for PartitionOffsetProvider executor to terminate, forcing shutdown", e);
+            executor.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    private static class PartitionOffsetProviderThreadFactory implements ThreadFactory {
+        @Override
+        public Thread newThread(Runnable runnable) {
+            Thread thread = new Thread(runnable, "SpannerConnector-PartitionOffsetProvider-" + THREAD_COUNTER.incrementAndGet());
+            thread.setDaemon(true);
+            return thread;
+        }
     }
 
     public Timestamp getOffset(PartitionState token) {
