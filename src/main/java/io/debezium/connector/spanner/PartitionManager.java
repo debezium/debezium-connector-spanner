@@ -28,6 +28,17 @@ public interface PartitionManager {
 
     void notifyMoveIn(String token, Timestamp commitTimestamp, String recordSequence, List<String> sourcePartitionTokens) throws InterruptedException;
 
+    /**
+     * Buffer-gate path: publishes the MoveIn state to the sync topic without transitioning
+     * the partition to {@code CREATED}.  The streaming thread remains alive and handles its
+     * own gate.
+     *
+     * @param isFirstMoveIn {@code true} for the first MoveIn in a buffer sequence
+     */
+    void publishMoveInStateOnly(String token, Timestamp commitTimestamp, String recordSequence,
+                                List<String> sourcePartitionTokens, boolean isFirstMoveIn)
+            throws InterruptedException;
+
     void updateProcessedTimestamp(String token, Timestamp processedTimestamp, String lastBoundaryRecordSequence) throws InterruptedException;
 
 }

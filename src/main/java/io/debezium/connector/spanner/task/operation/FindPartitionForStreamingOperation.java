@@ -13,17 +13,19 @@ import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.cloud.Timestamp;
-
 import io.debezium.connector.spanner.kafka.internal.model.MoveInState;
-import io.debezium.connector.spanner.kafka.internal.model.MoveOutState;
 import io.debezium.connector.spanner.kafka.internal.model.PartitionState;
 import io.debezium.connector.spanner.kafka.internal.model.PartitionStateEnum;
-import io.debezium.connector.spanner.kafka.internal.model.TaskState;
+import io.debezium.connector.spanner.task.MoveInGateChecker;
 import io.debezium.connector.spanner.task.TaskSyncContext;
 
 /**
- * Checks what partitions are ready for streaming
+ * Checks what partitions are ready for streaming.
+ *
+ * <p>Gate-check logic for MoveIn-paused partitions is delegated to
+ * {@link MoveInGateChecker} so that the same implementation is shared by
+ * both this state-machine path and the streaming-thread
+ * {@link io.debezium.connector.spanner.db.stream.MoveInBufferGate}.
  */
 public class FindPartitionForStreamingOperation implements Operation {
 
@@ -41,9 +43,9 @@ public class FindPartitionForStreamingOperation implements Operation {
     }
 
     private TaskSyncContext takePartitionForStreaming(TaskSyncContext taskSyncContext) {
-        Set<String> finishedPartitions = getFinishedPartitions(taskSyncContext);
+        Set<String> finishedPartitions = MoveInGateChecker.getFinishedPartitions(taskSyncContext);
 
-        TaskState taskState = taskSyncContext.getCurrentTaskState();
+        io.debezium.connector.spanner.kafka.internal.model.TaskState taskState = taskSyncContext.getCurrentTaskState();
         List<PartitionState> partitions = taskState.getPartitions().stream()
                 .map(partitionState -> {
                     if (partitionState.getState().equals(PartitionStateEnum.CREATED)) {
@@ -96,118 +98,40 @@ public class FindPartitionForStreamingOperation implements Operation {
                 .build();
     }
 
-    private Set<String> getFinishedPartitions(TaskSyncContext taskSyncContext) {
-        List<PartitionState> partitionStateList = new ArrayList<>();
-        partitionStateList.addAll(taskSyncContext.getCurrentTaskState().getPartitions());
-        partitionStateList.addAll(taskSyncContext.getTaskStates().values().stream()
-                .flatMap(taskState -> taskState.getPartitions().stream())
-                .collect(Collectors.toList()));
-
-        return partitionStateList.stream()
-                .filter(partitionState -> PartitionStateEnum.FINISHED.equals(partitionState.getState())
-                        || PartitionStateEnum.REMOVED.equals(partitionState.getState()))
-                .map(PartitionState::getToken)
-                .collect(Collectors.toSet());
-    }
-
     /**
      * Determines whether a destination partition that is paused after processing a MoveIn
      * event can resume streaming. This requires that every source partition referenced in the
-     * destination's {@link MoveInState} has published a {@link MoveOutState} that is at or past
-     * the MoveIn commit timestamp, and, if exactly at that timestamp, includes this destination
-     * partition among its recorded destinations.
+     * destination's {@link MoveInState} has published a
+     * {@link io.debezium.connector.spanner.kafka.internal.model.MoveOutState} that is at or
+     * past the MoveIn commit timestamp, and, if exactly at that timestamp, includes this
+     * destination partition among its recorded destinations.
+     *
+     * <p>Delegates gate-check logic to {@link MoveInGateChecker#canContinue} so that the same
+     * implementation is shared with the streaming-thread buffer-gate path.
      *
      * <p>Source partitions that have reached {@code FINISHED}/{@code REMOVED} are purged from
      * the task state (see {@link RemoveFinishedPartitionOperation}) and so no longer carry their
-     * {@link MoveOutState}. A source can only reach that state after streaming past every
-     * boundary in its key range, including any MoveOut it is a party to, so a source found in
-     * {@code finishedPartitions} is treated as having already satisfied this destination's wait
-     * condition, rather than deadlocking forever waiting on a purged {@link MoveOutState}.
+     * {@link io.debezium.connector.spanner.kafka.internal.model.MoveOutState}. A source can only
+     * reach that state after streaming past every boundary in its key range, including any MoveOut
+     * it is a party to, so a source found in {@code finishedPartitions} is treated as having
+     * already satisfied this destination's wait condition, rather than deadlocking forever waiting
+     * on a purged state.
      *
-     * <p>A source can also be missing a matching {@link MoveOutState} entry because a task
-     * crashed after the source's own change stream query had already read past the MoveIn commit
-     * timestamp, but before the resulting {@code MoveOutStateUpdateOperation} update was
-     * persisted to the sync topic. On restart, the source resumes from its persisted offset -
-     * which is already past that timestamp - so it will never re-read (and therefore never
-     * re-emit) that boundary record again. If the source's own {@code processedTimestamp} is
-     * already strictly past the MoveIn timestamp, its change stream has necessarily already read
-     * through that boundary for real (Spanner change streams deliver records in
-     * commit-timestamp order), so it is safe to treat the MoveOut as satisfied despite the
-     * missing local bookkeeping. This fallback is checked whenever no entry proves the move is
-     * satisfied - not only when {@code moveOutStates} is completely empty - since a source can
-     * accumulate several independent MoveOut entries over its life (see
-     * {@code MoveOutStateUpdateOperation}) and an older, unrelated entry must never mask the loss
-     * of a different, later one.
+     * <p>A source can also be missing a matching MoveOutState entry because a task crashed after
+     * the source's own change stream query had already read past the MoveIn commit timestamp, but
+     * before the resulting {@code MoveOutStateUpdateOperation} update was persisted to the sync
+     * topic. If the source's own {@code processedTimestamp} is already strictly past the MoveIn
+     * timestamp its change stream has necessarily already read through that boundary for real, so
+     * it is safe to treat the MoveOut as satisfied despite the missing local bookkeeping.
      */
     private boolean canDestPartitionContinue(TaskSyncContext taskSyncContext, PartitionState destPartition, Set<String> finishedPartitions) {
         MoveInState moveInState = destPartition.getMoveInState();
-        Timestamp moveInTimestamp = moveInState.getTimestamp();
-        String destToken = destPartition.getToken();
-
-        for (String sourceToken : moveInState.getSourcePartitionTokens()) {
-            if (!sourceHasResumedThisMove(taskSyncContext, sourceToken, moveInTimestamp, destToken, finishedPartitions)) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    private boolean sourceHasResumedThisMove(TaskSyncContext taskSyncContext, String sourceToken, Timestamp moveInTimestamp,
-                                             String destToken, Set<String> finishedPartitions) {
-        boolean satisfiedByMoveOutState = findMoveOutStates(taskSyncContext, sourceToken).stream()
-                .anyMatch(moveOutState -> {
-                    int cmp = moveOutState.getTimestamp().compareTo(moveInTimestamp);
-                    return cmp > 0 || (cmp == 0 && moveOutState.getDestPartitionTokens().contains(destToken));
-                });
-        if (satisfiedByMoveOutState) {
-            return true;
-        }
-        if (finishedPartitions.contains(sourceToken)) {
-            LOGGER.info("Task {}, source partition {} already finished and purged, treating MoveOut as satisfied for destination {}",
-                    taskSyncContext.getTaskUid(), sourceToken, destToken);
-            return true;
-        }
-        PartitionState sourceState = findPartitionState(taskSyncContext, sourceToken);
-        if (sourceState != null && sourceState.getProcessedTimestamp() != null
-                && sourceState.getProcessedTimestamp().compareTo(moveInTimestamp) > 0) {
-            LOGGER.info(
-                    "Task {}, source partition {} already streamed past MoveIn timestamp {} (processedTimestamp={}) despite missing a matching MoveOutState "
-                            + "(likely lost in a crash before it was persisted), treating MoveOut as satisfied for destination {}",
-                    taskSyncContext.getTaskUid(), sourceToken, moveInTimestamp, sourceState.getProcessedTimestamp(), destToken);
-            return true;
-        }
-        return false;
-    }
-
-    private List<MoveOutState> findMoveOutStates(TaskSyncContext taskSyncContext, String token) {
-        PartitionState partitionState = findPartitionState(taskSyncContext, token);
-        return partitionState == null ? List.of() : partitionState.getMoveOutStates();
-    }
-
-    private PartitionState findPartitionState(TaskSyncContext taskSyncContext, String token) {
-        for (PartitionState partitionState : taskSyncContext.getCurrentTaskState().getPartitions()) {
-            if (partitionState.getToken().equals(token)) {
-                return partitionState;
-            }
-        }
-        for (PartitionState partitionState : taskSyncContext.getCurrentTaskState().getSharedPartitions()) {
-            if (partitionState.getToken().equals(token)) {
-                return partitionState;
-            }
-        }
-        for (TaskState taskState : taskSyncContext.getTaskStates().values()) {
-            for (PartitionState partitionState : taskState.getPartitions()) {
-                if (partitionState.getToken().equals(token)) {
-                    return partitionState;
-                }
-            }
-            for (PartitionState partitionState : taskState.getSharedPartitions()) {
-                if (partitionState.getToken().equals(token)) {
-                    return partitionState;
-                }
-            }
-        }
-        return null;
+        return MoveInGateChecker.canContinue(
+                taskSyncContext,
+                destPartition.getToken(),
+                moveInState.getTimestamp(),
+                moveInState.getSourcePartitionTokens(),
+                finishedPartitions);
     }
 
     private boolean atLeastOneParentExists(TaskSyncContext taskSyncContext, Set<String> parents) {

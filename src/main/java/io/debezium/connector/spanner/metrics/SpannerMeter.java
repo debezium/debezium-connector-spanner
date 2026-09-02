@@ -23,6 +23,7 @@ import io.debezium.connector.spanner.metrics.event.ActiveQueriesUpdateMetricEven
 import io.debezium.connector.spanner.metrics.event.ChildPartitionsMetricEvent;
 import io.debezium.connector.spanner.metrics.event.DelayChangeStreamEventsMetricEvent;
 import io.debezium.connector.spanner.metrics.event.LatencyMetricEvent;
+import io.debezium.connector.spanner.metrics.event.MoveInLatencyMetricEvent;
 import io.debezium.connector.spanner.metrics.event.NewQueueMetricEvent;
 import io.debezium.connector.spanner.metrics.event.OffsetReceivingTimeMetricEvent;
 import io.debezium.connector.spanner.metrics.event.PartitionOffsetLagMetricEvent;
@@ -87,6 +88,11 @@ public class SpannerMeter {
 
     private final Statistics delayChangeStreamEvents;
 
+    // MoveIn boundary latency breakdown, see MoveInLatencyMetricEvent for what each stage means.
+    private final Statistics moveInCommitToQueryLatency;
+    private final Statistics moveInStreamLatency;
+    private final Statistics moveInTotalLatency;
+
     private final SpannerConnectorConfig connectorConfig;
 
     private final SpannerErrorHandler spannerErrorHandler;
@@ -114,6 +120,9 @@ public class SpannerMeter {
         this.partitionOffsetLagStatistics = new Statistics(connectorConfig.percentageMetricsClearInterval(), this::onError);
         this.receivingTimeOffsetStatistics = new Statistics(connectorConfig.percentageMetricsClearInterval(), this::onError);
         this.delayChangeStreamEvents = new Statistics(connectorConfig.percentageMetricsClearInterval(), this::onError);
+        this.moveInCommitToQueryLatency = new Statistics(connectorConfig.percentageMetricsClearInterval(), this::onError);
+        this.moveInStreamLatency = new Statistics(connectorConfig.percentageMetricsClearInterval(), this::onError);
+        this.moveInTotalLatency = new Statistics(connectorConfig.percentageMetricsClearInterval(), this::onError);
 
         metricsEventPublisher.subscribe(ChildPartitionsMetricEvent.class,
                 event -> detectedPartitionCount.addAndGet(event.getNumberPartitions()));
@@ -185,6 +194,12 @@ public class SpannerMeter {
         metricsEventPublisher.subscribe(DelayChangeStreamEventsMetricEvent.class,
                 event -> delayChangeStreamEvents.update(event.getDelayChangeStreamEvents()));
 
+        metricsEventPublisher.subscribe(MoveInLatencyMetricEvent.class, event -> {
+            moveInCommitToQueryLatency.update(event.getCommitToQueryMillis());
+            moveInStreamLatency.update(event.getStreamStartToReadMillis());
+            moveInTotalLatency.update(event.getCommitToReadMillis());
+        });
+
         metricsEventPublisher.subscribe(TaskStateChangeQueueUpdateMetricEvent.class, event -> {
             taskStateChangeEventQueueRemainingCapacity.set(event.getRemainingCapacity());
         });
@@ -226,6 +241,10 @@ public class SpannerMeter {
         receivingTimeOffsetStatistics.reset();
 
         delayChangeStreamEvents.reset();
+
+        moveInCommitToQueryLatency.reset();
+        moveInStreamLatency.reset();
+        moveInTotalLatency.reset();
     }
 
     public void start() {
@@ -246,6 +265,10 @@ public class SpannerMeter {
         receivingTimeOffsetStatistics.start();
 
         delayChangeStreamEvents.start();
+
+        moveInCommitToQueryLatency.start();
+        moveInStreamLatency.start();
+        moveInTotalLatency.start();
     }
 
     public void shutdown() {
@@ -277,6 +300,11 @@ public class SpannerMeter {
 
         delayChangeStreamEvents.shutdown();
         LOGGER.info("Task UID {}, Spanner meter, shutdown delayChangeStreamEvents", getTaskUid());
+
+        moveInCommitToQueryLatency.shutdown();
+        moveInStreamLatency.shutdown();
+        moveInTotalLatency.shutdown();
+        LOGGER.info("Task UID {}, Spanner meter, shutdown moveIn latency statistics", getTaskUid());
     }
 
     public void finishTask() {
@@ -363,6 +391,18 @@ public class SpannerMeter {
 
     public int getStuckHeartbeatIntervals() {
         return stuckHeartbeatIntervals.get();
+    }
+
+    public Statistics getMoveInCommitToQueryLatency() {
+        return moveInCommitToQueryLatency;
+    }
+
+    public Statistics getMoveInStreamLatency() {
+        return moveInStreamLatency;
+    }
+
+    public Statistics getMoveInTotalLatency() {
+        return moveInTotalLatency;
     }
 
     public Statistics getDelayChangeStreamEvents() {

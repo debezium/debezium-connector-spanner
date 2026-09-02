@@ -13,6 +13,7 @@ import io.debezium.connector.spanner.PartitionManager;
 import io.debezium.connector.spanner.db.model.Partition;
 import io.debezium.connector.spanner.kafka.internal.model.PartitionStateEnum;
 import io.debezium.connector.spanner.task.state.MoveInNotificationEvent;
+import io.debezium.connector.spanner.task.state.MoveInPublishOnlyEvent;
 import io.debezium.connector.spanner.task.state.MoveOutNotificationEvent;
 import io.debezium.connector.spanner.task.state.NewPartitionsEvent;
 import io.debezium.connector.spanner.task.state.PartitionStatusUpdateEvent;
@@ -66,6 +67,13 @@ public class SynchronizedPartitionManager implements PartitionManager {
     @Override
     public void notifyMoveIn(String token, Timestamp commitTimestamp, String recordSequence, List<String> sourcePartitionTokens) throws InterruptedException {
         syncEventPublisher.accept(new MoveInNotificationEvent(token, commitTimestamp, recordSequence, sourcePartitionTokens));
+    }
+
+    @Override
+    public void publishMoveInStateOnly(String token, Timestamp commitTimestamp, String recordSequence,
+                                       List<String> sourcePartitionTokens, boolean isFirstMoveIn)
+            throws InterruptedException {
+        syncEventPublisher.accept(new MoveInPublishOnlyEvent(token, commitTimestamp, recordSequence, sourcePartitionTokens, isFirstMoveIn));
     }
 
     @Override

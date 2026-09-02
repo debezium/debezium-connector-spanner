@@ -33,6 +33,7 @@ import io.debezium.connector.spanner.db.model.StreamEventMetadata;
 import io.debezium.connector.spanner.db.model.event.DataChangeEvent;
 import io.debezium.connector.spanner.db.model.event.PartitionEventEvent;
 import io.debezium.connector.spanner.db.stream.ChangeStreamEventConsumer;
+import io.debezium.connector.spanner.db.stream.MutableStreamOptions;
 import io.debezium.connector.spanner.db.stream.PartitionEventListener;
 import io.debezium.connector.spanner.db.stream.SpannerChangeStreamService;
 import io.debezium.connector.spanner.kafka.internal.model.PartitionState;
@@ -220,7 +221,8 @@ class PlacementMoveInMoveOutTest {
         Partition resumedPartition = new Partition(P_DST, Set.of(P_SRC), TS, TS, "origin", "83365be2414b3aae-00000000");
 
         SpannerChangeStreamService service = new SpannerChangeStreamService(
-                "task0", changeStreamDao, mapper, java.time.Duration.ofMinutes(1), metricsEventPublisher, 20, true);
+                "task0", changeStreamDao, mapper, java.time.Duration.ofMinutes(1), metricsEventPublisher,
+                20, MutableStreamOptions.withDefaults());
 
         ChangeStreamEventConsumer consumer = mock(ChangeStreamEventConsumer.class);
         PartitionEventListener listener = mock(PartitionEventListener.class);
