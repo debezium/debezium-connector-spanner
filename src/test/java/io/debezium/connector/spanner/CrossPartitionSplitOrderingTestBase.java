@@ -9,16 +9,16 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
-import org.junit.jupiter.api.Assumptions;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.EnumSource;
+import org.slf4j.Logger;
+
+import com.google.cloud.spanner.Dialect;
 
 import io.debezium.config.Configuration;
+import io.debezium.connector.spanner.util.Connection;
 import io.debezium.connector.spanner.util.PartitionMode;
 
 /**
@@ -36,53 +36,40 @@ import io.debezium.connector.spanner.util.PartitionMode;
  * once, with the correct content, strictly ordered after the first write - i.e. the
  * recursive splitting happening underneath does not cause reordering, drops, or duplicate
  * delivery.
- *
- * <p>Parameterized across both partition modes, but {@code MUTABLE_KEY_RANGE} currently
- * self-skips: after a background split, the connector doesn't pick up the new child
- * partition for streaming quickly enough, and Spanner rejects the query with
- * {@code OUT_OF_RANGE: Specified start_timestamp is too far in the past} - a real dispatch-latency
- * gap specific to {@code MUTABLE_KEY_RANGE} (its move-ordering machinery is the leading
- * suspect), not a test issue. {@code IMMUTABLE_KEY_RANGE} uses the same generic
- * split-handling code with no such delay.
  */
-public class CrossPartitionSplitOrderingIT extends AbstractSpannerConnectorIT {
+public class CrossPartitionSplitOrderingTestBase extends AbstractSpannerConnectorIT {
 
     private static final String tableNamePrefix = "cross_partition_split_ordering_table";
     private static final String changeStreamNamePrefix = "crossPartitionSplitOrderingStream";
 
-    @ParameterizedTest
-    @EnumSource(PartitionMode.class)
-    public void shouldDeliverFollowUpWriteExactlyOnceAndInOrderAcrossBackgroundPartitionSplits(PartitionMode partitionMode)
-            throws InterruptedException, ExecutionException {
-        Assumptions.assumeTrue(partitionMode != PartitionMode.MUTABLE_KEY_RANGE,
-                "Skipping: after a background split, the connector doesn't pick up the new MUTABLE_KEY_RANGE "
-                        + "child partition for streaming quickly enough, and Spanner rejects the query with "
-                        + "OUT_OF_RANGE: Specified start_timestamp is too far in the past - a dispatch-latency gap, "
-                        + "not something this test can work around.");
-        String tableName = tableNamePrefix + "_" + partitionMode.name().toLowerCase();
-        String changeStreamName = changeStreamNamePrefix + partitionMode.name();
-        databaseConnection.createTable(tableName + "(id INT64, value STRING(100)) PRIMARY KEY (id)");
-        databaseConnection.createChangeStream(changeStreamName, partitionMode, tableName);
+    public void shouldDeliverFollowUpWriteOnceInOrderAcrossBackgroundPartitionSplits(PartitionMode partitionMode, Dialect dialect, Logger logger)
+            throws InterruptedException {
+        Connection connection = connectionFor(dialect, logger);
+        Configuration base = baseConfigFor(dialect);
+        String table = tableFor(tableNamePrefix, partitionMode, dialect);
+        String stream = streamFor(changeStreamNamePrefix, partitionMode, dialect);
+
+        createTableAndStream(connection, partitionMode, table, stream);
         try {
-            final Configuration config = buildTestConfig(baseConfig, changeStreamName, tableName, partitionMode);
+            final Configuration config = buildTestConfig(base, stream, table, partitionMode);
 
             initializeConnectorTestFramework();
             start(SpannerConnector.class, config);
             assertConnectorIsRunning();
 
-            databaseConnection.executeUpdate(
-                    "INSERT INTO " + tableName + "(id, value) VALUES (1, 'v1')");
+            connection.executeUpdate(
+                    "INSERT INTO " + table + "(id, value) VALUES (1, 'v1')");
 
             // Long enough to guarantee multiple recursive splits have already happened
             // underneath by the time the follow-up write below lands.
             Thread.sleep(TimeUnit.SECONDS.toMillis(45));
 
-            databaseConnection.executeUpdate(
-                    "UPDATE " + tableName + " SET value = 'v2' WHERE id = 1");
+            connection.executeUpdate(
+                    "UPDATE " + table + " SET value = 'v2' WHERE id = 1");
 
             assertTrue(waitForAvailableRecords(waitTimeForRecords(), TimeUnit.SECONDS));
             SourceRecords sourceRecords = consumeRecordsByTopic(10, false);
-            List<SourceRecord> records = sourceRecords.recordsForTopic(getTopicName(config, tableName));
+            List<SourceRecord> records = sourceRecords.recordsForTopic(getTopicName(config, table));
 
             // Exactly insert + update - no duplicate delivery caused by the row's key range
             // having moved across several generations of child partitions in the background.
@@ -109,8 +96,8 @@ public class CrossPartitionSplitOrderingIT extends AbstractSpannerConnectorIT {
         }
         finally {
             stopConnector();
-            databaseConnection.dropChangeStream(changeStreamName);
-            databaseConnection.dropTable(tableName);
+            connection.dropChangeStream(stream);
+            connection.dropTable(table);
         }
     }
 }

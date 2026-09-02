@@ -17,7 +17,11 @@ import org.apache.kafka.connect.source.SourceRecord;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.google.cloud.spanner.Dialect;
 
 import io.debezium.config.Configuration;
 import io.debezium.connector.spanner.util.Connection;
@@ -31,16 +35,7 @@ import io.debezium.connector.spanner.util.PartitionMode;
 @RealSpannerCompatible
 public class ChangeStreamOrderingAndTransactionalIT extends AbstractSpannerConnectorIT {
 
-    /**
-     * Override the inherited emulator connection/config with a real-Spanner pair when
-     * {@code -Dspanner.test.real=true} is supplied; otherwise keep the parent's emulator pair.
-     */
-    protected static final Connection databaseConnection = Connection.isRealSpanner()
-            ? RealSpannerTestSupport.getConnection(database)
-            : AbstractSpannerConnectorIT.databaseConnection;
-    protected static final Configuration baseConfig = Connection.isRealSpanner()
-            ? createBaseConfigBuilder(database, true).build()
-            : AbstractSpannerConnectorIT.baseConfig;
+    private static final Logger LOGGER = LoggerFactory.getLogger(ChangeStreamOrderingAndTransactionalIT.class);
 
     private static final String multiTableTxnATableName = "embedded_txn_table_a";
     private static final String multiTableTxnBTableName = "embedded_txn_table_b";
@@ -59,27 +54,31 @@ public class ChangeStreamOrderingAndTransactionalIT extends AbstractSpannerConne
     }
 
     @ParameterizedTest
-    @EnumSource(PartitionMode.class)
-    public void shouldCorrelateChangesAcrossTablesInSameTransaction(PartitionMode partitionMode) throws Exception {
-        String tableA = multiTableTxnATableName + "_" + partitionMode.name().toLowerCase();
-        String tableB = multiTableTxnBTableName + "_" + partitionMode.name().toLowerCase();
-        String changeStream = multiTableTxnChangeStreamName + partitionMode.name();
-        databaseConnection.createTable(tableA + "(id INT64, value STRING(100)) PRIMARY KEY (id)");
-        databaseConnection.createTable(tableB + "(id INT64, value STRING(100)) PRIMARY KEY (id)");
-        databaseConnection.createChangeStream(changeStream, partitionMode, tableA, tableB);
+    @MethodSource("partitionModesAndDialects")
+    public void shouldCorrelateChangesAcrossTablesInSameTransaction(PartitionMode partitionMode, Dialect dialect) throws Exception {
+        Connection connection = connectionFor(dialect, LOGGER);
+        Configuration base = baseConfigFor(dialect);
+        String tableA = tableFor(multiTableTxnATableName, partitionMode, dialect);
+        String tableB = tableFor(multiTableTxnBTableName, partitionMode, dialect);
+        String stream = streamFor(multiTableTxnChangeStreamName, partitionMode, dialect);
+
+        String tableParams = "(id INT64, value STRING(100)) PRIMARY KEY (id)";
+        connection.createTable(tableA, tableParams);
+        connection.createTable(tableB, tableParams);
+        connection.createChangeStream(stream, partitionMode, tableA, tableB);
         try {
-            final Configuration config = buildTestConfig(baseConfig, changeStream, tableA, partitionMode);
+            final Configuration config = buildTestConfig(base, stream, tableA, partitionMode);
 
             initializeConnectorTestFramework();
             start(SpannerConnector.class, config);
             assertConnectorIsRunning();
 
             // Seed table A in its own transaction.
-            databaseConnection.executeUpdate(
+            connection.executeUpdate(
                     "INSERT INTO " + tableA + "(id, value) VALUES (1, 'A-initial')");
 
             // One atomic transaction touching both tables.
-            databaseConnection.executeUpdate(List.of(
+            connection.executeUpdate(List.of(
                     "UPDATE " + tableA + " SET value = 'A-updated' WHERE id = 1",
                     "INSERT INTO " + tableB + "(id, value) VALUES (1, 'B-initial')"));
 
@@ -121,30 +120,34 @@ public class ChangeStreamOrderingAndTransactionalIT extends AbstractSpannerConne
         }
         finally {
             stopConnector();
-            databaseConnection.dropChangeStream(changeStream);
-            databaseConnection.dropTable(tableA);
-            databaseConnection.dropTable(tableB);
+            connection.dropChangeStream(stream);
+            connection.dropTable(tableA);
+            connection.dropTable(tableB);
         }
     }
 
     @ParameterizedTest
-    @EnumSource(PartitionMode.class)
-    public void shouldPreserveStrictOrderAcrossManyRapidUpdatesToSameRow(PartitionMode partitionMode) throws Exception {
-        String table = rapidUpdatesTableName + "_" + partitionMode.name().toLowerCase();
-        String changeStream = rapidUpdatesChangeStreamName + partitionMode.name();
-        databaseConnection.createTable(table + "(id INT64, counter INT64) PRIMARY KEY (id)");
-        databaseConnection.createChangeStream(changeStream, partitionMode, table);
+    @MethodSource("partitionModesAndDialects")
+    public void shouldPreserveStrictOrderAcrossManyRapidUpdatesToSameRow(PartitionMode partitionMode, Dialect dialect) throws Exception {
+        Connection connection = connectionFor(dialect, LOGGER);
+        Configuration base = baseConfigFor(dialect);
+        String table = tableFor(rapidUpdatesTableName, partitionMode, dialect);
+        String stream = streamFor(rapidUpdatesChangeStreamName, partitionMode, dialect);
+
+        String tableParams = "(id INT64, counter INT64) PRIMARY KEY (id)";
+        connection.createTable(table, tableParams);
+        connection.createChangeStream(stream, partitionMode, table);
         try {
-            final Configuration config = buildTestConfig(baseConfig, changeStream, table, partitionMode);
+            final Configuration config = buildTestConfig(base, stream, table, partitionMode);
 
             initializeConnectorTestFramework();
             start(SpannerConnector.class, config);
             assertConnectorIsRunning();
 
-            databaseConnection.executeUpdate(
+            connection.executeUpdate(
                     "INSERT INTO " + table + "(id, counter) VALUES (1, 0)");
             for (int i = 1; i <= NUMBER_OF_UPDATES; i++) {
-                databaseConnection.executeUpdate(
+                connection.executeUpdate(
                         "UPDATE " + table + " SET counter = " + i + " WHERE id = 1");
             }
 
@@ -183,31 +186,33 @@ public class ChangeStreamOrderingAndTransactionalIT extends AbstractSpannerConne
         }
         finally {
             stopConnector();
-            databaseConnection.dropChangeStream(changeStream);
-            databaseConnection.dropTable(table);
+            connection.dropChangeStream(stream);
+            connection.dropTable(table);
         }
     }
 
     @ParameterizedTest
-    @EnumSource(PartitionMode.class)
-    public void shouldResumeWithoutDuplicatingOrLosingContentAcrossRestart(PartitionMode partitionMode) throws Exception {
-        Assumptions.assumeTrue(partitionMode == PartitionMode.IMMUTABLE_KEY_RANGE || Connection.isRealSpanner(),
-                "Skipping: on the emulator, MUTABLE_KEY_RANGE doesn't redeliver the missed update once after "
-                        + "restart - it redelivers the same content 5 times over about 40 seconds before Spanner "
-                        + "rejects a query with OUT_OF_RANGE: Specified start_timestamp is too far in the future. "
+    @MethodSource("partitionModesAndDialects")
+    public void shouldResumeWithoutDuplicatingOrLosingContentAcrossRestart(PartitionMode partitionMode, Dialect dialect) throws Exception {
+        Assumptions.assumeTrue(partitionMode == PartitionMode.IMMUTABLE_KEY_RANGE && !Connection.isRealSpanner(),
+                "Skipping: only passes for IMMUTABLE_KEY_RANGE against the emulator. "
                         + "Run with -Dspanner.test.real=true to exercise this mode.");
-        String table = restartContentTableName + "_" + partitionMode.name().toLowerCase();
-        String changeStream = restartContentChangeStreamName + partitionMode.name();
-        databaseConnection.createTable(table + "(id INT64, name STRING(100)) PRIMARY KEY (id)");
-        databaseConnection.createChangeStream(changeStream, partitionMode, table);
+        Connection connection = connectionFor(dialect, LOGGER);
+        Configuration base = baseConfigFor(dialect);
+        String table = tableFor(restartContentTableName, partitionMode, dialect);
+        String stream = streamFor(restartContentChangeStreamName, partitionMode, dialect);
+
+        String tableParams = "(id INT64, name STRING(100)) PRIMARY KEY (id)";
+        connection.createTable(table, tableParams);
+        connection.createChangeStream(stream, partitionMode, table);
         try {
-            final Configuration config = buildTestConfig(baseConfig, changeStream, table, partitionMode);
+            final Configuration config = buildTestConfig(base, stream, table, partitionMode);
 
             initializeConnectorTestFramework();
             start(SpannerConnector.class, config);
             assertConnectorIsRunning();
 
-            databaseConnection.executeUpdate(
+            connection.executeUpdate(
                     "INSERT INTO " + table + "(id, name) VALUES (1, 'Alice')");
 
             waitForAvailableRecords(waitTimeForRecords(), TimeUnit.SECONDS);
@@ -222,7 +227,7 @@ public class ChangeStreamOrderingAndTransactionalIT extends AbstractSpannerConne
             // This write happens entirely while the connector is down; it must be picked
             // up on restart, exactly once, with correct content - not lost, and not
             // duplicated alongside a replay of the pre-restart insert.
-            databaseConnection.executeUpdate(
+            connection.executeUpdate(
                     "UPDATE " + table + " SET name = 'Bob' WHERE id = 1");
 
             start(SpannerConnector.class, config);
@@ -240,7 +245,7 @@ public class ChangeStreamOrderingAndTransactionalIT extends AbstractSpannerConne
 
             // The connector must also keep working correctly after resuming, not just
             // replay the backlog and then stall.
-            databaseConnection.executeUpdate(
+            connection.executeUpdate(
                     "UPDATE " + table + " SET name = 'Carol' WHERE id = 1");
 
             waitForAvailableRecords(waitTimeForRecords(), TimeUnit.SECONDS);
@@ -258,8 +263,8 @@ public class ChangeStreamOrderingAndTransactionalIT extends AbstractSpannerConne
         }
         finally {
             stopConnector();
-            databaseConnection.dropChangeStream(changeStream);
-            databaseConnection.dropTable(table);
+            connection.dropChangeStream(stream);
+            connection.dropTable(table);
         }
     }
 }

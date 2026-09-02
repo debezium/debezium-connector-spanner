@@ -14,7 +14,11 @@ import java.util.concurrent.TimeUnit;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.google.cloud.spanner.Dialect;
 
 import io.debezium.config.Configuration;
 import io.debezium.connector.spanner.util.Connection;
@@ -34,54 +38,54 @@ import io.debezium.connector.spanner.util.PartitionMode;
 @RealSpannerCompatible
 public class ExcludeTtlDeletesFilterIT extends AbstractSpannerConnectorIT {
 
-    /**
-     * Override the inherited emulator connection/config with a real-Spanner pair when
-     * {@code -Dspanner.test.real=true} is supplied; otherwise keep the parent's emulator pair.
-     */
-    protected static final Connection databaseConnection = Connection.isRealSpanner()
-            ? RealSpannerTestSupport.getConnection(database)
-            : AbstractSpannerConnectorIT.databaseConnection;
-    protected static final Configuration baseConfig = Connection.isRealSpanner()
-            ? createBaseConfigBuilder(database, true).build()
-            : AbstractSpannerConnectorIT.baseConfig;
+    private static final Logger LOGGER = LoggerFactory.getLogger(ExcludeTtlDeletesFilterIT.class);
 
     private static final String tableNamePrefix = "exclude_ttl_deletes_filter_table";
     private static final String changeStreamNamePrefix = "excludeTtlDeletesFilterStream";
 
     @ParameterizedTest
-    @EnumSource(PartitionMode.class)
-    public void shouldFilterOutTtlDeletesButStillDeliverUserIssuedDeletes(PartitionMode partitionMode) throws Exception {
-        String tableName = tableNamePrefix + "_" + partitionMode.name().toLowerCase();
-        String changeStreamName = changeStreamNamePrefix + partitionMode.name();
-        databaseConnection.createTable(tableName
-                + "(id INT64, value STRING(100), expire_at TIMESTAMP NOT NULL) PRIMARY KEY (id), "
-                + "ROW DELETION POLICY (OLDER_THAN(expire_at, INTERVAL 1 DAY))");
-        databaseConnection.createChangeStreamExcludeTtlDeletes(changeStreamName, partitionMode, tableName);
+    @MethodSource("partitionModesAndDialects")
+    public void shouldFilterOutTtlDeletesButStillDeliverUserIssuedDeletes(PartitionMode partitionMode, Dialect dialect) throws Exception {
+        Connection connection = connectionFor(dialect, LOGGER);
+        Configuration base = baseConfigFor(dialect);
+        String table = tableFor(tableNamePrefix, partitionMode, dialect);
+        String stream = streamFor(changeStreamNamePrefix, partitionMode, dialect);
+
+        String tableParams = "(id INT64, value STRING(100), expire_at TIMESTAMP NOT NULL) PRIMARY KEY (id), "
+                + "ROW DELETION POLICY (OLDER_THAN(expire_at, INTERVAL 1 DAY))";
+        connection.createTable(table, tableParams);
+        connection.createChangeStreamExcludeTtlDeletes(stream, partitionMode, table);
         try {
-            final Configuration config = buildTestConfig(baseConfig, changeStreamName, tableName, partitionMode);
+            final Configuration config = buildTestConfig(base, stream, table, partitionMode);
 
             clearKafkaTopics();
             initializeConnectorTestFramework();
             start(SpannerConnector.class, config);
             assertConnectorIsRunning();
 
+            boolean isPostgres = dialect == Dialect.POSTGRESQL;
+
             // Row 1 is already past its TTL expiry - its eventual GC-driven delete must be
             // filtered out entirely by exclude_ttl_deletes.
-            databaseConnection.executeUpdate(
-                    "INSERT INTO " + tableName + "(id, value, expire_at) VALUES ("
-                            + "1, 'ttl-expires-soon', TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 2 DAY))");
+            String timestampSub = isPostgres ? "CURRENT_TIMESTAMP - INTERVAL '2 days'"
+                    : "TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 2 DAY)";
+            connection.executeUpdate(
+                    "INSERT INTO " + table + "(id, value, expire_at) VALUES ("
+                            + "1, 'ttl-expires-soon', " + timestampSub + ")");
 
             // Row 2 has a far-future expiry, so it will only ever be removed by the explicit
             // user-issued DELETE below - the filter must not affect it.
-            databaseConnection.executeUpdate(
-                    "INSERT INTO " + tableName + "(id, value, expire_at) VALUES ("
-                            + "2, 'not-expiring', TIMESTAMP_ADD(CURRENT_TIMESTAMP(), INTERVAL 30 DAY))");
-            databaseConnection.executeUpdate(
-                    "DELETE FROM " + tableName + " WHERE id = 2");
+            String timestampAdd = isPostgres ? "CURRENT_TIMESTAMP + INTERVAL '30 days'"
+                    : "TIMESTAMP_ADD(CURRENT_TIMESTAMP(), INTERVAL 30 DAY)";
+            connection.executeUpdate(
+                    "INSERT INTO " + table + "(id, value, expire_at) VALUES ("
+                            + "2, 'not-expiring', " + timestampAdd + ")");
+            connection.executeUpdate(
+                    "DELETE FROM " + table + " WHERE id = 2");
 
             assertTrue(waitForAvailableRecords(waitTimeForRecords(), TimeUnit.SECONDS));
             SourceRecords sourceRecords = consumeRecordsByTopic(10, false);
-            List<SourceRecord> records = sourceRecords.recordsForTopic(getTopicName(config, tableName));
+            List<SourceRecord> records = sourceRecords.recordsForTopic(getTopicName(config, table));
 
             // 2 inserts + 1 user-issued delete + 1 tombstone - no TTL-triggered delete or
             // tombstone for row 1, no matter how long we wait for it.
@@ -97,8 +101,8 @@ public class ExcludeTtlDeletesFilterIT extends AbstractSpannerConnectorIT {
         }
         finally {
             stopConnector();
-            databaseConnection.dropChangeStream(changeStreamName);
-            databaseConnection.dropTable(tableName);
+            connection.dropChangeStream(stream);
+            connection.dropTable(table);
         }
     }
 }

@@ -18,7 +18,11 @@ import org.apache.kafka.connect.source.SourceRecord;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.google.cloud.spanner.Dialect;
 
 import io.debezium.config.Configuration;
 import io.debezium.connector.spanner.util.Connection;
@@ -35,19 +39,10 @@ import io.debezium.connector.spanner.util.PartitionMode;
 @RealSpannerCompatible
 public class DataTypesIT extends AbstractSpannerConnectorIT {
 
-    /**
-     * Override the inherited emulator connection/config with a real-Spanner pair when
-     * {@code -Dspanner.test.real=true} is supplied; otherwise keep the parent's emulator pair.
-     */
-    protected static final Connection databaseConnection = Connection.isRealSpanner()
-            ? RealSpannerTestSupport.getConnection(database)
-            : AbstractSpannerConnectorIT.databaseConnection;
-    protected static final Configuration baseConfig = Connection.isRealSpanner()
-            ? createBaseConfigBuilder(database, true).build()
-            : AbstractSpannerConnectorIT.baseConfig;
+    private static final Logger LOGGER = LoggerFactory.getLogger(DataTypesIT.class);
 
-    private static final String gsqlTableNamePrefix = "g_embedded_data_types_tests_table";
-    private static final String gsqlChangeStreamNamePrefix = "g_embeddedDataTypesTestChangeStream";
+    private static final String tableNamePrefix = "embedded_data_types_tests_table";
+    private static final String changeStreamNamePrefix = "embeddedDataTypesTestChangeStream";
 
     private static final String edgeCasesTableNamePrefix = "embedded_data_type_edge_cases_table";
     private static final String edgeCasesChangeStreamNamePrefix = "embeddedDataTypeEdgeCasesStream";
@@ -64,12 +59,15 @@ public class DataTypesIT extends AbstractSpannerConnectorIT {
     }
 
     @ParameterizedTest
-    @EnumSource(PartitionMode.class)
-    public void shouldStreamUpdatesToKafkaWithTheCorrectType(PartitionMode partitionMode)
+    @MethodSource("partitionModesAndDialects")
+    public void shouldStreamUpdatesToKafkaWithTheCorrectType(PartitionMode partitionMode, Dialect dialect)
             throws InterruptedException, ExecutionException {
-        String gsqlTableName = gsqlTableNamePrefix + "_" + partitionMode.name().toLowerCase();
-        String gsqlChangeStreamName = gsqlChangeStreamNamePrefix + partitionMode.name();
-        databaseConnection.createTable(gsqlTableName + "(id INT64,"
+        Connection connection = connectionFor(dialect, LOGGER);
+        Configuration base = baseConfigFor(dialect);
+        String table = tableFor(tableNamePrefix, partitionMode, dialect);
+        String stream = streamFor(changeStreamNamePrefix, partitionMode, dialect);
+
+        String tableParams = "(id INT64,"
                 + "  boolcol BOOL,"
                 + "  int64col INT64,"
                 + "  float32col FLOAT32,"
@@ -82,15 +80,29 @@ public class DataTypesIT extends AbstractSpannerConnectorIT {
                 + "  jsoncol JSON,"
                 + "  arrcol ARRAY<STRING(MAX)>,"
                 + "  tokenlistcol TOKENLIST AS (TOKENIZE_FULLTEXT(stringcol)) HIDDEN, "
-                + ") PRIMARY KEY (id)");
-        databaseConnection.createChangeStream(gsqlChangeStreamName, partitionMode, gsqlTableName);
+                + ") PRIMARY KEY (id)";
+        connection.createTable(table, tableParams);
+        connection.createChangeStream(stream, partitionMode, table);
         try {
-            final Configuration config = buildTestConfig(baseConfig, gsqlChangeStreamName, gsqlTableName, partitionMode);
+            final Configuration config = buildTestConfig(base, stream, table, partitionMode);
 
             initializeConnectorTestFramework();
             start(SpannerConnector.class, config);
             assertConnectorIsRunning();
-            final long insertedRows = databaseConnection.executeUpdate("INSERT INTO " + gsqlTableName
+
+            boolean isPostgres = dialect == Dialect.POSTGRESQL;
+
+            String bytesValue = isPostgres
+                    ? "'bytesVal'"
+                    : "b'bytesVal'";
+            String jsonValue = isPostgres
+                    ? "'\"Hello\"'"
+                    : "JSON '\"Hello\"'";
+            String arrayValue = isPostgres
+                    ? "ARRAY['a', 'b']"
+                    : "['a', 'b']";
+
+            final long insertedRows = connection.executeUpdate("INSERT INTO " + table
                     + "(id"
                     + ", boolcol"
                     + ", int64col"
@@ -108,19 +120,20 @@ public class DataTypesIT extends AbstractSpannerConnectorIT {
                     + ", 42"
                     + ", 3.14"
                     + ", 2.71"
-                    + ", '1970-01-01 00:00:00 UTC',"
-                    + " '1970-01-01'"
+                    + ", '1970-01-01 00:00:00 UTC'"
+                    + ", '1970-01-01'"
                     + ", 'stringVal'"
-                    + ", b'bytesVal'"
-                    + ", 6.023,"
-                    + " JSON '\"Hello\"'"
-                    + ", ['a', 'b'])");
+                    + ", " + bytesValue
+                    + ", 6.023"
+                    + ", " + jsonValue
+                    + ", " + arrayValue
+                    + ")");
 
             assertEquals(1, insertedRows);
 
             assertTrue(waitForAvailableRecords(waitTimeForRecords(), TimeUnit.SECONDS));
             SourceRecords sourceRecords = consumeRecordsByTopic(10, false);
-            List<SourceRecord> records = sourceRecords.recordsForTopic(getTopicName(config, gsqlTableName));
+            List<SourceRecord> records = sourceRecords.recordsForTopic(getTopicName(config, table));
             assertThat(records).hasSize(1);
 
             Struct record = (Struct) (records.get(0).value());
@@ -140,11 +153,14 @@ public class DataTypesIT extends AbstractSpannerConnectorIT {
             assertThat(values.getString("numericcol")).isEqualTo("6.023");
             assertThat(values.getString("jsoncol")).isEqualTo("\"Hello\"");
             assertThat(values.getArray("arrcol")).containsExactly("a", "b");
-            assertThat(values.getString("tokenlistcol")).isNull();
+            if (dialect == Dialect.GOOGLE_STANDARD_SQL) {
+                // TOKENLIST is only relevant for GOOGLE_STANDARD_SQL dialect.
+                assertThat(values.getString("tokenlistcol")).isNull();
+            }
         }
         finally {
-            databaseConnection.dropChangeStream(gsqlChangeStreamName);
-            databaseConnection.dropTable(gsqlTableName);
+            connection.dropChangeStream(stream);
+            connection.dropTable(table);
         }
     }
 
@@ -156,41 +172,55 @@ public class DataTypesIT extends AbstractSpannerConnectorIT {
      * creation.
      */
     @ParameterizedTest
-    @EnumSource(PartitionMode.class)
-    public void shouldRoundTripEdgeCaseValuesAcrossInsertUpdateDelete(PartitionMode partitionMode) throws InterruptedException, ExecutionException {
-        String edgeCasesTableName = edgeCasesTableNamePrefix + "_" + partitionMode.name().toLowerCase();
-        String edgeCasesChangeStreamName = edgeCasesChangeStreamNamePrefix + partitionMode.name();
-        databaseConnection.createTable(edgeCasesTableName
-                + "(id INT64, description STRING(100), tag_bytes BYTES(100), balance NUMERIC, "
-                + "unicode_name STRING(100), tags ARRAY<STRING(50)>) PRIMARY KEY (id)");
-        databaseConnection.createChangeStream(edgeCasesChangeStreamName, partitionMode, edgeCasesTableName);
+    @MethodSource("partitionModesAndDialects")
+    public void shouldRoundTripEdgeCaseValuesAcrossInsertUpdateDelete(PartitionMode partitionMode, Dialect dialect) throws InterruptedException, ExecutionException {
+        Connection connection = connectionFor(dialect, LOGGER);
+        Configuration base = baseConfigFor(dialect);
+        String table = tableFor(edgeCasesTableNamePrefix, partitionMode, dialect);
+        String stream = streamFor(edgeCasesChangeStreamNamePrefix, partitionMode, dialect);
+
+        String tableParams = "(id INT64, description STRING(100), tag_bytes BYTES(100), balance NUMERIC, "
+                + "unicode_name STRING(100), tags ARRAY<STRING(50)>) PRIMARY KEY (id)";
+        connection.createTable(table, tableParams);
+        connection.createChangeStream(stream, partitionMode, table);
         try {
-            final Configuration config = buildTestConfig(baseConfig, edgeCasesChangeStreamName, edgeCasesTableName, partitionMode);
+            final Configuration config = buildTestConfig(base, stream, table, partitionMode);
 
             initializeConnectorTestFramework();
             start(SpannerConnector.class, config);
             assertConnectorIsRunning();
 
-            databaseConnection.executeUpdate(
-                    "INSERT INTO " + edgeCasesTableName + "(id, description, tag_bytes, balance, unicode_name, tags) VALUES ("
+            boolean isPostgres = dialect == Dialect.POSTGRESQL;
+
+            String emptyBytes = isPostgres ? "''"
+                    : "b''";
+            String emptyArray = isPostgres ? "'{}'"
+                    : "[]";
+            connection.executeUpdate(
+                    "INSERT INTO " + table
+                            + "(id, description, tag_bytes, balance, unicode_name, tags) VALUES ("
                             + "1, "
-                            + "'', " // empty string, not NULL
-                            + "b'', " // empty bytes, not NULL
-                            + "-123.456789, " // negative numeric
-                            + "'日本語 café ☕', " // unicode content
-                            + "[])"); // empty array, not NULL
+                            + "'', "
+                            + emptyBytes + ", "
+                            + "-123.456789, "
+                            + "'日本語 café ☕', "
+                            + emptyArray + ")");
 
-            databaseConnection.executeUpdate(
-                    "UPDATE " + edgeCasesTableName + " SET description = NULL, tag_bytes = b'payload', "
+            String tagBytes = isPostgres ? "'payload'"
+                    : "b'payload'";
+            String tags = isPostgres ? "ARRAY['a', 'b']"
+                    : "['a', 'b']";
+            connection.executeUpdate(
+                    "UPDATE " + table + " SET description = NULL, tag_bytes = " + tagBytes + ", "
                             + "balance = 99999999999999999999.999999999, "
-                            + "unicode_name = '北京 🎉', tags = ['a', 'b'] WHERE id = 1");
+                            + "unicode_name = '北京 🎉', tags = " + tags + " WHERE id = 1");
 
-            databaseConnection.executeUpdate(
-                    "DELETE FROM " + edgeCasesTableName + " WHERE id = 1");
+            connection.executeUpdate(
+                    "DELETE FROM " + table + " WHERE id = 1");
 
             assertTrue(waitForAvailableRecords(waitTimeForRecords(), TimeUnit.SECONDS));
             SourceRecords sourceRecords = consumeRecordsByTopic(10, false);
-            List<SourceRecord> records = sourceRecords.recordsForTopic(getTopicName(config, edgeCasesTableName));
+            List<SourceRecord> records = sourceRecords.recordsForTopic(getTopicName(config, table));
             // insert + update + delete + tombstone
             assertThat(records).hasSize(4);
 
@@ -228,8 +258,8 @@ public class DataTypesIT extends AbstractSpannerConnectorIT {
             assertThat(records.get(3).value()).isNull();
         }
         finally {
-            databaseConnection.dropChangeStream(edgeCasesChangeStreamName);
-            databaseConnection.dropTable(edgeCasesTableName);
+            connection.dropChangeStream(stream);
+            connection.dropTable(table);
         }
     }
 }

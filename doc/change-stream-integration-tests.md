@@ -18,12 +18,12 @@ the file. Each test runs against one of two possibilities:
 
 ## `ChangeStreamCorrectContentIT`
 
-Parameterized across all partition modes. Verifies the actual content of change-stream
+Parameterized across all partition modes and dialects. Verifies the actual content of change-stream
 records matches documented behavior for various row/column scenarios.
 
 Confirmed passing against the local Docker emulator, all parameterized tests, both partition
-modes. `@RealSpannerCompatible` with a connection/config override (`-Dspanner.test.real=true`).
-Confirmed passing against real Spanner too, both partition modes, for every test except
+modes, both dialects. `@RealSpannerCompatible` with a connection/config override (`-Dspanner.test.real=true`).
+Confirmed passing against real Spanner too, both partition modes, both dialects, for every test except
 `shouldCarryUnchangedColumnsThroughOnPartialUpdate` (self-skips there - see below).
 
 **`shouldCarryAllPrimaryKeyColumnsInKeyStruct`**
@@ -46,8 +46,8 @@ distinguished from "field never set" on the return-to-null step.
 Inserts a row with several columns, then updates only one of them. Confirms `before` and
 `after` both correctly carry through the untouched columns' values, showing a real
 old-to-new transition only for the column that was actually touched. Passes against the
-emulator. Self-skips against real Spanner, on both partition modes - see Known Issues #1
-below for the full explanation.
+emulator. Self-skips against real Spanner, on both partition modes and both dialects - 
+see Known Issues #1 below for the full explanation.
 
 **`shouldPickUpColumnAddedAfterStreamCreationWithoutReconfiguring`**
 The parameterized (all-partition-mode) equivalent of `MutableKeyRangeIT`'s schema-change
@@ -61,9 +61,9 @@ metadata shows an empty tag and a `false` system-transaction flag by default.
 
 **`shouldSurfaceExplicitTransactionTag`**
 Runs an insert inside a transaction carrying an explicit tag and confirms the tag surfaces on
-the record. Parameterized across both partition modes. Self-skips (`Assumptions.assumeTrue`)
-unless `-Dspanner.test.real=true` is set, since the local Docker emulator doesn't propagate
-transaction tags through its change stream at all.
+the record. Parameterized across both partition modes and both dialects. Self-skips 
+(`Assumptions.assumeTrue`) unless `-Dspanner.test.real=true` is set, since the local Docker 
+emulator doesn't propagate transaction tags through its change stream at all.
 
 ## `ChangeStreamFilterIT`
 
@@ -71,12 +71,12 @@ Tests for change-stream event filters (excluding specific operation types or spe
 transactions from the stream), and confirms filtered-out changes still correctly affect what
 later, unfiltered events report as the "before" state.
 
-Parameterized across both partition modes; `@RealSpannerCompatible` with a connection/config
-override (`-Dspanner.test.real=true`). Confirmed passing on both the emulator and real
-Spanner, for both partition modes. Every table here has a single non-key column, and every
-`UPDATE` always sets it, so none of these tests can trigger the before-image gap documented
-elsewhere (that only shows up when an `UPDATE` leaves some non-key column out of its `SET`
-clause).
+Parameterized across both partition modes and both dialects; `@RealSpannerCompatible` with a 
+connection/config override (`-Dspanner.test.real=true`). Confirmed passing on both the emulator 
+and real Spanner, for both partition modes and both dialects. Every table here has a single 
+non-key column, and every `UPDATE` always sets it, so none of these tests can trigger the 
+before-image gap documented elsewhere (that only shows up when an `UPDATE` leaves some non-key 
+column out of its `SET` clause).
 
 **`shouldExcludeDeleteEventsAndTheirTombstones`**
 With deletes excluded from the stream: inserts, updates, then deletes a row, and inserts an
@@ -103,28 +103,29 @@ real state left behind by the excluded transaction.
 
 ## `ChangeStreamOrderingAndTransactionalIT`
 
-Parameterized across both partition modes; each test creates and drops its own
-partition-mode-suffixed table/change stream per invocation. Verifies cross-table transaction
-correlation, strict ordering under rapid writes, and restart correctness.
-`@RealSpannerCompatible` with a connection/config override (`-Dspanner.test.real=true`).
+Parameterized across both partition modes and both dialects; each test creates and drops its own
+table/change stream per invocation. Verifies cross-table transaction correlation, strict ordering 
+under rapid writes, and restart correctness. `@RealSpannerCompatible` with a connection/config 
+override (`-Dspanner.test.real=true`).
 
 **`shouldCorrelateChangesAcrossTablesInSameTransaction`**
 Seeds a row in table A, then runs one atomic transaction that updates table A and inserts
 into table B. Confirms both changes from that shared transaction carry the same transaction
 ID and commit timestamp, while the earlier, separate seed transaction has a different ID.
-Passes on both the emulator and real Spanner, for both partition modes.
+Passes on both the emulator and real Spanner, for both partition modes and both dialects.
 
 **`shouldPreserveStrictOrderAcrossManyRapidUpdatesToSameRow`**
 Inserts a row, then issues eight rapid sequential updates to it. Confirms every resulting
 record appears in exactly the order the updates were issued, with strictly increasing commit
-timestamps throughout. Passes on both the emulator and real Spanner, for both partition modes.
+timestamps throughout. Passes on both the emulator and real Spanner, for both partition modes
+and both dialects.
 
 **`shouldResumeWithoutDuplicatingOrLosingContentAcrossRestart`**
 Inserts a row, confirms delivery, stops the connector, updates the row while it's down,
 restarts, and confirms the missed update is delivered exactly once (not lost, not
 duplicated) with correct before/after content. Then performs one more update after resuming
 to confirm the connector keeps working normally afterward. Passes on the emulator for
-`IMMUTABLE_KEY_RANGE`.
+`IMMUTABLE_KEY_RANGE` for both dialects.
 
 `MUTABLE_KEY_RANGE` self-skips on the emulator, and this test also fails against real
 Spanner on both partition modes - see Known Issues #3 below for the full explanation.
@@ -136,8 +137,8 @@ documented, each inserting a row and updating only one of its columns.
 
 **Runs against:** the local Docker emulator by default; `@RealSpannerCompatible` with a
 connection/config override (`-Dspanner.test.real=true`).
-Parameterized across both partition modes. All three tests pass on the emulator for both
-`IMMUTABLE_KEY_RANGE` and `MUTABLE_KEY_RANGE`. Against real Spanner, two of the three tests
+Parameterized across both partition modes and both dialects. All three tests pass on the emulator 
+for both `IMMUTABLE_KEY_RANGE` and `MUTABLE_KEY_RANGE`. Against real Spanner, two of the three tests
 self-skip - see Known Issues #1 below for the full explanation and the per-`value_capture_type`
 breakdown.
 
@@ -160,11 +161,11 @@ Spanner** - see Known Issues #1 below.
 **Currently `@Disabled`** (both partition modes) - see below.
 
 **`shouldNotCrossContaminateStateBetweenInterleavedKeys`**
-Parameterized across both partition modes. Inserts four different rows, then updates all four
-in a deliberately interleaved order (not fully processing one key before starting the next),
-to stress any per-row state tracking that might be indexed incorrectly. Confirms all eight
-resulting events are captured and, critically, that each row's update correctly reflects that
-row's own prior/new values - not a value that leaked in from a different row being processed
+Parameterized across both partition modes and both dialects. Inserts four different rows, then 
+updates all four in a deliberately interleaved order (not fully processing one key before starting 
+the next), to stress any per-row state tracking that might be indexed incorrectly. Confirms all 
+eight resulting events are captured and, critically, that each row's update correctly reflects 
+that row's own prior/new values - not a value that leaked in from a different row being processed
 nearby.
 
 `MUTABLE_KEY_RANGE` can't run against the emulator - see Known Issues #2 below. Against real
@@ -179,23 +180,23 @@ Spanner doesn't do (real Spanner splits based on load, not a fixed schedule). Th
 timer-driven splitting is used on purpose here to get a churning partition topology "for free"
 without needing to force a split manually.
 
-**`shouldDeliverFollowUpWriteExactlyOnceAndInOrderAcrossBackgroundPartitionSplits`**
-Parameterized across both partition modes, but only `IMMUTABLE_KEY_RANGE` actually runs;
-`MUTABLE_KEY_RANGE` self-skips. Inserts a row, then waits 45 seconds - long enough for the
-Spanner emulator's own timer-driven background partition splitting to run through several
-generations of splits on its own, with no forced split needed - then updates that row.
-Confirms exactly one insert and one update are delivered (no duplicates or drops from the
-row's key range having moved across several partition generations), and that the update's
+**`shouldDeliverFollowUpWriteOnceInOrderAcrossBackgroundPartitionSplits`**
+Parameterized across both partition modes and both dialects. Inserts a row, then waits 45 seconds - 
+long enough for the Spanner emulator's own timer-driven background partition splitting to run 
+through several generations of splits on its own, with no forced split needed - then updates 
+that row. Confirms exactly one insert and one update are delivered (no duplicates or drops from 
+the row's key range having moved across several partition generations), and that the update's
 timestamp is strictly later than the insert's.
 
-`MUTABLE_KEY_RANGE` self-skips - see Known Issues #2 below for the full explanation.
+Needed to be split into four separate test classes for each Partition Mode / Dialect combo: `CrossPartitionSplitOrderingIkrGoogleSqlIT`, `CrossPartitionSplitOrderingIkrPostgresqlIT`, `CrossPartitionSplitOrderingMkrGoogleSqlIT`, `CrossPartitionSplitOrderingMkrPostgresqlIT` - see Known Issues #2 below for the full explanation.
 
 ## `DataTypesIT`
 
 Pre-existing file; `shouldRoundTripEdgeCaseValuesAcrossInsertUpdateDelete` is the newer of the
-two tests. Both are now parameterized across both partition modes and `@RealSpannerCompatible`
-with a connection/config override (`-Dspanner.test.real=true`).
-Confirmed passing on both the emulator and real Spanner, for both partition modes, on both tests.
+two tests. Both are now parameterized across both partition modes, both dialects and 
+`@RealSpannerCompatible` with a connection/config override (`-Dspanner.test.real=true`).
+Confirmed passing on both the emulator and real Spanner, for both partition modes, both dialects, 
+on both tests.
 
 **`shouldStreamUpdatesToKafkaWithTheCorrectType`**
 Inserts one row covering every supported column type (`BOOL`, `INT64`, `FLOAT32`, `FLOAT64`,
@@ -214,10 +215,10 @@ that the delete's `before` reflects the post-update state with a trailing tombst
 
 ## `ExcludeTtlDeletesFilterIT`
 
-Parameterized across both partition modes; `@RealSpannerCompatible` with a connection/config
-override (`-Dspanner.test.real=true`). Passes on both the emulator and real Spanner, for both
-partition modes - but this pass is likely inconclusive rather than a genuine confirmation of
-the filter. See Known Issues #4 below for the full explanation.
+Parameterized across both partition modes and both dialects; `@RealSpannerCompatible` with a 
+connection/config override (`-Dspanner.test.real=true`). Passes on both the emulator and real 
+Spanner, for both partition modes - but this pass is likely inconclusive rather than a genuine 
+confirmation of the filter. See Known Issues #4 below for the full explanation.
 
 **`shouldFilterOutTtlDeletesButStillDeliverUserIssuedDeletes`**
 Inserts one row eligible for immediate TTL eviction and a second row with a far-future
@@ -227,10 +228,10 @@ normally, while no delete or tombstone ever appears for the TTL-expired row.
 
 ## `InterleavedTableIT`
 
-Parameterized across both partition modes; `@RealSpannerCompatible` with a connection/config
-override (`-Dspanner.test.real=true`). Confirmed passing on both the emulator and real
-Spanner, for both partition modes - unaffected by the before-image gap documented elsewhere
-since it only issues an INSERT and a DELETE, no partial UPDATE.
+Parameterized across both partition modes and both dialects; `@RealSpannerCompatible` with a 
+connection/config override (`-Dspanner.test.real=true`). Confirmed passing on both the emulator 
+and real Spanner, for both partition modes - unaffected by the before-image gap documented 
+elsewhere since it only issues an INSERT and a DELETE, no partial UPDATE.
 
 **`shouldCaptureCascadingDeleteOfInterleavedChildRows`**
 Inserts a parent row and a child row interleaved under it, in one transaction, then deletes
@@ -399,11 +400,12 @@ same row's disappearance at once. Confirmed passing against real Spanner.
 
 ## `TransactionRecordCountIT`
 
-Parameterized across both partition modes; `@RealSpannerCompatible` with a connection/config
-override (`-Dspanner.test.real=true`).
+Parameterized across both partition modes and both dialects; `@RealSpannerCompatible` with a 
+connection/config override (`-Dspanner.test.real=true`).
 
-**Runs against:** the local Docker emulator by default. `MUTABLE_KEY_RANGE` self-skips there -
-see Known Issues #2 below. Against real Spanner, both partition modes pass.
+**Runs against:** the local Docker emulator by default; `@RealSpannerCompatible` with a
+connection/config override (`-Dspanner.test.real=true`).
+Parameterized across both partition modes and both dialects.
 
 **`shouldReportRecordAndPartitionCountsForTransaction`**
 Inserts one row in its own transaction, then in a separate transaction updates that row and
@@ -411,7 +413,7 @@ inserts a new row as two statements executed atomically together. Confirms the s
 transaction reports a record count and partition count of 1, and that both records from the
 two-statement transaction report a transaction-wide record count of 2 (not a count scoped to
 just one row), while still correctly showing 1 partition. Confirmed passing against the
-emulator (`IMMUTABLE_KEY_RANGE`) and real Spanner (both partition modes).
+emulator and real Spanner (both partition modes and both dialects).
 
 ## Known Issues
 
@@ -445,35 +447,26 @@ This surfaces differently depending on `value_capture_type`:
 
 The following test scenarios are affected:
 
-| Test | Partition mode(s) | Backend |
-|---|---|---|
-| `ChangeStreamCorrectContentIT.shouldCarryUnchangedColumnsThroughOnPartialUpdate` | `IMMUTABLE_KEY_RANGE`, `MUTABLE_KEY_RANGE` | Real Spanner |
-| `ChangeStreamValueCaptureTypeIT.shouldCaptureFullNewRowWithNoNonKeyOldValues` (`NEW_VALUES`) | `IMMUTABLE_KEY_RANGE`, `MUTABLE_KEY_RANGE` | Real Spanner |
-| `ChangeStreamValueCaptureTypeIT.shouldCaptureFullRowOnBothSides` (`NEW_ROW_AND_OLD_VALUES`) | `IMMUTABLE_KEY_RANGE`, `MUTABLE_KEY_RANGE` | Real Spanner |
-| `ConcurrentKeysIT.shouldNotCrossContaminateStateBetweenInterleavedKeys` | `IMMUTABLE_KEY_RANGE`, `MUTABLE_KEY_RANGE` | Real Spanner |
+| Test | Partition mode(s) | Dialect | Backend |
+|---|---|---|---|
+| `ChangeStreamCorrectContentIT.shouldCarryUnchangedColumnsThroughOnPartialUpdate` | `IMMUTABLE_KEY_RANGE`, `MUTABLE_KEY_RANGE` | `GOOGLE_STANDARD_SQL`, `POSTGRESQL` | Real Spanner |
+| `ChangeStreamValueCaptureTypeIT.shouldCaptureFullNewRowWithNoNonKeyOldValues` (`NEW_VALUES`) | `IMMUTABLE_KEY_RANGE`, `MUTABLE_KEY_RANGE` | `GOOGLE_STANDARD_SQL`, `POSTGRESQL` | | Real Spanner |
+| `ChangeStreamValueCaptureTypeIT.shouldCaptureFullRowOnBothSides` (`NEW_ROW_AND_OLD_VALUES`) | `IMMUTABLE_KEY_RANGE`, `MUTABLE_KEY_RANGE` | `GOOGLE_STANDARD_SQL`, `POSTGRESQL` | | Real Spanner |
+| `ConcurrentKeysIT.shouldNotCrossContaminateStateBetweenInterleavedKeys` | `IMMUTABLE_KEY_RANGE`, `MUTABLE_KEY_RANGE` | `GOOGLE_STANDARD_SQL`, `POSTGRESQL` | Real Spanner |
 
-### 2. Emulator's background partition split breaks `MUTABLE_KEY_RANGE` mid-test
+### 2. OUT_OF_RANGE: Specified start_timestamp is too far in the past
+We are seeing `OUT_OF_RANGE: Specified start_timestamp is too far in the past` when running
+the parameterized `CrossPartitionSplitOrderingIT` tests. The first parameterized test will pass and then 
+all subsequent combinations will fail with this error because the test is wrongfully influenced
+by timestamps created during the previous test run. Presumably there is some shared JVM state
+causing this error.
 
-The local emulator automatically re-splits partitions on a ~15-20 second timer. After a
-background split, the connector doesn't pick up the new `MUTABLE_KEY_RANGE` child
-partition for streaming quickly enough, so Spanner rejects the query with
-`OUT_OF_RANGE: Specified start_timestamp is too far in the past`, and every retry reuses
-the same now-stale timestamp, failing identically forever. `IMMUTABLE_KEY_RANGE` uses the
-same generic split-handling code with no such delay and is unaffected. Real Spanner splits
-by load, not a fixed schedule, so it doesn't hit this either. Leading suspect:
-`PartitionManager`/`notifyMoveOut`, root cause not yet traced. This is a genuine bug in
-the connector's handling of splits that happen naturally on their own schedule - distinct
-from the emulator's separate, permanent inability to force a split via the
-`AddSplitPoints` admin RPC.
-The following test scenarios are affected:
+To avoid running into this issue, we have split these tests into four separate test classes `CrossPartitionSplitOrderingIkrGoogleSqlIT`, `CrossPartitionSplitOrderingIkrPostgresqlIT`, `CrossPartitionSplitOrderingMkrGoogleSqlIT`, `CrossPartitionSplitOrderingMkrPostgresqlIT`.
+Once the issue is resolved, these tests should be recombined into a single `CrossPartitionSplitOrderingIT` test class parameterized over partition mode and dialect.
 
-| Test | Partition mode(s) | Backend |
-|---|---|---|
-| `CrossPartitionSplitOrderingIT.shouldDeliverFollowUpWriteExactlyOnceAndInOrderAcrossBackgroundPartitionSplits` | `MUTABLE_KEY_RANGE` | Emulator |
-| `ConcurrentKeysIT.shouldNotCrossContaminateStateBetweenInterleavedKeys` | `MUTABLE_KEY_RANGE` | Emulator |
-| `TransactionRecordCountIT.shouldReportRecordAndPartitionCountsForTransaction` | `MUTABLE_KEY_RANGE` | Emulator |
+We are also seeing this issue for the parameterized tests `BasicSanityCheckIT`, `GracefulRestartIT`, and `KafkaTopicPartitionIT`. These tests have also been split into separate test classes and should be recombined again into a single parameterized test class once the issue is resolved.
 
-### 3. `MUTABLE_KEY_RANGE` restart/resume redelivers content instead of exactly once
+### 3. restart/resume redelivers content instead of exactly once
 
 Two distinct symptoms on the same test
 (`ChangeStreamOrderingAndTransactionalIT.shouldResumeWithoutDuplicatingOrLosingContentAcrossRestart`),
@@ -492,20 +485,19 @@ re-triggering a rebalance and re-emitting the same buffered record instead of se
 into steady-state streaming) rather than a test issue. Root cause not yet investigated.
 
 **Real Spanner, both partition modes**: a different, simpler symptom - exactly one
-duplicate, not five. The pre-restart insert is redelivered unchanged alongside the
-legitimate post-restart update, so the post-restart consume returns 2 records instead of
-1 record. Since `IMMUTABLE_KEY_RANGE` hits this too, while the emulator's rebalance-storm symptom
-above is `MUTABLE_KEY_RANGE`-only, these look like two separate issues rather than one
+duplicate. The pre-restart insert is redelivered unchanged alongside the legitimate post-restart 
+update, so the post-restart consume returns 2 records instead of 1 record. Both partition modes 
+and both dialects hit this as well. This looks like two separate issues rather than one
 shared root cause. Root cause not yet investigated - could be a genuine at-least-once
 duplicate this assertion is too strict to tolerate, or a gap in how the connector's
 persisted offset accounts for a record delivered just before shutdown.
 
 The following test scenarios are affected:
 
-| Test | Partition mode(s) | Backend |
-|---|---|---|
-| `ChangeStreamOrderingAndTransactionalIT.shouldResumeWithoutDuplicatingOrLosingContentAcrossRestart` | `MUTABLE_KEY_RANGE` | Emulator |
-| `ChangeStreamOrderingAndTransactionalIT.shouldResumeWithoutDuplicatingOrLosingContentAcrossRestart` | `IMMUTABLE_KEY_RANGE`, `MUTABLE_KEY_RANGE` | Real Spanner |
+| Test | Partition mode(s) | Dialect | Backend |
+|---|---|---|---|
+| `ChangeStreamOrderingAndTransactionalIT.shouldResumeWithoutDuplicatingOrLosingContentAcrossRestart` | `MUTABLE_KEY_RANGE` | `GOOGLE_STANDARD_SQL`, `POSTGRESQL` | Emulator |
+| `ChangeStreamOrderingAndTransactionalIT.shouldResumeWithoutDuplicatingOrLosingContentAcrossRestart` | `IMMUTABLE_KEY_RANGE`, `MUTABLE_KEY_RANGE` | `GOOGLE_STANDARD_SQL`, `POSTGRESQL` | Real Spanner |
 
 ### 4. `ExcludeTtlDeletesFilterIT`'s pass may be inconclusive
 
@@ -515,6 +507,6 @@ collection just never fired within the test's wait window" - both produce an ide
 observed record count. Passes everywhere, but isn't a confirmed proof of the filter.
 The following test scenarios are affected:
 
-| Test | Partition mode(s) | Backend |
-|---|---|---|
-| `ExcludeTtlDeletesFilterIT.shouldFilterOutTtlDeletesButStillDeliverUserIssuedDeletes` | `IMMUTABLE_KEY_RANGE`, `MUTABLE_KEY_RANGE` | Emulator & real Spanner |
+| Test | Partition mode(s) | Dialect | Backend |
+|---|---|---|---|
+| `ExcludeTtlDeletesFilterIT.shouldFilterOutTtlDeletesButStillDeliverUserIssuedDeletes` | `IMMUTABLE_KEY_RANGE`, `MUTABLE_KEY_RANGE` | `GOOGLE_STANDARD_SQL`, `POSTGRESQL` |  Emulator, Real Spanner |

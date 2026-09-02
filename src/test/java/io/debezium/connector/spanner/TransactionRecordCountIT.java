@@ -14,9 +14,12 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
-import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.google.cloud.spanner.Dialect;
 
 import io.debezium.config.Configuration;
 import io.debezium.connector.spanner.util.Connection;
@@ -41,34 +44,22 @@ import io.debezium.connector.spanner.util.PartitionMode;
 @RealSpannerCompatible
 public class TransactionRecordCountIT extends AbstractSpannerConnectorIT {
 
-    /**
-     * Override the inherited emulator connection/config with a real-Spanner pair when
-     * {@code -Dspanner.test.real=true} is supplied; otherwise keep the parent's emulator pair.
-     */
-    protected static final Connection databaseConnection = Connection.isRealSpanner()
-            ? RealSpannerTestSupport.getConnection(database)
-            : AbstractSpannerConnectorIT.databaseConnection;
-    protected static final Configuration baseConfig = Connection.isRealSpanner()
-            ? createBaseConfigBuilder(database, true).build()
-            : AbstractSpannerConnectorIT.baseConfig;
+    private static final Logger LOGGER = LoggerFactory.getLogger(TransactionRecordCountIT.class);
 
     private static final String tableNamePrefix = "embedded_txn_record_count_table";
     private static final String changeStreamNamePrefix = "embeddedTxnRecordCountStream";
 
     @ParameterizedTest
-    @EnumSource(PartitionMode.class)
-    public void shouldReportRecordAndPartitionCountsForTransaction(PartitionMode partitionMode) throws InterruptedException, ExecutionException {
-        Assumptions.assumeTrue(partitionMode != PartitionMode.MUTABLE_KEY_RANGE || Connection.isRealSpanner(),
-                "Skipping: this test incidentally spans the emulator's background partition split, and the "
-                        + "connector doesn't pick up the new MUTABLE_KEY_RANGE child partition for streaming "
-                        + "quickly enough - Spanner rejects the query with OUT_OF_RANGE: Specified start_timestamp "
-                        + "is too far in the past. Run with -Dspanner.test.real=true to exercise this mode.");
-        String tableName = tableNamePrefix + "_" + partitionMode.name().toLowerCase();
-        String changeStreamName = changeStreamNamePrefix + partitionMode.name();
-        databaseConnection.createTable(tableName + "(id INT64, value STRING(100)) PRIMARY KEY (id)");
-        databaseConnection.createChangeStream(changeStreamName, partitionMode, tableName);
+    @MethodSource("partitionModesAndDialects")
+    public void shouldReportRecordAndPartitionCountsForTransaction(PartitionMode partitionMode, Dialect dialect) throws InterruptedException, ExecutionException {
+        Connection connection = connectionFor(dialect, LOGGER);
+        Configuration base = baseConfigFor(dialect);
+        String table = tableFor(tableNamePrefix, partitionMode, dialect);
+        String stream = streamFor(changeStreamNamePrefix, partitionMode, dialect);
+
+        createTableAndStream(connection, partitionMode, table, stream);
         try {
-            final Configuration config = buildTestConfig(baseConfig, changeStreamName, tableName, partitionMode);
+            final Configuration config = buildTestConfig(base, stream, table, partitionMode);
 
             clearKafkaTopics();
             initializeConnectorTestFramework();
@@ -76,19 +67,19 @@ public class TransactionRecordCountIT extends AbstractSpannerConnectorIT {
             assertConnectorIsRunning();
 
             // Seed row 1 in its own single-statement transaction.
-            databaseConnection.executeUpdate(
-                    "INSERT INTO " + tableName + "(id, value) VALUES (1, 'A-initial')");
+            connection.executeUpdate(
+                    "INSERT INTO " + table + "(id, value) VALUES (1, 'A-initial')");
 
             // One atomic transaction touching two rows - the transaction-wide record count
             // must reflect both changes, not just what one row's own record shows in
             // isolation.
-            databaseConnection.executeUpdate(List.of(
-                    "UPDATE " + tableName + " SET value = 'A-updated' WHERE id = 1",
-                    "INSERT INTO " + tableName + "(id, value) VALUES (2, 'B-initial')"));
+            connection.executeUpdate(List.of(
+                    "UPDATE " + table + " SET value = 'A-updated' WHERE id = 1",
+                    "INSERT INTO " + table + "(id, value) VALUES (2, 'B-initial')"));
 
             assertTrue(waitForAvailableRecords(waitTimeForRecords(), TimeUnit.SECONDS));
             SourceRecords sourceRecords = consumeRecordsByTopic(10, false);
-            List<SourceRecord> records = sourceRecords.recordsForTopic(getTopicName(config, tableName));
+            List<SourceRecord> records = sourceRecords.recordsForTopic(getTopicName(config, table));
             assertThat(records).hasSize(3);
 
             Struct seedInsertSource = ((Struct) records.get(0).value()).getStruct("source");
@@ -115,8 +106,8 @@ public class TransactionRecordCountIT extends AbstractSpannerConnectorIT {
         }
         finally {
             stopConnector();
-            databaseConnection.dropChangeStream(changeStreamName);
-            databaseConnection.dropTable(tableName);
+            connection.dropChangeStream(stream);
+            connection.dropTable(table);
         }
     }
 }

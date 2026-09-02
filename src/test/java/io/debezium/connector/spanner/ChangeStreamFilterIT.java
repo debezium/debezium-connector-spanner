@@ -17,8 +17,11 @@ import org.apache.kafka.connect.source.SourceRecord;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import com.google.cloud.spanner.Dialect;
 import com.google.cloud.spanner.Options;
 import com.google.cloud.spanner.Statement;
 
@@ -37,16 +40,7 @@ import io.debezium.connector.spanner.util.PartitionMode;
 @RealSpannerCompatible
 public class ChangeStreamFilterIT extends AbstractSpannerConnectorIT {
 
-    /**
-     * Override the inherited emulator connection/config with a real-Spanner pair when
-     * {@code -Dspanner.test.real=true} is supplied; otherwise keep the parent's emulator pair.
-     */
-    protected static final Connection databaseConnection = Connection.isRealSpanner()
-            ? RealSpannerTestSupport.getConnection(database)
-            : AbstractSpannerConnectorIT.databaseConnection;
-    protected static final Configuration baseConfig = Connection.isRealSpanner()
-            ? createBaseConfigBuilder(database, true).build()
-            : AbstractSpannerConnectorIT.baseConfig;
+    private static final Logger LOGGER = LoggerFactory.getLogger(ChangeStreamFilterIT.class);
 
     private static final String tableNameExcludeDeletePrefix = "embedded_exclude_delete_table";
     private static final String changeStreamNameExcludeDeletePrefix = "embeddedExcludeDeleteStream";
@@ -73,34 +67,38 @@ public class ChangeStreamFilterIT extends AbstractSpannerConnectorIT {
     }
 
     @ParameterizedTest
-    @EnumSource(PartitionMode.class)
-    public void shouldExcludeDeleteEventsAndTheirTombstones(PartitionMode partitionMode) throws InterruptedException, ExecutionException {
-        String tableNameExcludeDelete = tableNameExcludeDeletePrefix + "_" + partitionMode.name().toLowerCase();
-        String changeStreamNameExcludeDelete = changeStreamNameExcludeDeletePrefix + partitionMode.name();
-        databaseConnection.createTable(tableNameExcludeDelete + "(id INT64, name STRING(100)) PRIMARY KEY (id)");
-        databaseConnection.createChangeStreamExcludeDelete(changeStreamNameExcludeDelete, partitionMode, tableNameExcludeDelete);
+    @MethodSource("partitionModesAndDialects")
+    public void shouldExcludeDeleteEventsAndTheirTombstones(PartitionMode partitionMode, Dialect dialect) throws InterruptedException, ExecutionException {
+        Connection connection = connectionFor(dialect, LOGGER);
+        Configuration base = baseConfigFor(dialect);
+        String table = tableFor(tableNameExcludeDeletePrefix, partitionMode, dialect);
+        String stream = streamFor(changeStreamNameExcludeDeletePrefix, partitionMode, dialect);
+
+        String tableParams = "(id INT64, name STRING(100)) PRIMARY KEY (id)";
+        connection.createTable(table, tableParams);
+        connection.createChangeStreamExcludeDelete(stream, partitionMode, table);
         try {
-            final Configuration config = buildTestConfig(baseConfig, changeStreamNameExcludeDelete, tableNameExcludeDelete, partitionMode);
+            final Configuration config = buildTestConfig(base, stream, table, partitionMode);
 
             start(SpannerConnector.class, config);
             assertConnectorIsRunning();
 
-            databaseConnection.executeUpdate(
-                    "INSERT INTO " + tableNameExcludeDelete + "(id, name) VALUES (1, 'Alice')");
-            databaseConnection.executeUpdate(
-                    "UPDATE " + tableNameExcludeDelete + " SET name = 'Bob' WHERE id = 1");
-            databaseConnection.executeUpdate(
-                    "DELETE FROM " + tableNameExcludeDelete + " WHERE id = 1");
+            connection.executeUpdate(
+                    "INSERT INTO " + table + "(id, name) VALUES (1, 'Alice')");
+            connection.executeUpdate(
+                    "UPDATE " + table + " SET name = 'Bob' WHERE id = 1");
+            connection.executeUpdate(
+                    "DELETE FROM " + table + " WHERE id = 1");
 
             // A second row, inserted and never touched again, gives us a clear signal
             // that the connector is still alive and delivering records after the
             // excluded delete - not just coincidentally quiet.
-            databaseConnection.executeUpdate(
-                    "INSERT INTO " + tableNameExcludeDelete + "(id, name) VALUES (2, 'Carol')");
+            connection.executeUpdate(
+                    "INSERT INTO " + table + "(id, name) VALUES (2, 'Carol')");
 
             assertTrue(waitForAvailableRecords(waitTimeForRecords(), TimeUnit.SECONDS));
             SourceRecords sourceRecords = consumeRecordsByTopic(10, false);
-            List<SourceRecord> records = sourceRecords.recordsForTopic(getTopicName(config, tableNameExcludeDelete));
+            List<SourceRecord> records = sourceRecords.recordsForTopic(getTopicName(config, table));
 
             // insert(1) + update(1) + insert(2) - no delete, and therefore no tombstone.
             assertThat(records).hasSize(3);
@@ -113,41 +111,45 @@ public class ChangeStreamFilterIT extends AbstractSpannerConnectorIT {
             assertThat(secondInsert.getStruct("after").getString("name")).isEqualTo("Carol");
         }
         finally {
-            databaseConnection.dropChangeStream(changeStreamNameExcludeDelete);
-            databaseConnection.dropTable(tableNameExcludeDelete);
+            connection.dropChangeStream(stream);
+            connection.dropTable(table);
         }
     }
 
     @ParameterizedTest
-    @EnumSource(PartitionMode.class)
-    public void shouldReflectRealPriorStateOnUpdateAfterAnExcludedInsert(PartitionMode partitionMode) throws InterruptedException, ExecutionException {
-        String tableNameExcludeInsert = tableNameExcludeInsertPrefix + "_" + partitionMode.name().toLowerCase();
-        String changeStreamNameExcludeInsert = changeStreamNameExcludeInsertPrefix + partitionMode.name();
-        databaseConnection.createTable(tableNameExcludeInsert + "(id INT64, name STRING(100)) PRIMARY KEY (id)");
-        databaseConnection.createChangeStreamExcludeInsert(changeStreamNameExcludeInsert, partitionMode, tableNameExcludeInsert);
+    @MethodSource("partitionModesAndDialects")
+    public void shouldReflectRealPriorStateOnUpdateAfterAnExcludedInsert(PartitionMode partitionMode, Dialect dialect) throws InterruptedException, ExecutionException {
+        Connection connection = connectionFor(dialect, LOGGER);
+        Configuration base = baseConfigFor(dialect);
+        String table = tableFor(tableNameExcludeInsertPrefix, partitionMode, dialect);
+        String stream = streamFor(changeStreamNameExcludeInsertPrefix, partitionMode, dialect);
+
+        String tableParams = "(id INT64, name STRING(100)) PRIMARY KEY (id)";
+        connection.createTable(table, tableParams);
+        connection.createChangeStreamExcludeInsert(stream, partitionMode, table);
         try {
-            final Configuration config = buildTestConfig(baseConfig, changeStreamNameExcludeInsert, tableNameExcludeInsert, partitionMode);
+            final Configuration config = buildTestConfig(base, stream, table, partitionMode);
 
             start(SpannerConnector.class, config);
             assertConnectorIsRunning();
 
             // This insert is invisible to the stream, but the row genuinely exists
             // afterward with these values.
-            databaseConnection.executeUpdate(
-                    "INSERT INTO " + tableNameExcludeInsert + "(id, name) VALUES (1, 'Alice')");
-            databaseConnection.executeUpdate(
-                    "UPDATE " + tableNameExcludeInsert + " SET name = 'Bob' WHERE id = 1");
-            databaseConnection.executeUpdate(
-                    "DELETE FROM " + tableNameExcludeInsert + " WHERE id = 1");
+            connection.executeUpdate(
+                    "INSERT INTO " + table + "(id, name) VALUES (1, 'Alice')");
+            connection.executeUpdate(
+                    "UPDATE " + table + " SET name = 'Bob' WHERE id = 1");
+            connection.executeUpdate(
+                    "DELETE FROM " + table + " WHERE id = 1");
 
             // A row that's only ever inserted, never revisited - it must produce zero
             // records at all, not just a suppressed-but-otherwise-present one.
-            databaseConnection.executeUpdate(
-                    "INSERT INTO " + tableNameExcludeInsert + "(id, name) VALUES (2, 'Carol')");
+            connection.executeUpdate(
+                    "INSERT INTO " + table + "(id, name) VALUES (2, 'Carol')");
 
             assertTrue(waitForAvailableRecords(waitTimeForRecords(), TimeUnit.SECONDS));
             SourceRecords sourceRecords = consumeRecordsByTopic(10, false);
-            List<SourceRecord> records = sourceRecords.recordsForTopic(getTopicName(config, tableNameExcludeInsert));
+            List<SourceRecord> records = sourceRecords.recordsForTopic(getTopicName(config, table));
 
             // update(1) + delete(1) + tombstone(1) - no insert for either row.
             assertThat(records).hasSize(3);
@@ -167,42 +169,47 @@ public class ChangeStreamFilterIT extends AbstractSpannerConnectorIT {
             assertThat(records.get(2).value()).isNull();
         }
         finally {
-            databaseConnection.dropChangeStream(changeStreamNameExcludeInsert);
-            databaseConnection.dropTable(tableNameExcludeInsert);
+            connection.dropChangeStream(stream);
+            connection.dropTable(table);
         }
     }
 
     @ParameterizedTest
-    @EnumSource(PartitionMode.class)
-    public void shouldExcludeUpdateEventsButReflectRealStateOnSubsequentDelete(PartitionMode partitionMode) throws InterruptedException, ExecutionException {
-        String tableNameExcludeUpdate = tableNameExcludeUpdatePrefix + "_" + partitionMode.name().toLowerCase();
-        String changeStreamNameExcludeUpdate = changeStreamNameExcludeUpdatePrefix + partitionMode.name();
-        databaseConnection.createTable(tableNameExcludeUpdate + "(id INT64, name STRING(100)) PRIMARY KEY (id)");
-        databaseConnection.createChangeStreamExcludeUpdate(changeStreamNameExcludeUpdate, partitionMode, tableNameExcludeUpdate);
+    @MethodSource("partitionModesAndDialects")
+    public void shouldExcludeUpdateEventsButReflectRealStateOnSubsequentDelete(PartitionMode partitionMode, Dialect dialect)
+            throws InterruptedException, ExecutionException {
+        Connection connection = connectionFor(dialect, LOGGER);
+        Configuration base = baseConfigFor(dialect);
+        String table = tableFor(tableNameExcludeUpdatePrefix, partitionMode, dialect);
+        String stream = streamFor(changeStreamNameExcludeUpdatePrefix, partitionMode, dialect);
+
+        String tableParams = "(id INT64, name STRING(100)) PRIMARY KEY (id)";
+        connection.createTable(table, tableParams);
+        connection.createChangeStreamExcludeUpdate(stream, partitionMode, table);
         try {
-            final Configuration config = buildTestConfig(baseConfig, changeStreamNameExcludeUpdate, tableNameExcludeUpdate, partitionMode);
+            final Configuration config = buildTestConfig(base, stream, table, partitionMode);
 
             start(SpannerConnector.class, config);
             assertConnectorIsRunning();
 
-            databaseConnection.executeUpdate(
-                    "INSERT INTO " + tableNameExcludeUpdate + "(id, name) VALUES (1, 'Alice')");
+            connection.executeUpdate(
+                    "INSERT INTO " + table + "(id, name) VALUES (1, 'Alice')");
             // This update really executes against the row - it's excluded from the
             // change stream, not from the database itself.
-            databaseConnection.executeUpdate(
-                    "UPDATE " + tableNameExcludeUpdate + " SET name = 'Bob' WHERE id = 1");
-            databaseConnection.executeUpdate(
-                    "DELETE FROM " + tableNameExcludeUpdate + " WHERE id = 1");
+            connection.executeUpdate(
+                    "UPDATE " + table + " SET name = 'Bob' WHERE id = 1");
+            connection.executeUpdate(
+                    "DELETE FROM " + table + " WHERE id = 1");
 
             // A second row, inserted and never touched again, gives us a clear signal
             // that the connector is still alive and delivering records after the
             // excluded update - not just coincidentally quiet.
-            databaseConnection.executeUpdate(
-                    "INSERT INTO " + tableNameExcludeUpdate + "(id, name) VALUES (2, 'Carol')");
+            connection.executeUpdate(
+                    "INSERT INTO " + table + "(id, name) VALUES (2, 'Carol')");
 
             assertTrue(waitForAvailableRecords(waitTimeForRecords(), TimeUnit.SECONDS));
             SourceRecords sourceRecords = consumeRecordsByTopic(10, false);
-            List<SourceRecord> records = sourceRecords.recordsForTopic(getTopicName(config, tableNameExcludeUpdate));
+            List<SourceRecord> records = sourceRecords.recordsForTopic(getTopicName(config, table));
 
             // insert(1) + delete(1) + tombstone(1) + insert(2) - no update event at all.
             assertThat(records).hasSize(4);
@@ -225,39 +232,44 @@ public class ChangeStreamFilterIT extends AbstractSpannerConnectorIT {
             assertThat(secondInsert.getStruct("after").getString("name")).isEqualTo("Carol");
         }
         finally {
-            databaseConnection.dropChangeStream(changeStreamNameExcludeUpdate);
-            databaseConnection.dropTable(tableNameExcludeUpdate);
+            connection.dropChangeStream(stream);
+            connection.dropTable(table);
         }
     }
 
     @ParameterizedTest
-    @EnumSource(PartitionMode.class)
-    public void shouldNotRecordTransactionExplicitlyExcludedFromChangeStreams(PartitionMode partitionMode) throws InterruptedException, ExecutionException {
-        String tableNameTxnExclusion = tableNameTxnExclusionPrefix + "_" + partitionMode.name().toLowerCase();
-        String changeStreamNameTxnExclusion = changeStreamNameTxnExclusionPrefix + partitionMode.name();
-        databaseConnection.createTable(tableNameTxnExclusion + "(id INT64, name STRING(100)) PRIMARY KEY (id)");
-        databaseConnection.createChangeStreamAllowTxnExclusion(changeStreamNameTxnExclusion, partitionMode, tableNameTxnExclusion);
+    @MethodSource("partitionModesAndDialects")
+    public void shouldNotRecordTransactionExplicitlyExcludedFromChangeStreams(PartitionMode partitionMode, Dialect dialect)
+            throws InterruptedException, ExecutionException {
+        Connection connection = connectionFor(dialect, LOGGER);
+        Configuration base = baseConfigFor(dialect);
+        String table = tableFor(tableNameTxnExclusionPrefix, partitionMode, dialect);
+        String stream = streamFor(changeStreamNameTxnExclusionPrefix, partitionMode, dialect);
+
+        String tableParams = "(id INT64, name STRING(100)) PRIMARY KEY (id)";
+        connection.createTable(table, tableParams);
+        connection.createChangeStreamAllowTxnExclusion(stream, partitionMode, table);
         try {
-            final Configuration config = buildTestConfig(baseConfig, changeStreamNameTxnExclusion, tableNameTxnExclusion, partitionMode);
+            final Configuration config = buildTestConfig(base, stream, table, partitionMode);
 
             start(SpannerConnector.class, config);
             assertConnectorIsRunning();
 
-            databaseConnection.executeUpdate(
-                    "INSERT INTO " + tableNameTxnExclusion + "(id, name) VALUES (1, 'Alice')");
+            connection.executeUpdate(
+                    "INSERT INTO " + table + "(id, name) VALUES (1, 'Alice')");
 
             // This transaction really executes against the row - it's excluded from the
             // change stream, not from the database itself.
-            databaseConnection.databaseClient.readWriteTransaction(Options.excludeTxnFromChangeStreams())
+            connection.databaseClient.readWriteTransaction(Options.excludeTxnFromChangeStreams())
                     .run(transaction -> transaction.executeUpdate(
-                            Statement.of("UPDATE " + tableNameTxnExclusion + " SET name = 'Excluded' WHERE id = 1")));
+                            Statement.of("UPDATE " + table + " SET name = 'Excluded' WHERE id = 1")));
 
-            databaseConnection.executeUpdate(
-                    "UPDATE " + tableNameTxnExclusion + " SET name = 'Bob' WHERE id = 1");
+            connection.executeUpdate(
+                    "UPDATE " + table + " SET name = 'Bob' WHERE id = 1");
 
             assertTrue(waitForAvailableRecords(waitTimeForRecords(), TimeUnit.SECONDS));
             SourceRecords sourceRecords = consumeRecordsByTopic(10, false);
-            List<SourceRecord> records = sourceRecords.recordsForTopic(getTopicName(config, tableNameTxnExclusion));
+            List<SourceRecord> records = sourceRecords.recordsForTopic(getTopicName(config, table));
 
             // insert + the final visible update - the excluded transaction produces
             // no record of its own at all.
@@ -276,8 +288,8 @@ public class ChangeStreamFilterIT extends AbstractSpannerConnectorIT {
             assertThat(visibleUpdate.getStruct("after").getString("name")).isEqualTo("Bob");
         }
         finally {
-            databaseConnection.dropChangeStream(changeStreamNameTxnExclusion);
-            databaseConnection.dropTable(tableNameTxnExclusion);
+            connection.dropChangeStream(stream);
+            connection.dropTable(table);
         }
     }
 }
