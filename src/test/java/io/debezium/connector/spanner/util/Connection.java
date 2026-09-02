@@ -144,6 +144,20 @@ public class Connection {
         this.updateDDL(List.of("create table " + tableDefinition));
     }
 
+    public void createTable(String table, String tableParams) throws ExecutionException, InterruptedException {
+        if (isPostgres()) {
+            tableParams = ToPostgresTableParams(tableParams);
+        }
+        this.updateDDL(List.of("create table " + table + tableParams));
+    }
+
+    public void updateTable(String table, String tableParams) throws ExecutionException, InterruptedException {
+        if (isPostgres()) {
+            tableParams = ToPostgresTypes(tableParams);
+        }
+        this.updateDDL(List.of("alter table " + table + tableParams));
+    }
+
     public void createChangeStream(String changeStreamName, String... tables) throws ExecutionException,
             InterruptedException {
         this.updateDDL(List.of("create change stream " + changeStreamName + " for " +
@@ -151,12 +165,21 @@ public class Connection {
         await().atMost(Duration.ofSeconds(ddlWaitTimeSeconds())).until(() -> isStreamExist(changeStreamName));
     }
 
-    public void createMutableKeyRangeChangeStream(String changeStreamName, String... tables) throws ExecutionException,
-            InterruptedException {
-        String optionsClause = schemaDao.isPostgres() ? "WITH" : "OPTIONS";
+    public void createChangeStream(String changeStreamName, PartitionMode partitionMode, String... tables)
+            throws ExecutionException, InterruptedException {
+        String optionsClause = isPostgres() ? " WITH " : " OPTIONS ";
         this.updateDDL(List.of("create change stream " + changeStreamName + " for " +
                 (tables.length == 0 ? "ALL" : String.join(",", tables)) +
-                " " + optionsClause + " (partition_mode = 'MUTABLE_KEY_RANGE')"));
+                optionsClause + "( partition_mode = '" + partitionMode.name() + "' )"));
+        await().atMost(Duration.ofSeconds(60)).until(() -> isStreamExist(changeStreamName));
+    }
+
+    public void createMutableKeyRangeChangeStream(String changeStreamName, String... tables) throws ExecutionException,
+            InterruptedException {
+        String optionsClause = isPostgres() ? " WITH " : " OPTIONS ";
+        this.updateDDL(List.of("create change stream " + changeStreamName + " for " +
+                (tables.length == 0 ? "ALL" : String.join(",", tables)) +
+                optionsClause + "(partition_mode = 'MUTABLE_KEY_RANGE')"));
         await().atMost(Duration.ofSeconds(ddlWaitTimeSeconds())).until(() -> isStreamExist(changeStreamName));
     }
 
@@ -243,9 +266,10 @@ public class Connection {
     private void createChangeStreamWithValueCaptureType(String changeStreamName, String valueCaptureType,
                                                         PartitionMode partitionMode, String... tables)
             throws ExecutionException, InterruptedException {
+        String optionsClause = isPostgres() ? " WITH " : " OPTIONS ";
         this.updateDDL(List.of("create change stream " + changeStreamName + " for " +
                 (tables.length == 0 ? "ALL" : String.join(",", tables)) +
-                " OPTIONS (\n" +
+                optionsClause + "(\n" +
                 "            value_capture_type = '" + valueCaptureType + "',\n" +
                 "            partition_mode = '" + partitionMode.name() + "'\n" +
                 "        ) "));
@@ -275,9 +299,10 @@ public class Connection {
     private void createChangeStreamWithBooleanOption(String changeStreamName, String optionName,
                                                      PartitionMode partitionMode, String... tables)
             throws ExecutionException, InterruptedException {
+        String optionsClause = isPostgres() ? " WITH " : " OPTIONS ";
         this.updateDDL(List.of("create change stream " + changeStreamName + " for " +
                 (tables.length == 0 ? "ALL" : String.join(",", tables)) +
-                " OPTIONS (\n" +
+                optionsClause + "(\n" +
                 "            " + optionName + " = true,\n" +
                 "            partition_mode = '" + partitionMode.name() + "'\n" +
                 "        ) "));
@@ -289,14 +314,6 @@ public class Connection {
         createChangeStreamWithBooleanOption(changeStreamName, "exclude_ttl_deletes", partitionMode, tables);
     }
 
-    public void createChangeStream(String changeStreamName, PartitionMode partitionMode, String... tables)
-            throws ExecutionException, InterruptedException {
-        this.updateDDL(List.of("create change stream " + changeStreamName + " for " +
-                (tables.length == 0 ? "ALL" : String.join(",", tables)) +
-                " OPTIONS ( partition_mode = '" + partitionMode.name() + "' )"));
-        await().atMost(Duration.ofSeconds(60)).until(() -> isStreamExist(changeStreamName));
-    }
-
     public void createPlacement(String placementName, String instancePartitionId) throws ExecutionException, InterruptedException {
         if (!instancePartitionExists(instancePartitionId)) {
             throw new IllegalStateException(
@@ -305,8 +322,10 @@ public class Connection {
                             + "  gcloud spanner instance-partitions create " + instancePartitionId
                             + " --instance=" + instanceId + " --project=" + projectId + " --config=<config> --nodes=1");
         }
-        this.updateDDL(List.of("create placement " + placementName +
-                " OPTIONS ( instance_partition = '" + instancePartitionId + "' )"));
+        String optionsClause = isPostgres() ? " WITH " : " OPTIONS ";
+        String ddlPlacementName = isPostgres() ? "\"" + placementName + "\"" : placementName;
+        this.updateDDL(List.of("create placement " + ddlPlacementName +
+                optionsClause + "( instance_partition = '" + instancePartitionId + "' )"));
         await().atMost(Duration.ofSeconds(ddlWaitTimeSeconds())).until(() -> placementExists(placementName));
     }
 
@@ -327,7 +346,8 @@ public class Connection {
             if (!placementExists(placementName)) {
                 return false;
             }
-            this.updateDDL(List.of("drop placement " + placementName));
+            String ddlPlacementName = isPostgres() ? "\"" + placementName + "\"" : placementName;
+            this.updateDDL(List.of("drop placement " + ddlPlacementName));
         }
         catch (ExecutionException ex) {
             LOG.warn("Can`t drop placement", ex);
@@ -337,10 +357,19 @@ public class Connection {
     }
 
     private boolean placementExists(String placementName) {
-        Statement statement = Statement.newBuilder("select placement_name " +
-                "from information_schema.placements " +
-                "where placement_name = @placementName")
-                .bind("placementName").to(placementName).build();
+        Statement statement;
+        if (isPostgres()) {
+            statement = Statement.newBuilder("select placement_name " +
+                    "from information_schema.placements " +
+                    "where placement_name = $1")
+                    .bind("p1").to(placementName).build();
+        }
+        else {
+            statement = Statement.newBuilder("select placement_name " +
+                    "from information_schema.placements " +
+                    "where placement_name = @placementName")
+                    .bind("placementName").to(placementName).build();
+        }
         try (ResultSet resultSet = this.executeSelect(statement)) {
             return resultSet.next();
         }
@@ -377,7 +406,7 @@ public class Connection {
 
     private boolean isStreamExist(String streamName) {
         Statement statement;
-        if (schemaDao.isPostgres()) {
+        if (isPostgres()) {
             statement = Statement.newBuilder("select change_stream_name " +
                     "from information_schema.change_streams cs " +
                     "where cs.change_stream_name = $1")
@@ -426,7 +455,7 @@ public class Connection {
 
     public boolean isChangeStreamExist(String changeStreamName) {
         Statement statement;
-        if (schemaDao.isPostgres()) {
+        if (isPostgres()) {
             statement = Statement.newBuilder("select * from information_schema.change_streams " +
                     "where change_stream_name = $1")
                     .bind("p1").to(changeStreamName).build();
@@ -443,7 +472,7 @@ public class Connection {
 
     public boolean isTableExist(String tableName) {
         Statement statement;
-        if (schemaDao.isPostgres()) {
+        if (isPostgres()) {
             statement = Statement
                     .newBuilder(
                             "select * from information_schema.tables where table_schema = '' and table_catalog = '' " +
@@ -518,6 +547,66 @@ public class Connection {
 
     public static boolean isRealSpanner() {
         return Boolean.parseBoolean(System.getProperty(REAL_SPANNER_PROPERTY, "false"));
+    }
+
+    public boolean isPostgres() {
+        return schemaDao.isPostgres();
+    }
+
+    private String ToPostgresTypes(String value) {
+        return value
+                // Arrays must be converted before their element types.
+                .replaceAll("(?i)\\bARRAY<STRING\\(MAX\\)>", "text[]")
+                .replaceAll("(?i)\\bARRAY<STRING\\((\\d+)\\)>", "varchar($1)[]")
+
+                // Scalar types.
+                .replaceAll("(?i)\\bINT64\\b", "bigint")
+                .replaceAll("(?i)\\bFLOAT32\\b", "real")
+                .replaceAll("(?i)\\bFLOAT64\\b", "double precision")
+                .replaceAll("(?i)\\bSTRING\\(MAX\\)", "text")
+                .replaceAll("(?i)\\bSTRING\\((\\d+)\\)", "varchar($1)")
+                .replaceAll("(?i)\\bBOOL\\b", "boolean")
+                .replaceAll("(?i)\\bTIMESTAMP\\b", "timestamptz")
+                .replaceAll("(?i)\\bDATE\\b", "date")
+                .replaceAll("(?i)\\bBYTES\\(MAX\\)", "bytea")
+                .replaceAll("(?i)\\bBYTES\\((\\d+)\\)", "bytea")
+                .replaceAll("(?i)\\bNUMERIC\\b", "numeric")
+                .replaceAll("(?i)\\bJSON\\b", "jsonb");
+    }
+
+    private String ToPostgresTableParams(String tableParams) {
+        String result = tableParams;
+
+        // Remove GoogleSQL-specific ROW DELETION POLICY
+        // (not supported in the PostgreSQL dialect).
+        int rowDeletionPolicyIndex = result.indexOf(", ROW DELETION POLICY");
+        if (rowDeletionPolicyIndex >= 0) {
+            result = result.substring(0, rowDeletionPolicyIndex);
+        }
+
+        // INTERLEAVE IN PARENT is supported in the PostgreSQL dialect but goes after the
+        // closing parenthesis rather than as a trailing clause alongside PRIMARY KEY.
+        String interleaveClause = "";
+        int interleaveIndex = result.indexOf(", INTERLEAVE IN PARENT");
+        if (interleaveIndex >= 0) {
+            interleaveClause = " " + result.substring(interleaveIndex + 2);
+            result = result.substring(0, interleaveIndex);
+        }
+
+        // Remove GoogleSQL-specific TOKENLIST column.
+        result = result.replaceAll(
+                ",?\\s*tokenlistcol\\s+TOKENLIST\\s+AS\\s*\\(TOKENIZE_FULLTEXT\\([^)]*\\)\\)\\s+HIDDEN\\s*,?",
+                "");
+
+        // Convert GoogleSQL types.
+        result = ToPostgresTypes(result);
+
+        // Move PRIMARY KEY into the column definition.
+        result = result.replaceFirst(
+                "(?i)\\)\\s*PRIMARY KEY\\s*\\(([^)]+)\\)\\s*$",
+                ", PRIMARY KEY ($1))");
+
+        return result + interleaveClause;
     }
 
     private GoogleCredentials getCredentials() {

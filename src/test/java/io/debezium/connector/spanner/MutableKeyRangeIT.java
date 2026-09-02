@@ -17,8 +17,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -36,7 +34,7 @@ import com.google.cloud.spanner.Dialect;
 
 import io.debezium.config.Configuration;
 import io.debezium.connector.spanner.util.Connection;
-import io.debezium.connector.spanner.util.Database;
+import io.debezium.connector.spanner.util.PartitionMode;
 import io.debezium.util.Testing;
 
 /**
@@ -65,83 +63,7 @@ import io.debezium.util.Testing;
 @RealSpannerCompatible
 public class MutableKeyRangeIT extends AbstractSpannerConnectorIT {
 
-    /**
-     * Override the inherited emulator connection/config with a real-Spanner pair when
-     * {@code -Dspanner.test.real=true} is supplied; otherwise keep the parent's emulator pair.
-     */
-    protected static final Connection databaseConnection = Connection.isRealSpanner()
-            ? RealSpannerTestSupport.getConnection(database)
-            : AbstractSpannerConnectorIT.databaseConnection;
-    protected static final Configuration baseConfig = Connection.isRealSpanner()
-            ? createBaseConfigBuilder(database, true).build()
-            : AbstractSpannerConnectorIT.baseConfig;
-
-    /**
-     * Same real-Spanner-or-emulator override as {@link #databaseConnection}/{@link #baseConfig}
-     * above, but for the PostgreSQL-dialect pair, so tests parameterized over {@link Dialect} get a
-     * real PostgreSQL-dialect connection too when {@code -Dspanner.test.real=true} is supplied.
-     */
-    protected static final Connection pgDatabaseConnection = Connection.isRealSpanner()
-            ? RealSpannerTestSupport.getConnection(pgDatabase)
-            : AbstractSpannerConnectorIT.pgDatabaseConnection;
-    protected static final Configuration basePgConfig = Connection.isRealSpanner()
-            ? createBaseConfigBuilder(pgDatabase, true).build()
-            : AbstractSpannerConnectorIT.basePgConfig;
-
-    private static final Logger LOG = LoggerFactory.getLogger(MutableKeyRangeIT.class);
-
-    /**
-     * The local Spanner emulator's PostgreSQL dialect support has an observed limitation where a
-     * dropped change stream doesn't immediately free its slot against the emulator's per-database
-     * cap of 10 concurrent change streams, so running this class's full dialect parameterization
-     * (which creates and drops a PostgreSQL change stream in nearly every test) against a single
-     * PostgreSQL-dialect database can hit that cap partway through the suite.
-     *
-     * <p>To keep full {@link Dialect} parameterization working reliably against the emulator, a
-     * fresh PostgreSQL-dialect database is transparently rotated in (via
-     * {@link #registerPgChangeStreamCreation()}) after every
-     * {@value #MAX_PG_CHANGE_STREAMS_PER_DATABASE} change streams created against the current one.
-     * {@code pgChangeStreamsCreatedOnCurrentDatabase} is an {@link AtomicInteger} and rotation is
-     * performed under a lock, so this is safe even if tests in this class were ever run
-     * concurrently (JUnit 5 parallel execution), not just sequentially as they run today.
-     */
-    private static final int MAX_PG_CHANGE_STREAMS_PER_DATABASE = 9;
-    private static final AtomicInteger pgChangeStreamsCreatedOnCurrentDatabase = new AtomicInteger(0);
-    private static final AtomicReference<Database> currentPgDatabase = new AtomicReference<>(pgDatabase);
-    private static final AtomicReference<Connection> currentPgDatabaseConnection = new AtomicReference<>(pgDatabaseConnection);
-    private static final AtomicReference<Configuration> currentBasePgConfig = new AtomicReference<>(basePgConfig);
-
-    /**
-     * Called once per test that's about to create a PostgreSQL-dialect change stream. Rotates in a
-     * fresh PostgreSQL-dialect database (updating {@link #currentPgDatabase},
-     * {@link #currentPgDatabaseConnection}, {@link #currentBasePgConfig}) once the current one has
-     * had {@value #MAX_PG_CHANGE_STREAMS_PER_DATABASE} change streams created against it.
-     */
-    private static synchronized void registerPgChangeStreamCreation() {
-        if (pgChangeStreamsCreatedOnCurrentDatabase.incrementAndGet() > MAX_PG_CHANGE_STREAMS_PER_DATABASE) {
-            Database freshDatabase = Database.builder()
-                    .generateDatabaseId()
-                    .dialect(Dialect.POSTGRESQL)
-                    .build();
-            Connection freshConnection = Connection.isRealSpanner()
-                    ? RealSpannerTestSupport.getConnection(freshDatabase)
-                    : freshDatabase.getConnection();
-            Configuration freshConfig = Connection.isRealSpanner()
-                    ? createBaseConfigBuilder(freshDatabase, true).build()
-                    : Configuration.copy(currentBasePgConfig.get())
-                            .with("gcp.spanner.instance.id", freshDatabase.getInstanceId())
-                            .with("gcp.spanner.project.id", freshDatabase.getProjectId())
-                            .with("gcp.spanner.database.id", freshDatabase.getDatabaseId())
-                            .build();
-            LOG.info("Rotating to a fresh PostgreSQL-dialect database {} (from {}) after reaching the "
-                    + "local emulator's per-database change stream cap",
-                    freshDatabase.getDatabaseId(), currentPgDatabase.get().getDatabaseId());
-            currentPgDatabase.set(freshDatabase);
-            currentPgDatabaseConnection.set(freshConnection);
-            currentBasePgConfig.set(freshConfig);
-            pgChangeStreamsCreatedOnCurrentDatabase.set(1);
-        }
-    }
+    private static final Logger LOGGER = LoggerFactory.getLogger(MutableKeyRangeIT.class);
 
     static {
         // Real Cloud Spanner change-stream reads plus this connector's task-sync/leader-election
@@ -206,76 +128,6 @@ public class MutableKeyRangeIT extends AbstractSpannerConnectorIT {
     private static final int WINDOW_MINUTES_FOR_MID_WINDOW_STOP = 5;
 
     /**
-     * Resolves the {@link Connection} to use for a given {@link Dialect}, for tests parameterized
-     * over dialect. For {@link Dialect#POSTGRESQL}, this is the trigger point for
-     * {@link #registerPgChangeStreamCreation()}: callers are expected to call this once per test,
-     * immediately before creating that test's change stream, and to reuse the returned
-     * {@link Connection} for the rest of the test (including config building via
-     * {@link #baseConfigFor}) so the connection and config always refer to the same database.
-     */
-    private Connection connectionFor(Dialect dialect) {
-        if (dialect == Dialect.POSTGRESQL) {
-            registerPgChangeStreamCreation();
-            return currentPgDatabaseConnection.get();
-        }
-        return databaseConnection;
-    }
-
-    /**
-     * Resolves the base {@link Configuration} to use for a given {@link Dialect}, for tests
-     * parameterized over dialect. Must be called after {@link #connectionFor} in the same test, so
-     * that if {@link #connectionFor} rotated in a fresh PostgreSQL-dialect database, this returns
-     * the config matching that same database rather than a stale one.
-     */
-    private Configuration baseConfigFor(Dialect dialect) {
-        return dialect == Dialect.POSTGRESQL ? currentBasePgConfig.get() : baseConfig;
-    }
-
-    /**
-     * Suffixes a table name constant with the dialect, so parameterized runs against different
-     * dialects don't collide on the same table name (mirrors the table-name suffixing already used
-     * by {@code CrossPartitionSplitOrderingIT} for its {@code PartitionMode} parameterization).
-     */
-    private static String tableFor(String tableNamePrefix, Dialect dialect) {
-        return tableNamePrefix + "_" + dialect.name().toLowerCase();
-    }
-
-    /**
-     * Suffixes a change stream name constant with the dialect, so parameterized runs against
-     * different dialects don't collide on the same change stream name.
-     */
-    private static String streamFor(String streamNamePrefix, Dialect dialect) {
-        return streamNamePrefix + dialect.name();
-    }
-
-    /**
-     * The Spanner type name for a 64-bit integer column, which differs between dialects (used e.g.
-     * for the mid-stream {@code ALTER TABLE ... ADD COLUMN} schema-change tests).
-     */
-    private static String int64TypeFor(Dialect dialect) {
-        return dialect == Dialect.POSTGRESQL ? "bigint" : "INT64";
-    }
-
-    /**
-     * Creates {@code table} (a plain {@code (id, name) PRIMARY KEY(id)} table, with dialect-
-     * appropriate column types) and a MUTABLE_KEY_RANGE change stream over it, for a single test's
-     * own setup. Used by tests parameterized over {@link Dialect} so the same scenario can run
-     * against both a GoogleSQL- and a PostgreSQL-dialect database.
-     */
-    private void createMutableKeyRangeTableAndStream(Connection connection, Dialect dialect, String table, String stream) {
-        try {
-            String tableDefinition = dialect == Dialect.POSTGRESQL
-                    ? table + "(id bigint, name varchar(100), PRIMARY KEY (id))"
-                    : table + "(id INT64, name STRING(100)) PRIMARY KEY(id)";
-            connection.createTable(tableDefinition);
-            connection.createMutableKeyRangeChangeStream(stream, table);
-        }
-        catch (Exception e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    /**
      * A different window size than {@link #WINDOW_MINUTES}, used only by
      * {@link #shouldResumeCorrectlyAfterWindowSizeIsChangedAcrossRestart} to verify the
      * connector doesn't assume a fixed window size across a restart.
@@ -298,7 +150,7 @@ public class MutableKeyRangeIT extends AbstractSpannerConnectorIT {
     private static void deleteOffsetFiles() {
         for (String tableNamePrefix : ALL_TABLE_NAME_PREFIXES) {
             for (Dialect dialect : Dialect.values()) {
-                String name = tableFor(tableNamePrefix, dialect) + "_connector";
+                String name = tableFor(tableNamePrefix, null, dialect) + "_connector";
                 new File(System.getProperty("java.io.tmpdir"), "mkr-offsets-" + name + ".dat").delete();
             }
         }
@@ -372,19 +224,19 @@ public class MutableKeyRangeIT extends AbstractSpannerConnectorIT {
     @ParameterizedTest
     @EnumSource(Dialect.class)
     void shouldStreamCrudEventsToKafka(Dialect dialect) throws InterruptedException, ExecutionException {
-        Connection connection = connectionFor(dialect);
+        Connection connection = connectionFor(dialect, LOGGER);
         Configuration base = baseConfigFor(dialect);
-        String table = tableFor(TABLE_CRUD, dialect);
-        String stream = streamFor(STREAM_CRUD, dialect);
+        String table = tableFor(TABLE_CRUD, null, dialect);
+        String stream = streamFor(STREAM_CRUD, null, dialect);
 
-        createMutableKeyRangeTableAndStream(connection, dialect, table, stream);
+        createTableAndStream(connection, PartitionMode.MUTABLE_KEY_RANGE, table, stream);
         try {
             Configuration config = buildConfig(base, table + "_connector", stream, WINDOW_MINUTES);
             start(SpannerConnector.class, config);
             assertConnectorIsRunning();
 
-            connection.executeUpdate("INSERT INTO " + table + " (id, name) VALUES (1, 'alpha')");
-            connection.executeUpdate("UPDATE " + table + " SET name = 'beta' WHERE id = 1");
+            connection.executeUpdate("INSERT INTO " + table + " (id, value) VALUES (1, 'alpha')");
+            connection.executeUpdate("UPDATE " + table + " SET value = 'beta' WHERE id = 1");
             connection.executeUpdate("DELETE FROM " + table + " WHERE id = 1");
 
             List<SourceRecord> records = consumeRecordsForTopic(config, table, 4);
@@ -408,16 +260,16 @@ public class MutableKeyRangeIT extends AbstractSpannerConnectorIT {
     @ParameterizedTest
     @EnumSource(Dialect.class)
     void shouldNotRepublishEventsAfterConnectorRestart(Dialect dialect) throws InterruptedException, ExecutionException {
-        Connection connection = connectionFor(dialect);
-        String table = tableFor(TABLE_RESTART, dialect);
-        String stream = streamFor(STREAM_RESTART, dialect);
-        createMutableKeyRangeTableAndStream(connection, dialect, table, stream);
+        Connection connection = connectionFor(dialect, LOGGER);
+        String table = tableFor(TABLE_RESTART, null, dialect);
+        String stream = streamFor(STREAM_RESTART, null, dialect);
+        createTableAndStream(connection, PartitionMode.MUTABLE_KEY_RANGE, table, stream);
         try {
             Configuration config = buildConfig(baseConfigFor(dialect), table + "_connector", stream, WINDOW_MINUTES);
             start(SpannerConnector.class, config);
             assertConnectorIsRunning();
 
-            connection.executeUpdate("INSERT INTO " + table + " (id, name) VALUES (10, 'pre-restart')");
+            connection.executeUpdate("INSERT INTO " + table + " (id, value) VALUES (10, 'pre-restart')");
             List<SourceRecord> before = consumeRecordsForTopic(config, table, 1);
             assertThat(before).as("Should have exactly 1 record before restart").hasSize(1);
             assertThat(op(before, 0)).isEqualTo("c");
@@ -425,7 +277,7 @@ public class MutableKeyRangeIT extends AbstractSpannerConnectorIT {
             stopConnector();
             assertConnectorNotRunning();
 
-            connection.executeUpdate("INSERT INTO " + table + " (id, name) VALUES (11, 'post-restart')");
+            connection.executeUpdate("INSERT INTO " + table + " (id, value) VALUES (11, 'post-restart')");
 
             start(SpannerConnector.class, config);
             assertConnectorIsRunning();
@@ -459,16 +311,16 @@ public class MutableKeyRangeIT extends AbstractSpannerConnectorIT {
     @ParameterizedTest
     @EnumSource(Dialect.class)
     void shouldNotReplayAfterWindowElapses(Dialect dialect) throws InterruptedException, ExecutionException {
-        Connection connection = connectionFor(dialect);
-        String table = tableFor(TABLE_WINDOW, dialect);
-        String stream = streamFor(STREAM_WINDOW, dialect);
-        createMutableKeyRangeTableAndStream(connection, dialect, table, stream);
+        Connection connection = connectionFor(dialect, LOGGER);
+        String table = tableFor(TABLE_WINDOW, null, dialect);
+        String stream = streamFor(STREAM_WINDOW, null, dialect);
+        createTableAndStream(connection, PartitionMode.MUTABLE_KEY_RANGE, table, stream);
         try {
             Configuration config = buildConfig(baseConfigFor(dialect), table + "_connector", stream, WINDOW_MINUTES);
             start(SpannerConnector.class, config);
             assertConnectorIsRunning();
 
-            connection.executeUpdate("INSERT INTO " + table + " (id, name) VALUES (20, 'window-seed')");
+            connection.executeUpdate("INSERT INTO " + table + " (id, value) VALUES (20, 'window-seed')");
             waitForAvailableRecords(waitTimeForRecords(), TimeUnit.SECONDS);
             consumeRecordsByTopic(5, false);
 
@@ -515,10 +367,10 @@ public class MutableKeyRangeIT extends AbstractSpannerConnectorIT {
                 "Skipping: the local Spanner emulator doesn't implement the AddSplitPoints admin RPC "
                         + "(UNIMPLEMENTED) that forceSplit relies on. Run with -Dspanner.test.real=true "
                         + "to exercise this test.");
-        Connection connection = connectionFor(dialect);
-        String table = tableFor(TABLE_ORDER, dialect);
-        String stream = streamFor(STREAM_ORDER, dialect);
-        createMutableKeyRangeTableAndStream(connection, dialect, table, stream);
+        Connection connection = connectionFor(dialect, LOGGER);
+        String table = tableFor(TABLE_ORDER, null, dialect);
+        String stream = streamFor(STREAM_ORDER, null, dialect);
+        createTableAndStream(connection, PartitionMode.MUTABLE_KEY_RANGE, table, stream);
         try {
             Configuration config = buildConfig(baseConfigFor(dialect), table + "_connector", stream, WINDOW_MINUTES);
             start(SpannerConnector.class, config);
@@ -529,7 +381,7 @@ public class MutableKeyRangeIT extends AbstractSpannerConnectorIT {
 
             for (long key : keys) {
                 connection.executeUpdate(
-                        "INSERT INTO " + table + " (id, name) VALUES (" + key + ", 'v0')");
+                        "INSERT INTO " + table + " (id, value) VALUES (" + key + ", 'v0')");
             }
 
             // Force the key range to split around each key, right as further updates are issued,
@@ -542,7 +394,7 @@ public class MutableKeyRangeIT extends AbstractSpannerConnectorIT {
             for (int i = 1; i <= updatesPerKey; i++) {
                 for (long key : keys) {
                     connection.executeUpdate(
-                            "UPDATE " + table + " SET name = 'v" + i + "' WHERE id = " + key);
+                            "UPDATE " + table + " SET value = 'v" + i + "' WHERE id = " + key);
                 }
             }
 
@@ -570,7 +422,7 @@ public class MutableKeyRangeIT extends AbstractSpannerConnectorIT {
 
             for (long key : keys) {
                 List<String> namesInOrder = byKey.getOrDefault(key, List.of()).stream()
-                        .map(r -> ((Struct) r.value()).getStruct("after").getString("name"))
+                        .map(r -> ((Struct) r.value()).getStruct("after").getString("value"))
                         .collect(Collectors.toList());
 
                 assertThat(namesInOrder)
@@ -600,10 +452,10 @@ public class MutableKeyRangeIT extends AbstractSpannerConnectorIT {
                 "Skipping: the local Spanner emulator doesn't implement the AddSplitPoints admin RPC "
                         + "(UNIMPLEMENTED) that forceSplit relies on. Run with -Dspanner.test.real=true "
                         + "to exercise this test.");
-        Connection connection = connectionFor(dialect);
-        String table = tableFor(TABLE_MOVE_IN_RESTART, dialect);
-        String stream = streamFor(STREAM_MOVE_IN_RESTART, dialect);
-        createMutableKeyRangeTableAndStream(connection, dialect, table, stream);
+        Connection connection = connectionFor(dialect, LOGGER);
+        String table = tableFor(TABLE_MOVE_IN_RESTART, null, dialect);
+        String stream = streamFor(STREAM_MOVE_IN_RESTART, null, dialect);
+        createTableAndStream(connection, PartitionMode.MUTABLE_KEY_RANGE, table, stream);
         try {
             Configuration config = buildConfig(baseConfigFor(dialect), table + "_connector", stream, WINDOW_MINUTES);
             start(SpannerConnector.class, config);
@@ -611,7 +463,7 @@ public class MutableKeyRangeIT extends AbstractSpannerConnectorIT {
 
             long key = 1500L;
             connection.executeUpdate(
-                    "INSERT INTO " + table + " (id, name) VALUES (" + key + ", 'v0')");
+                    "INSERT INTO " + table + " (id, value) VALUES (" + key + ", 'v0')");
 
             // Force a split, then stop immediately - no settle time - to maximize the chance the
             // connector is caught somewhere in the middle of the MoveIn/MoveOut handshake rather
@@ -628,7 +480,7 @@ public class MutableKeyRangeIT extends AbstractSpannerConnectorIT {
             int updatesAfterRestart = 5;
             for (int i = 1; i <= updatesAfterRestart; i++) {
                 connection.executeUpdate(
-                        "UPDATE " + table + " SET name = 'v" + i + "' WHERE id = " + key);
+                        "UPDATE " + table + " SET value = 'v" + i + "' WHERE id = " + key);
             }
 
             // Waiting for a raw record count isn't reliable here: at-least-once redelivery of
@@ -647,13 +499,13 @@ public class MutableKeyRangeIT extends AbstractSpannerConnectorIT {
                     records.addAll(batch);
                     sawFinalValue = batch.stream()
                             .filter(r -> r.value() != null)
-                            .anyMatch(r -> finalExpectedValue.equals(((Struct) r.value()).getStruct("after").getString("name")));
+                            .anyMatch(r -> finalExpectedValue.equals(((Struct) r.value()).getStruct("after").getString("value")));
                 }
             }
 
-            List<String> namesInOrder = records.stream()
+            List<String> valuesInOrder = records.stream()
                     .filter(r -> r.value() != null)
-                    .map(r -> ((Struct) r.value()).getStruct("after").getString("name"))
+                    .map(r -> ((Struct) r.value()).getStruct("after").getString("value"))
                     .collect(Collectors.toList());
 
             List<String> expected = IntStream.rangeClosed(0, updatesAfterRestart)
@@ -662,7 +514,7 @@ public class MutableKeyRangeIT extends AbstractSpannerConnectorIT {
 
             // containsSubsequence (not isEqualTo): at-least-once semantics permit a value to be
             // redelivered after the restart, but every expected value must still appear, in order.
-            assertThat(namesInOrder)
+            assertThat(valuesInOrder)
                     .as("Every write for id=%d must appear, in order, even though the connector was "
                             + "stopped as soon as possible after a forced key range split - whatever "
                             + "state the MoveIn/MoveOut handshake was caught in must resume correctly, "
@@ -685,10 +537,10 @@ public class MutableKeyRangeIT extends AbstractSpannerConnectorIT {
     @ParameterizedTest
     @EnumSource(Dialect.class)
     void shouldNotLoseEventsWhenStoppedMidWindow(Dialect dialect) throws InterruptedException, ExecutionException {
-        Connection connection = connectionFor(dialect);
-        String table = tableFor(TABLE_MID_WINDOW_STOP, dialect);
-        String stream = streamFor(STREAM_MID_WINDOW_STOP, dialect);
-        createMutableKeyRangeTableAndStream(connection, dialect, table, stream);
+        Connection connection = connectionFor(dialect, LOGGER);
+        String table = tableFor(TABLE_MID_WINDOW_STOP, null, dialect);
+        String stream = streamFor(STREAM_MID_WINDOW_STOP, null, dialect);
+        createTableAndStream(connection, PartitionMode.MUTABLE_KEY_RANGE, table, stream);
         try {
             Configuration config = buildConfig(baseConfigFor(dialect), table + "_connector", stream,
                     WINDOW_MINUTES_FOR_MID_WINDOW_STOP);
@@ -697,7 +549,7 @@ public class MutableKeyRangeIT extends AbstractSpannerConnectorIT {
 
             for (long id = 1; id <= 5; id++) {
                 connection.executeUpdate(
-                        "INSERT INTO " + table + " (id, name) VALUES (" + id + ", 'row-" + id + "')");
+                        "INSERT INTO " + table + " (id, value) VALUES (" + id + ", 'row-" + id + "')");
             }
 
             // Give the connector time to open its window query and start delivering some of the
@@ -740,10 +592,10 @@ public class MutableKeyRangeIT extends AbstractSpannerConnectorIT {
     @ParameterizedTest
     @EnumSource(Dialect.class)
     void shouldNotLoseDeleteWhenStoppedMidWindow(Dialect dialect) throws InterruptedException, ExecutionException {
-        Connection connection = connectionFor(dialect);
-        String table = tableFor(TABLE_MID_WINDOW_DELETE, dialect);
-        String stream = streamFor(STREAM_MID_WINDOW_DELETE, dialect);
-        createMutableKeyRangeTableAndStream(connection, dialect, table, stream);
+        Connection connection = connectionFor(dialect, LOGGER);
+        String table = tableFor(TABLE_MID_WINDOW_DELETE, null, dialect);
+        String stream = streamFor(STREAM_MID_WINDOW_DELETE, null, dialect);
+        createTableAndStream(connection, PartitionMode.MUTABLE_KEY_RANGE, table, stream);
         try {
             Configuration config = buildConfig(baseConfigFor(dialect), table + "_connector", stream,
                     WINDOW_MINUTES_FOR_MID_WINDOW_STOP);
@@ -751,7 +603,7 @@ public class MutableKeyRangeIT extends AbstractSpannerConnectorIT {
             assertConnectorIsRunning();
 
             connection.executeUpdate(
-                    "INSERT INTO " + table + " (id, name) VALUES (1, 'row-1')");
+                    "INSERT INTO " + table + " (id, value) VALUES (1, 'row-1')");
             connection.executeUpdate(
                     "DELETE FROM " + table + " WHERE id = 1");
 
@@ -798,10 +650,10 @@ public class MutableKeyRangeIT extends AbstractSpannerConnectorIT {
     @ParameterizedTest
     @EnumSource(Dialect.class)
     void shouldDeliverAllModsFromLargeSingleTransaction(Dialect dialect) throws InterruptedException, ExecutionException {
-        Connection connection = connectionFor(dialect);
-        String table = tableFor(TABLE_LARGE_TRANSACTION, dialect);
-        String stream = streamFor(STREAM_LARGE_TRANSACTION, dialect);
-        createMutableKeyRangeTableAndStream(connection, dialect, table, stream);
+        Connection connection = connectionFor(dialect, LOGGER);
+        String table = tableFor(TABLE_LARGE_TRANSACTION, null, dialect);
+        String stream = streamFor(STREAM_LARGE_TRANSACTION, null, dialect);
+        createTableAndStream(connection, PartitionMode.MUTABLE_KEY_RANGE, table, stream);
         try {
             Configuration config = buildConfig(baseConfigFor(dialect), table + "_connector", stream, WINDOW_MINUTES);
             start(SpannerConnector.class, config);
@@ -810,7 +662,7 @@ public class MutableKeyRangeIT extends AbstractSpannerConnectorIT {
             int rowCount = 20;
             List<String> inserts = new ArrayList<>();
             for (long id = 1; id <= rowCount; id++) {
-                inserts.add("INSERT INTO " + table + " (id, name) VALUES (" + id + ", 'row-" + id + "')");
+                inserts.add("INSERT INTO " + table + " (id, value) VALUES (" + id + ", 'row-" + id + "')");
             }
             connection.executeUpdate(inserts);
 
@@ -870,10 +722,10 @@ public class MutableKeyRangeIT extends AbstractSpannerConnectorIT {
     @ParameterizedTest
     @EnumSource(Dialect.class)
     void shouldAdvanceThroughQuietWindowWithoutStalling(Dialect dialect) throws InterruptedException, ExecutionException {
-        Connection connection = connectionFor(dialect);
-        String table = tableFor(TABLE_QUIET_WINDOW, dialect);
-        String stream = streamFor(STREAM_QUIET_WINDOW, dialect);
-        createMutableKeyRangeTableAndStream(connection, dialect, table, stream);
+        Connection connection = connectionFor(dialect, LOGGER);
+        String table = tableFor(TABLE_QUIET_WINDOW, null, dialect);
+        String stream = streamFor(STREAM_QUIET_WINDOW, null, dialect);
+        createTableAndStream(connection, PartitionMode.MUTABLE_KEY_RANGE, table, stream);
         try {
             Configuration config = buildConfig(baseConfigFor(dialect), table + "_connector", stream, WINDOW_MINUTES);
             start(SpannerConnector.class, config);
@@ -889,7 +741,7 @@ public class MutableKeyRangeIT extends AbstractSpannerConnectorIT {
             consumeRecordsByTopic(50, false);
 
             connection.executeUpdate(
-                    "INSERT INTO " + table + " (id, name) VALUES (30, 'after-quiet-window')");
+                    "INSERT INTO " + table + " (id, value) VALUES (30, 'after-quiet-window')");
 
             List<SourceRecord> records = consumeRecordsForTopic(config, table, 1);
 
@@ -918,8 +770,8 @@ public class MutableKeyRangeIT extends AbstractSpannerConnectorIT {
     @ParameterizedTest
     @EnumSource(Dialect.class)
     void shouldNotStartConnectorWithWindowMinutesTooLow(Dialect dialect) throws InterruptedException {
-        String table = tableFor(TABLE_CRUD, dialect);
-        String stream = streamFor(STREAM_CRUD, dialect);
+        String table = tableFor(TABLE_CRUD, null, dialect);
+        String stream = streamFor(STREAM_CRUD, null, dialect);
         Configuration config = buildConfig(baseConfigFor(dialect), table + "_connector", stream, 0);
         start(SpannerConnector.class, config, (success, msg, error) -> {
             assertThat(success).isFalse();
@@ -938,8 +790,8 @@ public class MutableKeyRangeIT extends AbstractSpannerConnectorIT {
     @ParameterizedTest
     @EnumSource(Dialect.class)
     void shouldNotStartConnectorWithWindowMinutesTooHigh(Dialect dialect) throws InterruptedException {
-        String table = tableFor(TABLE_CRUD, dialect);
-        String stream = streamFor(STREAM_CRUD, dialect);
+        String table = tableFor(TABLE_CRUD, null, dialect);
+        String stream = streamFor(STREAM_CRUD, null, dialect);
         Configuration config = buildConfig(baseConfigFor(dialect), table + "_connector", stream, 31);
         start(SpannerConnector.class, config, (success, msg, error) -> {
             assertThat(success).isFalse();
@@ -959,15 +811,15 @@ public class MutableKeyRangeIT extends AbstractSpannerConnectorIT {
     @ParameterizedTest
     @EnumSource(Dialect.class)
     void shouldCatchUpQuicklyThroughHistoricalWindows(Dialect dialect) throws InterruptedException, ExecutionException {
-        Connection connection = connectionFor(dialect);
-        String table = tableFor(TABLE_HISTORICAL_START, dialect);
-        String stream = streamFor(STREAM_HISTORICAL_START, dialect);
-        createMutableKeyRangeTableAndStream(connection, dialect, table, stream);
+        Connection connection = connectionFor(dialect, LOGGER);
+        String table = tableFor(TABLE_HISTORICAL_START, null, dialect);
+        String stream = streamFor(STREAM_HISTORICAL_START, null, dialect);
+        createTableAndStream(connection, PartitionMode.MUTABLE_KEY_RANGE, table, stream);
         try {
             Instant historicalStart = Instant.now();
             for (long id = 1; id <= 3; id++) {
                 connection.executeUpdate(
-                        "INSERT INTO " + table + " (id, name) VALUES (" + id + ", 'historical-" + id + "')");
+                        "INSERT INTO " + table + " (id, value) VALUES (" + id + ", 'historical-" + id + "')");
             }
 
             int minutesInPast = WINDOW_MINUTES * 3;
@@ -1038,17 +890,17 @@ public class MutableKeyRangeIT extends AbstractSpannerConnectorIT {
     @ParameterizedTest
     @EnumSource(Dialect.class)
     void shouldPickUpSchemaChangeMidStream(Dialect dialect) throws InterruptedException, ExecutionException {
-        Connection connection = connectionFor(dialect);
-        String table = tableFor(TABLE_SCHEMA_CHANGE, dialect);
-        String stream = streamFor(STREAM_SCHEMA_CHANGE, dialect);
-        createMutableKeyRangeTableAndStream(connection, dialect, table, stream);
+        Connection connection = connectionFor(dialect, LOGGER);
+        String table = tableFor(TABLE_SCHEMA_CHANGE, null, dialect);
+        String stream = streamFor(STREAM_SCHEMA_CHANGE, null, dialect);
+        createTableAndStream(connection, PartitionMode.MUTABLE_KEY_RANGE, table, stream);
         try {
             Configuration config = buildConfig(baseConfigFor(dialect), table + "_connector", stream, WINDOW_MINUTES);
             start(SpannerConnector.class, config);
             assertConnectorIsRunning();
 
             connection.executeUpdate(
-                    "INSERT INTO " + table + " (id, name) VALUES (1, 'Alice')");
+                    "INSERT INTO " + table + " (id, value) VALUES (1, 'Alice')");
 
             // Schema change happens mid-stream, without touching the change stream's own
             // configuration or restarting the connector.
@@ -1056,7 +908,7 @@ public class MutableKeyRangeIT extends AbstractSpannerConnectorIT {
                     "ALTER TABLE " + table + " ADD COLUMN age " + int64TypeFor(dialect)));
 
             connection.executeUpdate(
-                    "INSERT INTO " + table + " (id, name, age) VALUES (2, 'Bob', 30)");
+                    "INSERT INTO " + table + " (id, value, age) VALUES (2, 'Bob', 30)");
             connection.executeUpdate(
                     "UPDATE " + table + " SET age = 99 WHERE id = 1");
 
@@ -1074,12 +926,12 @@ public class MutableKeyRangeIT extends AbstractSpannerConnectorIT {
 
             Struct preAlterInsert = (Struct) records.get(0).value();
             assertThat(preAlterInsert.get("op")).isEqualTo("c");
-            assertThat(preAlterInsert.getStruct("after").getString("name")).isEqualTo("Alice");
+            assertThat(preAlterInsert.getStruct("after").getString("value")).isEqualTo("Alice");
 
             Struct postAlterInsert = (Struct) records.get(1).value();
             assertThat(postAlterInsert.get("op")).isEqualTo("c");
             Struct postAlterAfter = postAlterInsert.getStruct("after");
-            assertThat(postAlterAfter.getString("name")).isEqualTo("Bob");
+            assertThat(postAlterAfter.getString("value")).isEqualTo("Bob");
             assertThat(postAlterAfter.getInt64("age")).isEqualTo(30L);
 
             // Existing row, updated after the column was added: the new column must be usable
@@ -1108,17 +960,17 @@ public class MutableKeyRangeIT extends AbstractSpannerConnectorIT {
     @ParameterizedTest
     @EnumSource(Dialect.class)
     void shouldPickUpSchemaChangeMidStreamForNewInserts(Dialect dialect) throws InterruptedException, ExecutionException {
-        Connection connection = connectionFor(dialect);
-        String table = tableFor(TABLE_SCHEMA_CHANGE_MID_STREAM, dialect);
-        String stream = streamFor(STREAM_SCHEMA_CHANGE_MID_STREAM, dialect);
-        createMutableKeyRangeTableAndStream(connection, dialect, table, stream);
+        Connection connection = connectionFor(dialect, LOGGER);
+        String table = tableFor(TABLE_SCHEMA_CHANGE_MID_STREAM, null, dialect);
+        String stream = streamFor(STREAM_SCHEMA_CHANGE_MID_STREAM, null, dialect);
+        createTableAndStream(connection, PartitionMode.MUTABLE_KEY_RANGE, table, stream);
         try {
             Configuration config = buildConfig(baseConfigFor(dialect), table + "_connector", stream, WINDOW_MINUTES);
             start(SpannerConnector.class, config);
             assertConnectorIsRunning();
 
             connection.executeUpdate(
-                    "INSERT INTO " + table + " (id, name) VALUES (1, 'Alice')");
+                    "INSERT INTO " + table + " (id, value) VALUES (1, 'Alice')");
 
             // Schema change happens mid-stream, without touching the change stream's own
             // configuration or restarting the connector.
@@ -1126,19 +978,19 @@ public class MutableKeyRangeIT extends AbstractSpannerConnectorIT {
                     "ALTER TABLE " + table + " ADD COLUMN age " + int64TypeFor(dialect)));
 
             connection.executeUpdate(
-                    "INSERT INTO " + table + " (id, name, age) VALUES (2, 'Bob', 30)");
+                    "INSERT INTO " + table + " (id, value, age) VALUES (2, 'Bob', 30)");
 
             List<SourceRecord> records = consumeRecordsForTopic(config, table, 2);
             assertThat(records).hasSize(2);
 
             Struct preAlterInsert = (Struct) records.get(0).value();
             assertThat(preAlterInsert.get("op")).isEqualTo("c");
-            assertThat(preAlterInsert.getStruct("after").getString("name")).isEqualTo("Alice");
+            assertThat(preAlterInsert.getStruct("after").getString("value")).isEqualTo("Alice");
 
             Struct postAlterInsert = (Struct) records.get(1).value();
             assertThat(postAlterInsert.get("op")).isEqualTo("c");
             Struct postAlterAfter = postAlterInsert.getStruct("after");
-            assertThat(postAlterAfter.getString("name")).isEqualTo("Bob");
+            assertThat(postAlterAfter.getString("value")).isEqualTo("Bob");
             assertThat(postAlterAfter.getInt64("age")).isEqualTo(30L);
         }
         finally {
@@ -1157,11 +1009,11 @@ public class MutableKeyRangeIT extends AbstractSpannerConnectorIT {
     @ParameterizedTest
     @EnumSource(Dialect.class)
     void shouldResumeCorrectlyAfterWindowSizeIsChangedAcrossRestart(Dialect dialect) throws InterruptedException, ExecutionException {
-        Connection connection = connectionFor(dialect);
+        Connection connection = connectionFor(dialect, LOGGER);
         Configuration base = baseConfigFor(dialect);
-        String table = tableFor(TABLE_WINDOW_RECONFIG, dialect);
-        String stream = streamFor(STREAM_WINDOW_RECONFIG, dialect);
-        createMutableKeyRangeTableAndStream(connection, dialect, table, stream);
+        String table = tableFor(TABLE_WINDOW_RECONFIG, null, dialect);
+        String stream = streamFor(STREAM_WINDOW_RECONFIG, null, dialect);
+        createTableAndStream(connection, PartitionMode.MUTABLE_KEY_RANGE, table, stream);
         try {
             String connectorName = table + "_connector";
             Configuration initialConfig = buildConfig(base, connectorName, stream, WINDOW_MINUTES);
@@ -1169,7 +1021,7 @@ public class MutableKeyRangeIT extends AbstractSpannerConnectorIT {
             assertConnectorIsRunning();
 
             connection.executeUpdate(
-                    "INSERT INTO " + table + " (id, name) VALUES (1, 'before-reconfig')");
+                    "INSERT INTO " + table + " (id, value) VALUES (1, 'before-reconfig')");
 
             List<SourceRecord> before = consumeRecordsForTopic(initialConfig, table, 1);
             assertThat(before)
@@ -1186,7 +1038,7 @@ public class MutableKeyRangeIT extends AbstractSpannerConnectorIT {
             assertConnectorIsRunning();
 
             connection.executeUpdate(
-                    "INSERT INTO " + table + " (id, name) VALUES (2, 'after-reconfig')");
+                    "INSERT INTO " + table + " (id, value) VALUES (2, 'after-reconfig')");
 
             // minExpectedCount=2, not 1: consumeRecordsForTopic stops polling once it hits the count,
             // so requesting just 1 risks returning on a redelivered id=1 before id=2 - the record

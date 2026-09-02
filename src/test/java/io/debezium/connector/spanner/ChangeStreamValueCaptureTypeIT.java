@@ -18,7 +18,11 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.google.cloud.spanner.Dialect;
 
 import io.debezium.config.Configuration;
 import io.debezium.connector.spanner.util.Connection;
@@ -35,16 +39,7 @@ import io.debezium.connector.spanner.util.PartitionMode;
 @RealSpannerCompatible
 public class ChangeStreamValueCaptureTypeIT extends AbstractSpannerConnectorIT {
 
-    /**
-     * Override the inherited emulator connection/config with a real-Spanner pair when
-     * {@code -Dspanner.test.real=true} is supplied; otherwise keep the parent's emulator pair.
-     */
-    protected static final Connection databaseConnection = Connection.isRealSpanner()
-            ? RealSpannerTestSupport.getConnection(database)
-            : AbstractSpannerConnectorIT.databaseConnection;
-    protected static final Configuration baseConfig = Connection.isRealSpanner()
-            ? createBaseConfigBuilder(database, true).build()
-            : AbstractSpannerConnectorIT.baseConfig;
+    private static final Logger LOGGER = LoggerFactory.getLogger(ChangeStreamValueCaptureTypeIT.class);
 
     private static final String tableNameNewValuesPrefix = "embedded_new_values_capture_table";
     private static final String changeStreamNameNewValuesPrefix = "embeddedNewValuesCaptureStream";
@@ -53,7 +48,7 @@ public class ChangeStreamValueCaptureTypeIT extends AbstractSpannerConnectorIT {
     private static final String changeStreamNameNewRowPrefix = "embeddedNewRowCaptureStream";
 
     private static final String tableNameNewRowAndOldValuesPrefix = "embedded_new_row_old_values_capture_table";
-    private static final String changeStreamNameNewRowAndOldValuesPrefix = "embeddedNewRowAndOldValuesCaptureStream";
+    private static final String changeStreamNameNewRowAndOldValuesPrefix = "embeddedNewRowOldValuesCaptureStream";
 
     @BeforeEach
     void initFramework() {
@@ -68,32 +63,35 @@ public class ChangeStreamValueCaptureTypeIT extends AbstractSpannerConnectorIT {
     }
 
     @ParameterizedTest
-    @EnumSource(PartitionMode.class)
-    public void shouldCaptureFullNewRowWithNoNonKeyOldValues(PartitionMode partitionMode) throws InterruptedException, ExecutionException {
+    @MethodSource("partitionModesAndDialects")
+    public void shouldCaptureFullNewRowWithNoNonKeyOldValues(PartitionMode partitionMode, Dialect dialect) throws InterruptedException, ExecutionException {
         Assumptions.assumeTrue(!Connection.isRealSpanner(),
                 "Skipping: on real Cloud Spanner, NEW_VALUES's 'after' struct omits columns that "
                         + "weren't part of the UPDATE's SET clause, contrary to the emulator's full-row "
                         + "behavior - see doc/change-stream-integration-tests.md.");
-        String tableName = tableNameNewValuesPrefix + "_" + partitionMode.name().toLowerCase();
-        String changeStreamName = changeStreamNameNewValuesPrefix + partitionMode.name();
-        databaseConnection.createTable(tableName
-                + "(id INT64, name STRING(100), status STRING(20), score INT64) PRIMARY KEY (id)");
-        databaseConnection.createChangeStreamNewValue(changeStreamName, partitionMode, tableName);
+        Connection connection = connectionFor(dialect, LOGGER);
+        Configuration base = baseConfigFor(dialect);
+        String table = tableFor(tableNameNewValuesPrefix, partitionMode, dialect);
+        String stream = streamFor(changeStreamNameNewValuesPrefix, partitionMode, dialect);
+
+        String tableParams = "(id INT64, name STRING(100), status STRING(20), score INT64) PRIMARY KEY (id)";
+        connection.createTable(table, tableParams);
+        connection.createChangeStreamNewValue(stream, partitionMode, table);
         try {
-            final Configuration config = buildTestConfig(baseConfig, changeStreamName, tableName, partitionMode);
+            final Configuration config = buildTestConfig(base, stream, table, partitionMode);
 
             start(SpannerConnector.class, config);
             assertConnectorIsRunning();
 
-            databaseConnection.executeUpdate(
-                    "INSERT INTO " + tableName + "(id, name, status, score) VALUES (1, 'Alice', 'active', 10)");
+            connection.executeUpdate(
+                    "INSERT INTO " + table + "(id, name, status, score) VALUES (1, 'Alice', 'active', 10)");
             // Only 'score' is touched here — 'name' and 'status' are left alone.
-            databaseConnection.executeUpdate(
-                    "UPDATE " + tableName + " SET score = 20 WHERE id = 1");
+            connection.executeUpdate(
+                    "UPDATE " + table + " SET score = 20 WHERE id = 1");
 
             assertTrue(waitForAvailableRecords(waitTimeForRecords(), TimeUnit.SECONDS));
             SourceRecords sourceRecords = consumeRecordsByTopic(10, false);
-            List<SourceRecord> records = sourceRecords.recordsForTopic(getTopicName(config, tableName));
+            List<SourceRecord> records = sourceRecords.recordsForTopic(getTopicName(config, table));
             assertThat(records).hasSize(2);
 
             Struct updateRecord = (Struct) records.get(1).value();
@@ -117,34 +115,37 @@ public class ChangeStreamValueCaptureTypeIT extends AbstractSpannerConnectorIT {
             assertThat(after.getString("status")).isEqualTo("active");
         }
         finally {
-            databaseConnection.dropChangeStream(changeStreamName);
-            databaseConnection.dropTable(tableName);
+            connection.dropChangeStream(stream);
+            connection.dropTable(table);
         }
     }
 
     @ParameterizedTest
-    @EnumSource(PartitionMode.class)
-    public void shouldCaptureFullNewRowWithNoOldValues(PartitionMode partitionMode) throws InterruptedException, ExecutionException {
-        String tableName = tableNameNewRowPrefix + "_" + partitionMode.name().toLowerCase();
-        String changeStreamName = changeStreamNameNewRowPrefix + partitionMode.name();
-        databaseConnection.createTable(tableName
-                + "(id INT64, name STRING(100), status STRING(20), score INT64) PRIMARY KEY (id)");
-        databaseConnection.createChangeStreamNewRow(changeStreamName, partitionMode, tableName);
+    @MethodSource("partitionModesAndDialects")
+    public void shouldCaptureFullNewRowWithNoOldValues(PartitionMode partitionMode, Dialect dialect) throws InterruptedException, ExecutionException {
+        Connection connection = connectionFor(dialect, LOGGER);
+        Configuration base = baseConfigFor(dialect);
+        String table = tableFor(tableNameNewRowPrefix, partitionMode, dialect);
+        String stream = streamFor(changeStreamNameNewRowPrefix, partitionMode, dialect);
+
+        String tableParams = "(id INT64, name STRING(100), status STRING(20), score INT64) PRIMARY KEY (id)";
+        connection.createTable(table, tableParams);
+        connection.createChangeStreamNewRow(stream, partitionMode, table);
         try {
-            final Configuration config = buildTestConfig(baseConfig, changeStreamName, tableName, partitionMode);
+            final Configuration config = buildTestConfig(base, stream, table, partitionMode);
 
             start(SpannerConnector.class, config);
             assertConnectorIsRunning();
 
-            databaseConnection.executeUpdate(
-                    "INSERT INTO " + tableName + "(id, name, status, score) VALUES (1, 'Alice', 'active', 10)");
+            connection.executeUpdate(
+                    "INSERT INTO " + table + "(id, name, status, score) VALUES (1, 'Alice', 'active', 10)");
             // Only 'score' is touched here — 'name' and 'status' are left alone.
-            databaseConnection.executeUpdate(
-                    "UPDATE " + tableName + " SET score = 20 WHERE id = 1");
+            connection.executeUpdate(
+                    "UPDATE " + table + " SET score = 20 WHERE id = 1");
 
             assertTrue(waitForAvailableRecords(waitTimeForRecords(), TimeUnit.SECONDS));
             SourceRecords sourceRecords = consumeRecordsByTopic(10, false);
-            List<SourceRecord> records = sourceRecords.recordsForTopic(getTopicName(config, tableName));
+            List<SourceRecord> records = sourceRecords.recordsForTopic(getTopicName(config, table));
             assertThat(records).hasSize(2);
 
             Struct updateRecord = (Struct) records.get(1).value();
@@ -165,38 +166,41 @@ public class ChangeStreamValueCaptureTypeIT extends AbstractSpannerConnectorIT {
             assertThat(after.getString("status")).isEqualTo("active");
         }
         finally {
-            databaseConnection.dropChangeStream(changeStreamName);
-            databaseConnection.dropTable(tableName);
+            connection.dropChangeStream(stream);
+            connection.dropTable(table);
         }
     }
 
     @ParameterizedTest
-    @EnumSource(PartitionMode.class)
-    public void shouldCaptureFullRowOnBothSides(PartitionMode partitionMode) throws InterruptedException, ExecutionException {
+    @MethodSource("partitionModesAndDialects")
+    public void shouldCaptureFullRowOnBothSides(PartitionMode partitionMode, Dialect dialect) throws InterruptedException, ExecutionException {
         Assumptions.assumeTrue(!Connection.isRealSpanner(),
                 "Skipping: on real Cloud Spanner, NEW_ROW_AND_OLD_VALUES's 'before' struct omits "
                         + "columns that weren't part of the UPDATE's SET clause, contrary to the "
                         + "emulator's full-row behavior - see doc/change-stream-integration-tests.md.");
-        String tableName = tableNameNewRowAndOldValuesPrefix + "_" + partitionMode.name().toLowerCase();
-        String changeStreamName = changeStreamNameNewRowAndOldValuesPrefix + partitionMode.name();
-        databaseConnection.createTable(tableName
-                + "(id INT64, name STRING(100), status STRING(20), score INT64) PRIMARY KEY (id)");
-        databaseConnection.createChangeStreamNewRowAndOldValues(changeStreamName, partitionMode, tableName);
+        Connection connection = connectionFor(dialect, LOGGER);
+        Configuration base = baseConfigFor(dialect);
+        String table = tableFor(tableNameNewRowAndOldValuesPrefix, partitionMode, dialect);
+        String stream = streamFor(changeStreamNameNewRowAndOldValuesPrefix, partitionMode, dialect);
+
+        String tableParams = "(id INT64, name STRING(100), status STRING(20), score INT64) PRIMARY KEY (id)";
+        connection.createTable(table, tableParams);
+        connection.createChangeStreamNewRowAndOldValues(stream, partitionMode, table);
         try {
-            final Configuration config = buildTestConfig(baseConfig, changeStreamName, tableName, partitionMode);
+            final Configuration config = buildTestConfig(base, stream, table, partitionMode);
 
             start(SpannerConnector.class, config);
             assertConnectorIsRunning();
 
-            databaseConnection.executeUpdate(
-                    "INSERT INTO " + tableName + "(id, name, status, score) VALUES (1, 'Alice', 'active', 10)");
+            connection.executeUpdate(
+                    "INSERT INTO " + table + "(id, name, status, score) VALUES (1, 'Alice', 'active', 10)");
             // Only 'score' is touched here — 'name' and 'status' are left alone.
-            databaseConnection.executeUpdate(
-                    "UPDATE " + tableName + " SET score = 20 WHERE id = 1");
+            connection.executeUpdate(
+                    "UPDATE " + table + " SET score = 20 WHERE id = 1");
 
             assertTrue(waitForAvailableRecords(waitTimeForRecords(), TimeUnit.SECONDS));
             SourceRecords sourceRecords = consumeRecordsByTopic(10, false);
-            List<SourceRecord> records = sourceRecords.recordsForTopic(getTopicName(config, tableName));
+            List<SourceRecord> records = sourceRecords.recordsForTopic(getTopicName(config, table));
             assertThat(records).hasSize(2);
 
             Struct updateRecord = (Struct) records.get(1).value();
@@ -213,8 +217,8 @@ public class ChangeStreamValueCaptureTypeIT extends AbstractSpannerConnectorIT {
             assertThat(after.getString("status")).isEqualTo("active");
         }
         finally {
-            databaseConnection.dropChangeStream(changeStreamName);
-            databaseConnection.dropTable(tableName);
+            connection.dropChangeStream(stream);
+            connection.dropTable(table);
         }
     }
 }

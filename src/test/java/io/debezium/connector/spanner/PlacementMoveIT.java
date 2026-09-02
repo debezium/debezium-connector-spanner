@@ -17,7 +17,12 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Disabled;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.google.cloud.spanner.Dialect;
 
 import io.debezium.config.Configuration;
 import io.debezium.connector.spanner.util.Connection;
@@ -40,16 +45,7 @@ import io.debezium.connector.spanner.util.PartitionMode;
         + "(see doc/real-spanner-testing.md).")
 public class PlacementMoveIT extends AbstractSpannerConnectorIT {
 
-    /**
-     * Override the inherited emulator connection/config with a real-Spanner pair when
-     * {@code -Dspanner.test.real=true} is supplied; otherwise keep the parent's emulator pair.
-     */
-    protected static final Connection databaseConnection = Connection.isRealSpanner()
-            ? RealSpannerTestSupport.getConnection(database)
-            : AbstractSpannerConnectorIT.databaseConnection;
-    protected static final Configuration baseConfig = Connection.isRealSpanner()
-            ? createBaseConfigBuilder(database, true).build()
-            : AbstractSpannerConnectorIT.baseConfig;
+    private static final Logger LOGGER = LoggerFactory.getLogger(PlacementMoveIT.class);
 
     private static final String placementEast = "PlacementMoveEast";
     private static final String placementWest = "PlacementMoveWest";
@@ -61,16 +57,20 @@ public class PlacementMoveIT extends AbstractSpannerConnectorIT {
                         + "instance supports. Run with -Dspanner.test.real=true.");
         databaseConnection.createPlacement(placementEast, "east-partition");
         databaseConnection.createPlacement(placementWest, "west-partition");
+        pgDatabaseConnection.createPlacement(placementEast, "east-partition");
+        pgDatabaseConnection.createPlacement(placementWest, "west-partition");
     }
 
     @AfterAll
     static void clear() throws InterruptedException {
         databaseConnection.dropPlacement(placementEast);
         databaseConnection.dropPlacement(placementWest);
+        pgDatabaseConnection.dropPlacement(placementEast);
+        pgDatabaseConnection.dropPlacement(placementWest);
     }
 
-    private static final String tableName = "placement_key_move_table";
-    private static final String changeStreamName = "placementKeyMoveStream";
+    private static final String tablePrefix = "placement_key_move_table";
+    private static final String changeStreamPrefix = "placementKeyMoveStream";
 
     /**
      * Core placement-table scenario: a row physically moves between placements, and a
@@ -78,14 +78,19 @@ public class PlacementMoveIT extends AbstractSpannerConnectorIT {
      * move. This is the property that actually depends on correct
      * {@code PartitionEventRecord} move-in/move-out handling.
      */
-    @Test
-    public void shouldOrderRecordsCorrectlyWhenRowMovesBetweenPlacements() throws Exception {
-        databaseConnection.createTable(tableName
-                + "(id INT64 NOT NULL, region STRING(MAX) NOT NULL PLACEMENT KEY, value STRING(MAX)) "
-                + "PRIMARY KEY (id)");
-        databaseConnection.createMutableKeyRangeChangeStream(changeStreamName, tableName);
+    @ParameterizedTest
+    @EnumSource(Dialect.class)
+    public void shouldOrderRecordsCorrectlyWhenRowMovesBetweenPlacements(Dialect dialect) throws Exception {
+        Connection connection = connectionFor(dialect, LOGGER);
+        Configuration base = baseConfigFor(dialect);
+        String table = tableFor(tablePrefix, null, dialect);
+        String stream = streamFor(changeStreamPrefix, null, dialect);
+
+        String tableParams = "(id INT64 NOT NULL, region STRING(MAX) NOT NULL PLACEMENT KEY, value STRING(MAX)) PRIMARY KEY (id)";
+        connection.createTable(table, tableParams);
+        connection.createMutableKeyRangeChangeStream(stream, table);
         try {
-            final Configuration config = buildTestConfig(baseConfig, changeStreamName, tableName, PartitionMode.MUTABLE_KEY_RANGE);
+            final Configuration config = buildTestConfig(base, stream, table, PartitionMode.MUTABLE_KEY_RANGE);
 
             clearKafkaTopics();
             initializeConnectorTestFramework();
@@ -93,23 +98,23 @@ public class PlacementMoveIT extends AbstractSpannerConnectorIT {
             assertConnectorIsRunning();
 
             // Row starts in the "east" placement.
-            databaseConnection.executeUpdate(
-                    "INSERT INTO " + tableName + "(id, region, value) VALUES (1, '" + placementEast + "', 'v1')");
+            connection.executeUpdate(
+                    "INSERT INTO " + table + "(id, region, value) VALUES (1, '" + placementEast + "', 'v1')");
 
             // Changing the placement key physically moves the row's data to the other
             // instance partition. This is the operation that triggers PartitionEventRecord
             // move-out (on the source partition) and move-in (on the destination partition).
-            databaseConnection.executeUpdate(
-                    "UPDATE " + tableName + " SET region = '" + placementWest + "' WHERE id = 1");
+            connection.executeUpdate(
+                    "UPDATE " + table + " SET region = '" + placementWest + "' WHERE id = 1");
 
             // A follow-up write to the SAME row, issued immediately after the move, so we
             // can check it isn't processed out of order relative to the move itself.
-            databaseConnection.executeUpdate(
-                    "UPDATE " + tableName + " SET value = 'v2' WHERE id = 1");
+            connection.executeUpdate(
+                    "UPDATE " + table + " SET value = 'v2' WHERE id = 1");
 
             assertTrue(waitForAvailableRecords(waitTimeForRecords(), TimeUnit.SECONDS));
             SourceRecords sourceRecords = consumeRecordsByTopic(10, false);
-            List<SourceRecord> records = sourceRecords.recordsForTopic(getTopicName(config, tableName));
+            List<SourceRecord> records = sourceRecords.recordsForTopic(getTopicName(config, table));
             assertThat(records).hasSize(3); // insert + move + follow-up
 
             Struct moveRecord = (Struct) records.get(1).value();
@@ -134,14 +139,14 @@ public class PlacementMoveIT extends AbstractSpannerConnectorIT {
             assertConnectorNotRunning();
         }
         finally {
-            databaseConnection.dropChangeStream(changeStreamName);
-            databaseConnection.dropTable(tableName);
+            connection.dropChangeStream(stream);
+            connection.dropTable(table);
         }
     }
 
-    private static final String interleavedParentTableName = "placement_parent_move_table";
-    private static final String interleavedChildTableName = "placement_child_move_table";
-    private static final String interleavedChangeStreamName = "placementParentChildMoveStream";
+    private static final String interleavedParentTablePrefix = "placement_parent_move_table";
+    private static final String interleavedChildTablePrefix = "placement_child_move_table";
+    private static final String interleavedChangeStreamPrefix = "placementParentChildMoveStream";
 
     /**
      * Interleaved-in-placement scenario: a child table has no placement key of its own - it
@@ -154,49 +159,55 @@ public class PlacementMoveIT extends AbstractSpannerConnectorIT {
      * of a follow-up child write relative to the parent's move is the only observable signal that
      * the child moved with it.
      */
-    @Test
-    public void shouldMoveInterleavedChildRowsWithParentPlacementChange() throws Exception {
-        databaseConnection.createTable(interleavedParentTableName
-                + "(id INT64 NOT NULL, region STRING(MAX) NOT NULL PLACEMENT KEY, name STRING(MAX)) "
-                + "PRIMARY KEY (id)");
+    @ParameterizedTest
+    @EnumSource(Dialect.class)
+    public void shouldMoveInterleavedChildRowsWithParentPlacementChange(Dialect dialect) throws Exception {
+        Connection connection = connectionFor(dialect, LOGGER);
+        Configuration base = baseConfigFor(dialect);
+        String parentTable = tableFor(interleavedParentTablePrefix, null, dialect);
+        String childTable = tableFor(interleavedChildTablePrefix, null, dialect);
+        String stream = streamFor(interleavedChangeStreamPrefix, null, dialect);
+
+        String tableParams = "(id INT64 NOT NULL, region STRING(MAX) NOT NULL PLACEMENT KEY, name STRING(MAX)) PRIMARY KEY (id)";
+        connection.createTable(parentTable, tableParams);
+
         // Interleaved children of a placement table have no placement key of their own -
         // they are physically co-located with the parent row and move with it.
-        databaseConnection.createTable(interleavedChildTableName
-                + "(id INT64 NOT NULL, child_id INT64 NOT NULL, value STRING(MAX)) "
-                + "PRIMARY KEY (id, child_id), INTERLEAVE IN PARENT " + interleavedParentTableName + " ON DELETE CASCADE");
-        databaseConnection.createMutableKeyRangeChangeStream(interleavedChangeStreamName,
-                interleavedParentTableName, interleavedChildTableName);
+        tableParams = "(id INT64 NOT NULL, child_id INT64 NOT NULL, value STRING(MAX)) "
+                + "PRIMARY KEY (id, child_id), INTERLEAVE IN PARENT " + parentTable + " ON DELETE CASCADE";
+        connection.createTable(childTable, tableParams);
+        connection.createMutableKeyRangeChangeStream(stream, parentTable, childTable);
         try {
-            final Configuration config = buildTestConfig(baseConfig, interleavedChangeStreamName, interleavedParentTableName, PartitionMode.MUTABLE_KEY_RANGE);
+            final Configuration config = buildTestConfig(base, stream, parentTable, PartitionMode.MUTABLE_KEY_RANGE);
 
             clearKafkaTopics();
             initializeConnectorTestFramework();
             start(SpannerConnector.class, config);
             assertConnectorIsRunning();
 
-            databaseConnection.executeUpdate(
-                    "INSERT INTO " + interleavedParentTableName + "(id, region, name) VALUES (1, '" + placementEast + "', 'Alice')");
-            databaseConnection.executeUpdate(
-                    "INSERT INTO " + interleavedChildTableName + "(id, child_id, value) VALUES (1, 100, 'Item1')");
+            connection.executeUpdate(
+                    "INSERT INTO " + parentTable + "(id, region, name) VALUES (1, '" + placementEast + "', 'Alice')");
+            connection.executeUpdate(
+                    "INSERT INTO " + childTable + "(id, child_id, value) VALUES (1, 100, 'Item1')");
 
             // Moving the parent's placement must move the child's physical storage too,
             // since interleaved rows are always co-located with their parent.
-            databaseConnection.executeUpdate(
-                    "UPDATE " + interleavedParentTableName + " SET region = '" + placementWest + "' WHERE id = 1");
+            connection.executeUpdate(
+                    "UPDATE " + parentTable + " SET region = '" + placementWest + "' WHERE id = 1");
 
             assertTrue(waitForAvailableRecords(waitTimeForRecords(), TimeUnit.SECONDS));
             SourceRecords sourceRecords = consumeRecordsByTopic(20, false);
 
-            List<SourceRecord> parentRecords = sourceRecords.recordsForTopic(getTopicName(config, interleavedParentTableName));
+            List<SourceRecord> parentRecords = sourceRecords.recordsForTopic(getTopicName(config, parentTable));
             Struct parentMoveRecord = (Struct) parentRecords.get(1).value(); // after the insert
             assertThat(parentMoveRecord.getStruct("after").getString("region")).isEqualTo(placementWest);
 
-            databaseConnection.executeUpdate(
-                    "UPDATE " + interleavedChildTableName + " SET value = 'Item1-updated' WHERE id = 1 AND child_id = 100");
+            connection.executeUpdate(
+                    "UPDATE " + childTable + " SET value = 'Item1-updated' WHERE id = 1 AND child_id = 100");
 
             assertTrue(waitForAvailableRecords(waitTimeForRecords(), TimeUnit.SECONDS));
             SourceRecords childUpdateRecords = consumeRecordsByTopic(10, false);
-            List<SourceRecord> childRecords = childUpdateRecords.recordsForTopic(getTopicName(config, interleavedChildTableName));
+            List<SourceRecord> childRecords = childUpdateRecords.recordsForTopic(getTopicName(config, childTable));
             Struct childUpdateRecord = (Struct) childRecords.get(childRecords.size() - 1).value();
             long parentMoveTimestamp = parentMoveRecord.getStruct("source").getInt64("ts_ms");
             long childUpdateTimestamp = childUpdateRecord.getStruct("source").getInt64("ts_ms");
@@ -206,15 +217,15 @@ public class PlacementMoveIT extends AbstractSpannerConnectorIT {
             assertConnectorNotRunning();
         }
         finally {
-            databaseConnection.dropChangeStream(interleavedChangeStreamName);
-            databaseConnection.dropTable(interleavedChildTableName);
-            databaseConnection.dropTable(interleavedParentTableName);
+            connection.dropChangeStream(stream);
+            connection.dropTable(childTable);
+            connection.dropTable(parentTable);
         }
     }
 
-    private static final String cascadeParentTableName = "placement_parent_cascade_table";
-    private static final String cascadeChildTableName = "placement_child_cascade_table";
-    private static final String cascadeChangeStreamName = "placementCascadeDuringMoveStream";
+    private static final String cascadeParentTablePrefix = "placement_parent_cascade_table";
+    private static final String cascadeChildTablePrefix = "placement_child_cascade_table";
+    private static final String cascadeChangeStreamPrefix = "placementCascadeDuringMoveStream";
 
     /**
      * The most complex of the three placement scenarios: combines {@link InterleavedTableIT}'s
@@ -222,31 +233,38 @@ public class PlacementMoveIT extends AbstractSpannerConnectorIT {
      * connector's partition-move bookkeeping and its cascade-delete handling agree on which
      * partition owns the key at the moment of deletion.
      */
-    @Test
-    public void shouldOrderCascadingDeleteCorrectlyRelativeToInFlightPlacementMove() throws Exception {
-        databaseConnection.createTable(cascadeParentTableName
-                + "(id INT64 NOT NULL, region STRING(MAX) NOT NULL PLACEMENT KEY, name STRING(MAX)) "
-                + "PRIMARY KEY (id)");
-        databaseConnection.createTable(cascadeChildTableName
-                + "(id INT64 NOT NULL, child_id INT64 NOT NULL, value STRING(MAX)) "
-                + "PRIMARY KEY (id, child_id), INTERLEAVE IN PARENT " + cascadeParentTableName + " ON DELETE CASCADE");
-        databaseConnection.createMutableKeyRangeChangeStream(cascadeChangeStreamName,
-                cascadeParentTableName, cascadeChildTableName);
+    @ParameterizedTest
+    @EnumSource(Dialect.class)
+    public void shouldOrderCascadingDeleteCorrectlyRelativeToInFlightPlacementMove(Dialect dialect) throws Exception {
+        Connection connection = connectionFor(dialect, LOGGER);
+        Configuration base = baseConfigFor(dialect);
+        String parentTable = tableFor(cascadeParentTablePrefix, null, dialect);
+        String childTable = tableFor(cascadeChildTablePrefix, null, dialect);
+        String stream = streamFor(cascadeChangeStreamPrefix, null, dialect);
+
+        String tableParams = "(id INT64 NOT NULL, region STRING(MAX) NOT NULL PLACEMENT KEY, name STRING(MAX)) "
+                + "PRIMARY KEY (id)";
+        connection.createTable(parentTable, tableParams);
+
+        tableParams = "(id INT64 NOT NULL, child_id INT64 NOT NULL, value STRING(MAX)) "
+                + "PRIMARY KEY (id, child_id), INTERLEAVE IN PARENT " + parentTable + " ON DELETE CASCADE";
+        connection.createTable(childTable, tableParams);
+        connection.createMutableKeyRangeChangeStream(stream, parentTable, childTable);
         try {
-            final Configuration config = buildTestConfig(baseConfig, cascadeChangeStreamName, cascadeParentTableName, PartitionMode.MUTABLE_KEY_RANGE);
+            final Configuration config = buildTestConfig(base, stream, parentTable, PartitionMode.MUTABLE_KEY_RANGE);
 
             clearKafkaTopics();
             initializeConnectorTestFramework();
             start(SpannerConnector.class, config);
             assertConnectorIsRunning();
 
-            databaseConnection.executeUpdate(
-                    "INSERT INTO " + cascadeParentTableName + "(id, region, name) VALUES (1, '" + placementEast + "', 'Alice')");
-            databaseConnection.executeUpdate(
-                    "INSERT INTO " + cascadeChildTableName + "(id, child_id, value) VALUES (1, 100, 'Item1')");
+            connection.executeUpdate(
+                    "INSERT INTO " + parentTable + "(id, region, name) VALUES (1, '" + placementEast + "', 'Alice')");
+            connection.executeUpdate(
+                    "INSERT INTO " + childTable + "(id, child_id, value) VALUES (1, 100, 'Item1')");
 
-            databaseConnection.executeUpdate(
-                    "UPDATE " + cascadeParentTableName + " SET region = '" + placementWest + "' WHERE id = 1");
+            connection.executeUpdate(
+                    "UPDATE " + parentTable + " SET region = '" + placementWest + "' WHERE id = 1");
 
             // Deleting the parent immediately after the move cascades to the child, exactly
             // as InterleavedTableIT proved for a non-placement parent - but now the delete
@@ -254,14 +272,14 @@ public class PlacementMoveIT extends AbstractSpannerConnectorIT {
             // to. If the connector's partition-move bookkeeping and its cascade-delete
             // handling don't agree on which partition currently owns this key, this is
             // exactly the kind of place a duplicate or dropped delete could hide.
-            databaseConnection.executeUpdate(
-                    "DELETE FROM " + cascadeParentTableName + " WHERE id = 1");
+            connection.executeUpdate(
+                    "DELETE FROM " + parentTable + " WHERE id = 1");
 
             assertTrue(waitForAvailableRecords(waitTimeForRecords(), TimeUnit.SECONDS));
             SourceRecords sourceRecords = consumeRecordsByTopic(20, false);
 
-            List<SourceRecord> parentRecords = sourceRecords.recordsForTopic(getTopicName(config, cascadeParentTableName));
-            List<SourceRecord> childRecords = sourceRecords.recordsForTopic(getTopicName(config, cascadeChildTableName));
+            List<SourceRecord> parentRecords = sourceRecords.recordsForTopic(getTopicName(config, parentTable));
+            List<SourceRecord> childRecords = sourceRecords.recordsForTopic(getTopicName(config, childTable));
             // insert + move + delete + tombstone, for both parent and child.
             assertThat(parentRecords).hasSize(4);
             assertThat(childRecords).hasSize(3); // insert + cascaded delete + tombstone (no move-triggered record on the child)
@@ -285,9 +303,9 @@ public class PlacementMoveIT extends AbstractSpannerConnectorIT {
             assertConnectorNotRunning();
         }
         finally {
-            databaseConnection.dropChangeStream(cascadeChangeStreamName);
-            databaseConnection.dropTable(cascadeChildTableName);
-            databaseConnection.dropTable(cascadeParentTableName);
+            connection.dropChangeStream(stream);
+            connection.dropTable(childTable);
+            connection.dropTable(parentTable);
         }
     }
 }
