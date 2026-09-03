@@ -22,13 +22,21 @@ public class Partition {
 
     private final String originPartitionToken;
 
+    private final String lastBoundaryRecordSequence;
+
     public Partition(String partitionToken, Set<String> parentTokens, Timestamp startTimestamp,
                      Timestamp endTimestamp, String originPartitionToken) {
+        this(partitionToken, parentTokens, startTimestamp, endTimestamp, originPartitionToken, null);
+    }
+
+    public Partition(String partitionToken, Set<String> parentTokens, Timestamp startTimestamp,
+                     Timestamp endTimestamp, String originPartitionToken, String lastBoundaryRecordSequence) {
         this.partitionToken = partitionToken;
         this.parentTokens = parentTokens;
         this.startTimestamp = startTimestamp;
         this.endTimestamp = endTimestamp;
         this.originPartitionToken = originPartitionToken;
+        this.lastBoundaryRecordSequence = lastBoundaryRecordSequence;
     }
 
     public static Builder builder() {
@@ -55,6 +63,10 @@ public class Partition {
         return originPartitionToken;
     }
 
+    public String getLastBoundaryRecordSequence() {
+        return lastBoundaryRecordSequence;
+    }
+
     public Builder toBuilder() {
         return new Builder(this);
     }
@@ -67,6 +79,7 @@ public class Partition {
                 ", startTimestamp=" + startTimestamp +
                 ", endTimestamp=" + endTimestamp +
                 ", originPartitionToken='" + originPartitionToken + '\'' +
+                ", lastBoundaryRecordSequence='" + lastBoundaryRecordSequence + '\'' +
                 '}';
     }
 
@@ -79,14 +92,18 @@ public class Partition {
 
         private String originPartitionToken;
 
+        private String lastBoundaryRecordSequence;
+
         public Builder() {
         }
 
         private Builder(Partition partition) {
             this.partitionToken = partition.partitionToken;
+            this.parentTokens = partition.parentTokens;
             this.startTimestamp = partition.startTimestamp;
             this.endTimestamp = partition.endTimestamp;
             this.originPartitionToken = partition.originPartitionToken;
+            this.lastBoundaryRecordSequence = partition.lastBoundaryRecordSequence;
         }
 
         public Builder token(String partitionToken) {
@@ -114,6 +131,11 @@ public class Partition {
             return this;
         }
 
+        public Builder lastBoundaryRecordSequence(String lastBoundaryRecordSequence) {
+            this.lastBoundaryRecordSequence = lastBoundaryRecordSequence;
+            return this;
+        }
+
         public Partition build() {
             Preconditions.checkState(partitionToken != null, "partitionToken");
             Preconditions.checkState(parentTokens != null, "parentTokens");
@@ -124,7 +146,8 @@ public class Partition {
                     parentTokens,
                     startTimestamp,
                     endTimestamp,
-                    originPartitionToken);
+                    originPartitionToken,
+                    lastBoundaryRecordSequence);
         }
     }
 }

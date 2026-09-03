@@ -80,6 +80,44 @@ class ChildPartitionOperationTest {
         Assertions.assertEquals(0, taskSyncContext.getCurrentTaskState().getSharedPartitions().size());
     }
 
+    @Test
+    void doOperationWithEmptyParentsSkipsConflictResolutionAndAddsPartition() {
+        TaskSyncContext taskSyncContext = new ChildPartitionOperation(
+                List.of(buildPartition("mutableChild", null, Set.of())))
+                .doOperation(buildTaskSyncContext());
+
+        long ownedCount = taskSyncContext.getCurrentTaskState().getPartitions().stream()
+                .filter(p -> "mutableChild".equals(p.getToken()))
+                .count();
+        long sharedCount = taskSyncContext.getCurrentTaskState().getSharedPartitions().stream()
+                .filter(p -> "mutableChild".equals(p.getToken()))
+                .count();
+
+        Assertions.assertEquals(1, ownedCount + sharedCount,
+                "Mutable child with empty parents must be registered (owned or shared) without conflict filtering");
+    }
+
+    @Test
+    void doOperationMultipleMutableChildrenWithEmptyParentsAllRegistered() {
+        List<io.debezium.connector.spanner.db.model.Partition> children = List.of(
+                buildPartition("mC1", null, Set.of()),
+                buildPartition("mC2", null, Set.of()),
+                buildPartition("mC3", null, Set.of()));
+
+        TaskSyncContext taskSyncContext = new ChildPartitionOperation(children)
+                .doOperation(buildTaskSyncContext());
+
+        long total = taskSyncContext.getCurrentTaskState().getPartitions().stream()
+                .filter(p -> p.getToken().startsWith("mC"))
+                .count()
+                + taskSyncContext.getCurrentTaskState().getSharedPartitions().stream()
+                        .filter(p -> p.getToken().startsWith("mC"))
+                        .count();
+
+        Assertions.assertEquals(3, total,
+                "All mutable children with empty parents should be registered");
+    }
+
     private TaskSyncContext buildTaskSyncContext() {
         return TaskSyncContext.builder()
                 .taskUid("taskO")

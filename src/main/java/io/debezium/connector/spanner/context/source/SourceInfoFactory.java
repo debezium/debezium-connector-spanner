@@ -11,6 +11,7 @@ import io.debezium.connector.spanner.SpannerConnectorConfig;
 import io.debezium.connector.spanner.context.offset.LowWatermarkProvider;
 import io.debezium.connector.spanner.db.metadata.TableId;
 import io.debezium.connector.spanner.db.model.event.DataChangeEvent;
+import io.debezium.connector.spanner.db.model.event.RecordSequenceUtils;
 
 /**
  * Creates {@link SourceInfo} from the input {@link DataChangeEvent}
@@ -29,7 +30,8 @@ public class SourceInfoFactory {
         Instant recordTimestamp = dataChangeEvent.getRecordTimestamp().toSqlTimestamp().toInstant();
         Instant readAtTimestamp = dataChangeEvent.getMetadata().getRecordReadAt().toSqlTimestamp().toInstant();
         String serverTransactionId = dataChangeEvent.getServerTransactionId();
-        Long recordSequence = Long.parseLong(dataChangeEvent.getRecordSequence());
+        Long recordSequence = RecordSequenceUtils.parseSequenceNumber(dataChangeEvent.getRecordSequence());
+        String recordSequencePrefix = RecordSequenceUtils.parseSequencePrefix(dataChangeEvent.getRecordSequence());
         Long numberRecordInTransaction = dataChangeEvent.getNumberOfRecordsInTransaction();
         String transactionTag = dataChangeEvent.getTransactionTag();
         boolean systemTransaction = dataChangeEvent.isSystemTransaction();
@@ -45,7 +47,7 @@ public class SourceInfoFactory {
         }
 
         return new SourceInfo(connectorConfig, dataChangeEvent.getTableName(), recordTimestamp, commitTimestamp,
-                readAtTimestamp, serverTransactionId, recordSequence, lowWatermark, numberRecordInTransaction,
+                readAtTimestamp, serverTransactionId, recordSequence, recordSequencePrefix, lowWatermark, numberRecordInTransaction,
                 transactionTag, systemTransaction, valueCaptureType, partitionToken, modNumber,
                 isLastRecordInTransactionInPartition, numberOfPartitionsInTransaction);
     }
@@ -59,7 +61,7 @@ public class SourceInfoFactory {
         }
 
         return new SourceInfo(connectorConfig, tableId.getTableName(), null, null,
-                null, null, null, lowWatermark, null,
+                null, null, null, null, lowWatermark, null,
                 null, null, null, null, null,
                 null, null);
     }

@@ -40,6 +40,7 @@
         <docker.db>gcr.io/cloud-spanner-emulator/emulator</docker.db>
         <docker.filter>${docker.db},${docker.repository.name}:${docker.tag.name}</docker.filter>
         <docker.skip>false</docker.skip>
+        <docker.skip.emulator>${docker.skip}</docker.skip.emulator>
         <docker.showLogs>true</docker.showLogs>
 
         <publish.descriptorset>false</publish.descriptorset>
@@ -557,6 +558,9 @@
                         <goals>
                             <goal>start</goal>
                         </goals>
+                        <configuration>
+                            <skip>${docker.skip.emulator}</skip>
+                        </configuration>
                     </execution>
                     <execution>
                         <id>stop</id>
@@ -564,6 +568,9 @@
                         <goals>
                             <goal>stop</goal>
                         </goals>
+                        <configuration>
+                            <skip>${docker.skip.emulator}</skip>
+                        </configuration>
                     </execution>
                 </executions>
             </plugin>

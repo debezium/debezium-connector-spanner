@@ -107,6 +107,10 @@ public class SpannerConnectorConfig extends BaseSpannerConnectorConfig {
         return getConfig().getInteger(MAX_MISSED_HEARTBEATS);
     }
 
+    public Duration getHeartbeatLagWarnThreshold() {
+        return Duration.ofMillis(getConfig().getLong(HEARTBEAT_LAG_WARN_THRESHOLD_MS));
+    }
+
     public Duration getLowWatermarkStampInterval() {
         return getConfig().getDuration(LOW_WATERMARK_STAMP_INTERVAL, ChronoUnit.MILLIS);
     }
@@ -297,6 +301,26 @@ public class SpannerConnectorConfig extends BaseSpannerConnectorConfig {
 
     public boolean isFinishingPartitionAfterCommit() {
         return getConfig().getBoolean(CONNECTOR_SPANNER_PARTITION_FINISHING_AFTER_COMMIT_FIELD);
+    }
+
+    public boolean isMutablePartitionOrderingEnabled() {
+        return getConfig().getBoolean(MUTABLE_PARTITION_ORDERING_ENABLED);
+    }
+
+    public int getMutableWindowMinutes() {
+        return getConfig().getInteger(MUTABLE_WINDOW_MINUTES, (int) MUTABLE_WINDOW_MINUTES.defaultValue());
+    }
+
+    public int getMutableMoveInBufferMaxEvents() {
+        return getConfig().getInteger(MUTABLE_MOVE_IN_BUFFER_MAX_EVENTS, (int) MUTABLE_MOVE_IN_BUFFER_MAX_EVENTS.defaultValue());
+    }
+
+    public int getMutableMoveInGateCheckIntervalMs() {
+        return getConfig().getInteger(MUTABLE_MOVE_IN_GATE_CHECK_INTERVAL_MS, (int) MUTABLE_MOVE_IN_GATE_CHECK_INTERVAL_MS.defaultValue());
+    }
+
+    public int getMutableMoveInGateTimeoutMs() {
+        return getConfig().getInteger(MUTABLE_MOVE_IN_GATE_TIMEOUT_MS, (int) MUTABLE_MOVE_IN_GATE_TIMEOUT_MS.defaultValue());
     }
 
     public int taskStateChangeEventQueueCapacity() {

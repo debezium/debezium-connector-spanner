@@ -117,6 +117,52 @@ public class SpannerStreamingChangeEventSourceMetrics
         return spannerMeter.getDelayChangeStreamEvents().getValueAtP99();
     }
 
+    // MoveIn latency breakdown
+    @Override
+    public Double getMoveInCommitToQueryLatencyP50MilliSeconds() {
+        return spannerMeter.getMoveInCommitToQueryLatency().getValueAtP50();
+    }
+
+    @Override
+    public Double getMoveInCommitToQueryLatencyP95MilliSeconds() {
+        return spannerMeter.getMoveInCommitToQueryLatency().getValueAtP95();
+    }
+
+    @Override
+    public Double getMoveInCommitToQueryLatencyP99MilliSeconds() {
+        return spannerMeter.getMoveInCommitToQueryLatency().getValueAtP99();
+    }
+
+    @Override
+    public Double getMoveInStreamLatencyP50MilliSeconds() {
+        return spannerMeter.getMoveInStreamLatency().getValueAtP50();
+    }
+
+    @Override
+    public Double getMoveInStreamLatencyP95MilliSeconds() {
+        return spannerMeter.getMoveInStreamLatency().getValueAtP95();
+    }
+
+    @Override
+    public Double getMoveInStreamLatencyP99MilliSeconds() {
+        return spannerMeter.getMoveInStreamLatency().getValueAtP99();
+    }
+
+    @Override
+    public Double getMoveInTotalLatencyP50MilliSeconds() {
+        return spannerMeter.getMoveInTotalLatency().getValueAtP50();
+    }
+
+    @Override
+    public Double getMoveInTotalLatencyP95MilliSeconds() {
+        return spannerMeter.getMoveInTotalLatency().getValueAtP95();
+    }
+
+    @Override
+    public Double getMoveInTotalLatencyP99MilliSeconds() {
+        return spannerMeter.getMoveInTotalLatency().getValueAtP99();
+    }
+
     @Override
     public int getErrorCount() {
         return spannerMeter.getErrorCount();

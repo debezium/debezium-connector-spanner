@@ -7,6 +7,8 @@ package io.debezium.connector.spanner;
 
 import java.util.List;
 
+import com.google.cloud.Timestamp;
+
 import io.debezium.connector.spanner.db.model.Partition;
 
 /**
@@ -21,5 +23,22 @@ public interface PartitionManager {
     void updateToRunning(String token) throws InterruptedException;
 
     void updateToReadyForStreaming(String token) throws InterruptedException;
+
+    void notifyMoveOut(String token, Timestamp commitTimestamp, List<String> destinationTokens) throws InterruptedException;
+
+    void notifyMoveIn(String token, Timestamp commitTimestamp, String recordSequence, List<String> sourcePartitionTokens) throws InterruptedException;
+
+    /**
+     * Buffer-gate path: publishes the MoveIn state to the sync topic without transitioning
+     * the partition to {@code CREATED}.  The streaming thread remains alive and handles its
+     * own gate.
+     *
+     * @param isFirstMoveIn {@code true} for the first MoveIn in a buffer sequence
+     */
+    void publishMoveInStateOnly(String token, Timestamp commitTimestamp, String recordSequence,
+                                List<String> sourcePartitionTokens, boolean isFirstMoveIn)
+            throws InterruptedException;
+
+    void updateProcessedTimestamp(String token, Timestamp processedTimestamp, String lastBoundaryRecordSequence) throws InterruptedException;
 
 }

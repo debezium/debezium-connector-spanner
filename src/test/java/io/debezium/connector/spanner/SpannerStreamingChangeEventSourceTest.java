@@ -6,17 +6,24 @@
 package io.debezium.connector.spanner;
 
 import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.argThat;
 import static org.mockito.Mockito.atLeast;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.kafka.connect.data.ConnectSchema;
 import org.apache.kafka.connect.data.Schema;
@@ -40,7 +47,10 @@ import io.debezium.connector.spanner.db.metadata.TableId;
 import io.debezium.connector.spanner.db.model.ModType;
 import io.debezium.connector.spanner.db.model.StreamEventMetadata;
 import io.debezium.connector.spanner.db.model.ValueCaptureType;
+import io.debezium.connector.spanner.db.model.event.PartitionEventEvent;
+import io.debezium.connector.spanner.db.model.event.PartitionStartEvent;
 import io.debezium.connector.spanner.db.model.schema.Column;
+import io.debezium.connector.spanner.db.stream.ChangeStream;
 import io.debezium.connector.spanner.kafka.KafkaPartitionInfoProvider;
 import io.debezium.connector.spanner.metrics.MetricsEventPublisher;
 import io.debezium.connector.spanner.processor.SpannerEventDispatcher;
@@ -57,12 +67,14 @@ import io.debezium.pipeline.ErrorHandler;
 import io.debezium.pipeline.EventDispatcher;
 import io.debezium.pipeline.metrics.DefaultChangeEventSourceMetricsFactory;
 import io.debezium.pipeline.notification.NotificationService;
+import io.debezium.pipeline.source.spi.ChangeEventSource;
 import io.debezium.pipeline.source.spi.ChangeEventSourceFactory;
 import io.debezium.pipeline.spi.ChangeEventCreator;
 import io.debezium.pipeline.spi.OffsetContext;
 import io.debezium.pipeline.spi.Partition;
 import io.debezium.schema.DatabaseSchema;
 import io.debezium.schema.SchemaNameAdjuster;
+import io.debezium.service.spi.ServiceRegistry;
 import io.debezium.snapshot.SnapshotterService;
 import io.debezium.spi.topic.TopicNamingStrategy;
 
@@ -300,5 +312,216 @@ class SpannerStreamingChangeEventSourceTest {
         CommittedRecord record1 = new CommittedRecord("t1", "uid1");
         CommittedRecord record2 = new CommittedRecord("t2", "uid2");
         spannerStreamingChangeEventSource.commitRecords(List.of(record1, record2));
+    }
+
+    private SpannerStreamingChangeEventSource buildSourceWithMockedStream(
+                                                                          PartitionManager partitionManager,
+                                                                          SpannerConnectorConfig connectorConfig,
+                                                                          ChangeStream stream,
+                                                                          StreamEventQueue eventQueue,
+                                                                          CountDownLatch streamRunningLatch)
+            throws Exception {
+
+        when(connectorConfig.getServiceRegistry()).thenReturn(mock(ServiceRegistry.class));
+
+        doAnswer(inv -> {
+            streamRunningLatch.countDown();
+            try {
+                Thread.sleep(Long.MAX_VALUE);
+            }
+            catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            return null;
+        }).when(stream).run(any(), any(), any());
+
+        return new SpannerStreamingChangeEventSource(
+                connectorConfig, null, stream, eventQueue, new MetricsEventPublisher(),
+                partitionManager,
+                new SchemaRegistry("stream",
+                        mock(io.debezium.connector.spanner.db.dao.SchemaDao.class), mock(Runnable.class)),
+                null, true, mock(SpannerOffsetContextFactory.class));
+    }
+
+    @Test
+    void testProcessPartitionStartEventCreatesChildrenWithEmptyParents() throws Exception {
+        PartitionManager partitionManager = mock(PartitionManager.class);
+        SpannerConnectorConfig connectorConfig = mock(SpannerConnectorConfig.class);
+        ChangeStream stream = mock(ChangeStream.class);
+        StreamEventQueue eventQueue = new StreamEventQueue(10, new MetricsEventPublisher());
+        CountDownLatch streamStarted = new CountDownLatch(1);
+
+        SpannerStreamingChangeEventSource source = buildSourceWithMockedStream(
+                partitionManager, connectorConfig, stream, eventQueue, streamStarted);
+
+        ChangeEventSource.ChangeEventSourceContext context = mock(ChangeEventSource.ChangeEventSourceContext.class);
+        when(context.isRunning()).thenReturn(true);
+
+        Thread execThread = new Thread(() -> {
+            try {
+                source.execute(context, SpannerPartition.getInitialSpannerPartition(), null);
+            }
+            catch (Exception e) {
+            }
+        });
+        execThread.start();
+
+        org.junit.jupiter.api.Assertions.assertTrue(
+                streamStarted.await(3, TimeUnit.SECONDS), "stream.run() not called in time");
+
+        StreamEventMetadata metadata = StreamEventMetadata.newBuilder()
+                .withPartitionToken("sourceToken")
+                .build();
+        PartitionStartEvent event = new PartitionStartEvent(
+                Timestamp.ofTimeMicroseconds(100L),
+                "seq-1",
+                List.of("destToken1", "destToken2"),
+                false,
+                metadata);
+        eventQueue.put(event);
+
+        verify(partitionManager, timeout(3000)).newChildPartitions(argThat(partitions -> partitions.size() == 2
+                && partitions.stream().allMatch(p -> p.getParentTokens().isEmpty())));
+
+        execThread.interrupt();
+        execThread.join(3000);
+    }
+
+    @Test
+    void testProcessPartitionEventEventWithDestinationsOrderingEnabledCallsNotifyMoveOut() throws Exception {
+        PartitionManager partitionManager = mock(PartitionManager.class);
+        SpannerConnectorConfig connectorConfig = mock(SpannerConnectorConfig.class);
+        when(connectorConfig.isMutablePartitionOrderingEnabled()).thenReturn(true);
+
+        ChangeStream stream = mock(ChangeStream.class);
+        StreamEventQueue eventQueue = new StreamEventQueue(10, new MetricsEventPublisher());
+        CountDownLatch streamStarted = new CountDownLatch(1);
+
+        SpannerStreamingChangeEventSource source = buildSourceWithMockedStream(
+                partitionManager, connectorConfig, stream, eventQueue, streamStarted);
+
+        ChangeEventSource.ChangeEventSourceContext context = mock(ChangeEventSource.ChangeEventSourceContext.class);
+        when(context.isRunning()).thenReturn(true);
+
+        Thread execThread = new Thread(() -> {
+            try {
+                source.execute(context, SpannerPartition.getInitialSpannerPartition(), null);
+            }
+            catch (Exception e) {
+            }
+        });
+        execThread.start();
+
+        org.junit.jupiter.api.Assertions.assertTrue(
+                streamStarted.await(3, TimeUnit.SECONDS), "stream.run() not called in time");
+
+        Timestamp commitTs = Timestamp.ofTimeMicroseconds(999L);
+        StreamEventMetadata metadata = StreamEventMetadata.newBuilder()
+                .withPartitionToken("srcPartition")
+                .build();
+        PartitionEventEvent event = new PartitionEventEvent(
+                commitTs, "seq-1", "srcPartition",
+                Collections.emptyList(),
+                List.of("destPartition1"),
+                metadata);
+        eventQueue.put(event);
+
+        verify(partitionManager, timeout(3000)).notifyMoveOut(
+                org.mockito.ArgumentMatchers.eq("srcPartition"),
+                org.mockito.ArgumentMatchers.eq(commitTs),
+                argThat(dests -> dests.size() == 1 && "destPartition1".equals(dests.get(0))));
+
+        execThread.interrupt();
+        execThread.join(3000);
+    }
+
+    @Test
+    void testProcessPartitionEventEventOrderingDisabledSkipsNotifyMoveOut() throws Exception {
+        PartitionManager partitionManager = mock(PartitionManager.class);
+        SpannerConnectorConfig connectorConfig = mock(SpannerConnectorConfig.class);
+        when(connectorConfig.isMutablePartitionOrderingEnabled()).thenReturn(false);
+
+        ChangeStream stream = mock(ChangeStream.class);
+        StreamEventQueue eventQueue = new StreamEventQueue(10, new MetricsEventPublisher());
+        CountDownLatch streamStarted = new CountDownLatch(1);
+
+        SpannerStreamingChangeEventSource source = buildSourceWithMockedStream(
+                partitionManager, connectorConfig, stream, eventQueue, streamStarted);
+
+        ChangeEventSource.ChangeEventSourceContext context = mock(ChangeEventSource.ChangeEventSourceContext.class);
+        when(context.isRunning()).thenReturn(true);
+
+        Thread execThread = new Thread(() -> {
+            try {
+                source.execute(context, SpannerPartition.getInitialSpannerPartition(), null);
+            }
+            catch (Exception e) {
+            }
+        });
+        execThread.start();
+
+        org.junit.jupiter.api.Assertions.assertTrue(
+                streamStarted.await(3, TimeUnit.SECONDS), "stream.run() not called in time");
+
+        StreamEventMetadata metadata = StreamEventMetadata.newBuilder()
+                .withPartitionToken("srcPartition")
+                .build();
+        PartitionEventEvent event = new PartitionEventEvent(
+                Timestamp.ofTimeMicroseconds(999L), "seq-1", "srcPartition",
+                Collections.emptyList(),
+                List.of("destPartition1"),
+                metadata);
+        eventQueue.put(event);
+
+        Thread.sleep(300);
+        verify(partitionManager, never()).notifyMoveOut(any(), any(), any());
+
+        execThread.interrupt();
+        execThread.join(3000);
+    }
+
+    @Test
+    void testProcessPartitionEventEventWithOnlySourcesDoesNotCallNotifyMoveOut() throws Exception {
+        PartitionManager partitionManager = mock(PartitionManager.class);
+        SpannerConnectorConfig connectorConfig = mock(SpannerConnectorConfig.class);
+        when(connectorConfig.isMutablePartitionOrderingEnabled()).thenReturn(true);
+
+        ChangeStream stream = mock(ChangeStream.class);
+        StreamEventQueue eventQueue = new StreamEventQueue(10, new MetricsEventPublisher());
+        CountDownLatch streamStarted = new CountDownLatch(1);
+
+        SpannerStreamingChangeEventSource source = buildSourceWithMockedStream(
+                partitionManager, connectorConfig, stream, eventQueue, streamStarted);
+
+        ChangeEventSource.ChangeEventSourceContext context = mock(ChangeEventSource.ChangeEventSourceContext.class);
+        when(context.isRunning()).thenReturn(true);
+
+        Thread execThread = new Thread(() -> {
+            try {
+                source.execute(context, SpannerPartition.getInitialSpannerPartition(), null);
+            }
+            catch (Exception e) {
+            }
+        });
+        execThread.start();
+
+        org.junit.jupiter.api.Assertions.assertTrue(
+                streamStarted.await(3, TimeUnit.SECONDS), "stream.run() not called in time");
+
+        StreamEventMetadata metadata = StreamEventMetadata.newBuilder()
+                .withPartitionToken("dstPartition")
+                .build();
+        PartitionEventEvent moveInOnly = new PartitionEventEvent(
+                Timestamp.ofTimeMicroseconds(1L), "seq-1", "dstPartition",
+                List.of("srcPartition"),
+                Collections.emptyList(),
+                metadata);
+        eventQueue.put(moveInOnly);
+
+        Thread.sleep(300);
+        verify(partitionManager, never()).notifyMoveOut(any(), any(), any());
+
+        execThread.interrupt();
+        execThread.join(3000);
     }
 }

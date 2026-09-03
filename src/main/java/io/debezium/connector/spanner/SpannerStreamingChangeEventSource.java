@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
@@ -22,6 +23,7 @@ import io.debezium.connector.spanner.context.offset.SpannerOffsetContext;
 import io.debezium.connector.spanner.context.offset.SpannerOffsetContextFactory;
 import io.debezium.connector.spanner.db.metadata.SchemaRegistry;
 import io.debezium.connector.spanner.db.metadata.TableId;
+import io.debezium.connector.spanner.db.model.ChildPartition;
 import io.debezium.connector.spanner.db.model.InitialPartition;
 import io.debezium.connector.spanner.db.model.Mod;
 import io.debezium.connector.spanner.db.model.Partition;
@@ -30,6 +32,8 @@ import io.debezium.connector.spanner.db.model.event.ChildPartitionsEvent;
 import io.debezium.connector.spanner.db.model.event.DataChangeEvent;
 import io.debezium.connector.spanner.db.model.event.FinishPartitionEvent;
 import io.debezium.connector.spanner.db.model.event.HeartbeatEvent;
+import io.debezium.connector.spanner.db.model.event.PartitionEventEvent;
+import io.debezium.connector.spanner.db.model.event.PartitionStartEvent;
 import io.debezium.connector.spanner.db.stream.ChangeStream;
 import io.debezium.connector.spanner.db.stream.PartitionEventListener;
 import io.debezium.connector.spanner.exception.FinishingPartitionTimeout;
@@ -157,6 +161,36 @@ public class SpannerStreamingChangeEventSource implements CommittingRecordsStrea
                     }
                     return false;
                 }
+
+                @Override
+                public void onWindowAdvanced(Partition partition, Timestamp windowEnd, String lastBoundaryRecordSequence) throws InterruptedException {
+                    partitionManager.updateProcessedTimestamp(partition.getToken(), windowEnd, lastBoundaryRecordSequence);
+                }
+
+                @Override
+                public void onMoveIn(Partition partition, Timestamp commitTimestamp, String recordSequence, List<String> sourcePartitionTokens)
+                        throws InterruptedException {
+                    if (!connectorConfig.isMutablePartitionOrderingEnabled()) {
+                        LOGGER.debug("Mutable ordering disabled; ignoring MoveIn pause for partition {}", partition.getToken());
+                        return;
+                    }
+                    LOGGER.info("Partition onMoveIn: {}, commitTimestamp={}, recordSequence={}, sources={}",
+                            partition.getToken(), commitTimestamp, recordSequence, sourcePartitionTokens);
+                    partitionManager.notifyMoveIn(partition.getToken(), commitTimestamp, recordSequence, sourcePartitionTokens);
+                }
+
+                @Override
+                public void onMoveInPublishOnly(Partition partition, Timestamp commitTimestamp, String recordSequence,
+                                                List<String> sourcePartitionTokens, boolean isFirstMoveIn)
+                        throws InterruptedException {
+                    if (!connectorConfig.isMutablePartitionOrderingEnabled()) {
+                        return;
+                    }
+                    LOGGER.info("Partition onMoveInPublishOnly (buffer-gate): {}, commitTimestamp={}, recordSequence={}, sources={}, isFirst={}",
+                            partition.getToken(), commitTimestamp, recordSequence, sourcePartitionTokens, isFirstMoveIn);
+                    partitionManager.publishMoveInStateOnly(
+                            partition.getToken(), commitTimestamp, recordSequence, sourcePartitionTokens, isFirstMoveIn);
+                }
             });
 
         }
@@ -244,6 +278,20 @@ public class SpannerStreamingChangeEventSource implements CommittingRecordsStrea
                         else if (finishPartitionStrategy.equals(FinishPartitionStrategy.AFTER_STREAMING_FINISH)) {
                             finishingPartitionManager.forceFinish(event.getMetadata().getPartitionToken());
                         }
+                    }
+                    else if (event instanceof PartitionStartEvent) {
+
+                        PartitionStartEvent partitionStartEvent = (PartitionStartEvent) event;
+
+                        processPartitionStartEvent(partitionStartEvent);
+
+                    }
+                    else if (event instanceof PartitionEventEvent) {
+
+                        PartitionEventEvent partitionEventEvent = (PartitionEventEvent) event;
+
+                        processPartitionEventEvent(partitionEventEvent);
+
                     }
                     else {
                         // ignore event
@@ -340,6 +388,56 @@ public class SpannerStreamingChangeEventSource implements CommittingRecordsStrea
      */
     private void pulseOffsetActivityMonitor(SpannerPartition partition, SpannerOffsetContext offsetContext) {
         offsetActivityMonitorService.pulse(partition, offsetContext);
+    }
+
+    private void processPartitionStartEvent(PartitionStartEvent event) throws InterruptedException {
+        LOGGER.info("Received PartitionStartEvent: schedulingPartitions={} from sourceToken={}",
+                event.getPartitionTokens(), event.getMetadata().getPartitionToken());
+        // Mutable key range: destination partitions are scheduled with EMPTY parents.
+        // PartitionStartRecord has no parent_partition_tokens field (unlike immutable child_partitions_record).
+        // Source partition A continues streaming after a partial move-out — it never emits PartitionEndRecord —
+        // so gating D on A.state == FINISHED would deadlock permanently.
+        // The A→D dependency is established later when D's own stream hits PartitionEventRecord::MoveInEvent.
+        List<ChildPartition> children = event.getPartitionTokens().stream()
+                .map(t -> new ChildPartition(t, Set.of()))
+                .collect(Collectors.toList());
+        ChildPartitionsEvent synthetic = new ChildPartitionsEvent(
+                event.getStartTimestamp(), event.getRecordSequence(), children, event.getMetadata());
+        processChildPartitionsEvent(Collections.singletonList(synthetic));
+    }
+
+    private void processPartitionEventEvent(PartitionEventEvent event) throws InterruptedException {
+        LOGGER.info("Received PartitionEventEvent: token={}, sources={}, destinations={}",
+                event.getPartitionToken(), event.getSourcePartitions(), event.getDestinationPartitions());
+        if (!event.getDestinationPartitions().isEmpty()) {
+            processMoveOutEvent(event); // MoveOut side — gated
+        }
+        // MoveIn (sourcePartitions non-empty): handled by PartitionEventListener#onMoveIn,
+        // triggered directly from the partition streaming loop when the query is paused.
+    }
+
+    private void processMoveOutEvent(PartitionEventEvent event) throws InterruptedException {
+        if (!connectorConfig.isMutablePartitionOrderingEnabled()) {
+            LOGGER.debug("Mutable ordering disabled; skipping MoveOut notification for partition {}",
+                    event.getPartitionToken());
+            return;
+        }
+        partitionManager.notifyMoveOut(
+                event.getPartitionToken(),
+                event.getCommitTimestamp(),
+                event.getDestinationPartitions());
+
+        // A partition under heavy MoveOut churn can emit thousands of these events per window with
+        // no DataChangeEvent/HeartbeatEvent in between (see SpannerChangeStreamService's per-window
+        // dataEvents/heartbeatEvents counters). Only those two event types previously advanced the
+        // Kafka Connect-committed offset, so this partition's offset — and the low watermark, which
+        // falls back to it when no fresher offset exists — stayed frozen at the window start despite
+        // real, continuous progress, only catching up once the outer window boundary closed (up to
+        // mutable.window.minutes late). Dispatch the MoveOut event's own commit timestamp the same
+        // way a heartbeat is dispatched so this progress is reflected immediately.
+        SpannerOffsetContext offsetContext = offsetContextFactory.getOffsetContextFromPartitionEventEvent(event);
+        SpannerPartition partition = new SpannerPartition(event.getPartitionToken());
+        spannerEventDispatcher.alwaysDispatchHeartbeatEvent(partition, offsetContext);
     }
 
     private void processFailure(Exception ex) {

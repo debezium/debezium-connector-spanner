@@ -5,6 +5,7 @@
  */
 package io.debezium.connector.spanner.db.stream;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -19,6 +20,9 @@ import static org.mockito.Mockito.when;
 import java.time.Duration;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.junit.jupiter.api.Test;
 
@@ -27,13 +31,18 @@ import com.google.cloud.Timestamp;
 import io.debezium.connector.spanner.db.dao.ChangeStreamDao;
 import io.debezium.connector.spanner.db.dao.ChangeStreamResultSet;
 import io.debezium.connector.spanner.db.mapper.ChangeStreamRecordMapper;
+import io.debezium.connector.spanner.db.model.InitialPartition;
 import io.debezium.connector.spanner.db.model.Partition;
 import io.debezium.connector.spanner.db.model.StreamEventMetadata;
 import io.debezium.connector.spanner.db.model.event.ChildPartitionsEvent;
 import io.debezium.connector.spanner.db.model.event.FinishPartitionEvent;
 import io.debezium.connector.spanner.db.model.event.HeartbeatEvent;
+import io.debezium.connector.spanner.db.model.event.PartitionEndEvent;
+import io.debezium.connector.spanner.db.model.event.PartitionEventEvent;
 import io.debezium.connector.spanner.db.stream.exception.ChangeStreamException;
+import io.debezium.connector.spanner.kafka.internal.model.TaskState;
 import io.debezium.connector.spanner.metrics.MetricsEventPublisher;
+import io.debezium.connector.spanner.task.TaskSyncContext;
 
 class SpannerChangeStreamServiceTest {
 
@@ -174,5 +183,519 @@ class SpannerChangeStreamServiceTest {
         verify(changeStreamEventConsumer).acceptChangeStreamEvent(childPartitionsEvent);
         verify(changeStreamEventConsumer).acceptChangeStreamEvent(any(FinishPartitionEvent.class));
         verify(partitionEventListener).onFinish(partition);
+    }
+
+    @Test
+    void testGetEventsMutableRoutesToMutablePath() throws Exception {
+        ChangeStreamDao changeStreamDao = mock(ChangeStreamDao.class);
+        ChangeStreamResultSet changeStreamResultSet = mock(ChangeStreamResultSet.class);
+        MetricsEventPublisher metricsEventPublisher = mock(MetricsEventPublisher.class);
+        ChangeStreamRecordMapper mapper = mock(ChangeStreamRecordMapper.class);
+
+        when(changeStreamDao.isMutableKeyRange()).thenReturn(true);
+        when(changeStreamResultSet.next()).thenReturn(false);
+        when(changeStreamDao.streamQuery(any(), any(), any(), anyLong())).thenReturn(changeStreamResultSet);
+        when(mapper.toChangeStreamEvents(any(), any(), any())).thenReturn(List.of());
+
+        SpannerChangeStreamService service = new SpannerChangeStreamService(
+                "TaskUid", changeStreamDao, mapper, Duration.ofMillis(1000), metricsEventPublisher);
+
+        Timestamp start = Timestamp.ofTimeSecondsAndNanos(0, 0);
+        Timestamp end = Timestamp.ofTimeSecondsAndNanos(0, 0);
+        Partition partition = new Partition("token", new HashSet<>(), start, end, "origin");
+
+        ChangeStreamEventConsumer consumer = mock(ChangeStreamEventConsumer.class);
+        PartitionEventListener listener = mock(PartitionEventListener.class);
+        doNothing().when(listener).onRun(any());
+
+        service.getEvents(partition, consumer, listener);
+
+        verify(listener).onRun(partition);
+        verify(listener).onFinish(partition);
+        verify(consumer).acceptChangeStreamEvent(any(FinishPartitionEvent.class));
+    }
+
+    @Test
+    void testGetEventsMutableWithNullEndTimestampStreamsUntilPartitionEnd() throws Exception {
+        ChangeStreamDao changeStreamDao = mock(ChangeStreamDao.class);
+        ChangeStreamResultSet resultSet = mock(ChangeStreamResultSet.class);
+        ChangeStreamRecordMapper mapper = mock(ChangeStreamRecordMapper.class);
+        MetricsEventPublisher metricsEventPublisher = mock(MetricsEventPublisher.class);
+
+        when(changeStreamDao.isMutableKeyRange()).thenReturn(true);
+        when(changeStreamDao.streamQuery(any(), any(), any(), anyLong())).thenReturn(resultSet);
+        when(resultSet.next()).thenReturn(true, false);
+
+        Timestamp start = Timestamp.ofTimeSecondsAndNanos(0, 0);
+        StreamEventMetadata meta = StreamEventMetadata.newBuilder()
+                .withPartitionToken("token")
+                .build();
+        PartitionEndEvent endEvent = new PartitionEndEvent(
+                start, "seq", "token", meta);
+        when(mapper.toChangeStreamEvents(any(), any(), any())).thenReturn(List.of(endEvent));
+
+        SpannerChangeStreamService service = new SpannerChangeStreamService(
+                "TaskUid", changeStreamDao, mapper, Duration.ofMillis(1000), metricsEventPublisher);
+
+        Partition partition = new Partition("token", new HashSet<>(), start, null, "origin");
+        ChangeStreamEventConsumer consumer = mock(ChangeStreamEventConsumer.class);
+        PartitionEventListener listener = mock(PartitionEventListener.class);
+        doNothing().when(listener).onRun(any());
+
+        service.getEvents(partition, consumer, listener);
+
+        org.mockito.ArgumentCaptor<Timestamp> endTsCaptor = org.mockito.ArgumentCaptor.forClass(Timestamp.class);
+        verify(changeStreamDao, times(1)).streamQuery(any(), any(), endTsCaptor.capture(), anyLong());
+        Timestamp expectedWindowEnd = Timestamp.ofTimeSecondsAndNanos(20 * 60, 0);
+        assertEquals(expectedWindowEnd, endTsCaptor.getValue());
+        verify(listener).onFinish(partition);
+        verify(consumer).acceptChangeStreamEvent(any(FinishPartitionEvent.class));
+    }
+
+    @Test
+    void testGetEventsMutableStopsOnPartitionEndEvent() throws Exception {
+        ChangeStreamDao changeStreamDao = mock(ChangeStreamDao.class);
+        ChangeStreamResultSet resultSet = mock(ChangeStreamResultSet.class);
+        ChangeStreamRecordMapper mapper = mock(ChangeStreamRecordMapper.class);
+        MetricsEventPublisher metricsEventPublisher = mock(MetricsEventPublisher.class);
+
+        when(changeStreamDao.isMutableKeyRange()).thenReturn(true);
+        when(changeStreamDao.streamQuery(any(), any(), any(), anyLong())).thenReturn(resultSet);
+        when(resultSet.next()).thenReturn(true, false);
+
+        StreamEventMetadata meta = StreamEventMetadata.newBuilder()
+                .withPartitionToken("token")
+                .build();
+        PartitionEndEvent endEvent = new PartitionEndEvent(
+                Timestamp.ofTimeSecondsAndNanos(0, 0), "seq", "token", meta);
+
+        Partition partition = new Partition("token", new HashSet<>(),
+                Timestamp.ofTimeSecondsAndNanos(0, 0),
+                Timestamp.ofTimeSecondsAndNanos(3600, 0),
+                "origin");
+
+        when(mapper.toChangeStreamEvents(any(), any(), any())).thenReturn(List.of(endEvent));
+
+        SpannerChangeStreamService service = new SpannerChangeStreamService(
+                "TaskUid", changeStreamDao, mapper, Duration.ofMillis(1000), metricsEventPublisher);
+
+        ChangeStreamEventConsumer consumer = mock(ChangeStreamEventConsumer.class);
+        PartitionEventListener listener = mock(PartitionEventListener.class);
+        doNothing().when(listener).onRun(any());
+
+        service.getEvents(partition, consumer, listener);
+
+        verify(changeStreamDao, times(1)).streamQuery(any(), any(), any(), anyLong());
+        verify(listener).onFinish(partition);
+    }
+
+    @Test
+    void testGetEventsMutableInitialPartitionExitsAfterFirstIteration() throws Exception {
+        ChangeStreamDao changeStreamDao = mock(ChangeStreamDao.class);
+        ChangeStreamResultSet resultSet = mock(ChangeStreamResultSet.class);
+        ChangeStreamRecordMapper mapper = mock(ChangeStreamRecordMapper.class);
+
+        when(changeStreamDao.isMutableKeyRange()).thenReturn(true);
+        when(changeStreamDao.streamQuery(any(), any(), any(), anyLong())).thenReturn(resultSet);
+        when(resultSet.next()).thenReturn(false);
+        when(mapper.toChangeStreamEvents(any(), any(), any())).thenReturn(List.of());
+
+        Timestamp start = Timestamp.ofTimeSecondsAndNanos(0, 0);
+        Timestamp end = Timestamp.ofTimeSecondsAndNanos(7200, 0);
+        Partition partition = new Partition(
+                InitialPartition.PARTITION_TOKEN, new HashSet<>(), start, end, "origin");
+
+        SpannerChangeStreamService service = new SpannerChangeStreamService(
+                "TaskUid", changeStreamDao, mapper, Duration.ofMillis(1000),
+                mock(MetricsEventPublisher.class));
+
+        ChangeStreamEventConsumer consumer = mock(ChangeStreamEventConsumer.class);
+        PartitionEventListener listener = mock(PartitionEventListener.class);
+        doNothing().when(listener).onRun(any());
+
+        service.getEvents(partition, consumer, listener);
+
+        verify(changeStreamDao, times(1)).streamQuery(any(), any(), any(), anyLong());
+    }
+
+    @Test
+    void testGetEventsMutableDeduplicatesBoundaryEventsAcrossWindows() throws Exception {
+        ChangeStreamDao changeStreamDao = mock(ChangeStreamDao.class);
+        ChangeStreamResultSet resultSet1 = mock(ChangeStreamResultSet.class);
+        ChangeStreamResultSet resultSet2 = mock(ChangeStreamResultSet.class);
+        ChangeStreamRecordMapper mapper = mock(ChangeStreamRecordMapper.class);
+
+        when(changeStreamDao.isMutableKeyRange()).thenReturn(true);
+
+        Timestamp start = Timestamp.ofTimeSecondsAndNanos(0, 0);
+        Timestamp end = Timestamp.ofTimeSecondsAndNanos(1200, 0);
+
+        when(changeStreamDao.streamQuery(any(), org.mockito.ArgumentMatchers.eq(start), any(Timestamp.class), anyLong()))
+                .thenReturn(resultSet1);
+        when(changeStreamDao.streamQuery(any(), org.mockito.ArgumentMatchers.eq(end), any(Timestamp.class), anyLong()))
+                .thenReturn(resultSet2);
+
+        when(resultSet1.next()).thenReturn(true, false);
+        when(resultSet2.next()).thenReturn(true, false);
+
+        StreamEventMetadata meta = StreamEventMetadata.newBuilder().withPartitionToken("token").build();
+
+        io.debezium.connector.spanner.db.model.event.DataChangeEvent eventAtBoundary = new io.debezium.connector.spanner.db.model.event.DataChangeEvent(
+                "token", end, "tx1", true, "0000000000000000-00000001", "MyTable",
+                List.of(), List.of(), io.debezium.connector.spanner.db.model.ModType.INSERT,
+                io.debezium.connector.spanner.db.model.ValueCaptureType.NEW_ROW,
+                1L, 1L, "", false, meta);
+
+        when(mapper.toChangeStreamEvents(any(), org.mockito.ArgumentMatchers.eq(resultSet1), any()))
+                .thenReturn(List.of(eventAtBoundary));
+        when(mapper.toChangeStreamEvents(any(), org.mockito.ArgumentMatchers.eq(resultSet2), any()))
+                .thenReturn(List.of(eventAtBoundary));
+
+        ChangeStreamEventConsumer consumer = mock(ChangeStreamEventConsumer.class);
+        PartitionEventListener listener = mock(PartitionEventListener.class);
+        doNothing().when(listener).onRun(any());
+
+        SpannerChangeStreamService service = new SpannerChangeStreamService(
+                "TaskUid", changeStreamDao, mapper, Duration.ofMillis(1000),
+                mock(MetricsEventPublisher.class));
+
+        Partition partition = new Partition("token", new HashSet<>(), start, end, "origin");
+        service.getEvents(partition, consumer, listener);
+
+        verify(consumer, org.mockito.Mockito.times(1)).acceptChangeStreamEvent(
+                org.mockito.ArgumentMatchers.eq(eventAtBoundary));
+    }
+
+    /**
+     * Boundary dedup uses {@code RecordSequenceUtils}, the same record_sequence interpretation
+     * {@code SourceInfoFactory} uses for the Kafka Connect offset. Exercises this with the actual
+     * hex {@code "<hi>-<lo>"} composite format observed from Spanner (e.g.
+     * {@code "963d1af435fb3e79-00000000"}), not a synthetic unpadded integer - real record_sequence
+     * values are always zero-padded or hex composites, so plain lexicographic comparison already
+     * behaves correctly for them; this is a realistic regression test, not a bug reproduction.
+     */
+    @Test
+    void testGetEventsMutableDeduplicatesRealSpannerFormatBoundarySequence() throws Exception {
+        ChangeStreamDao changeStreamDao = mock(ChangeStreamDao.class);
+        ChangeStreamResultSet resultSet1 = mock(ChangeStreamResultSet.class);
+        ChangeStreamResultSet resultSet2 = mock(ChangeStreamResultSet.class);
+        ChangeStreamRecordMapper mapper = mock(ChangeStreamRecordMapper.class);
+
+        when(changeStreamDao.isMutableKeyRange()).thenReturn(true);
+
+        Timestamp start = Timestamp.ofTimeSecondsAndNanos(0, 0);
+        Timestamp end = Timestamp.ofTimeSecondsAndNanos(1200, 0);
+
+        when(changeStreamDao.streamQuery(any(), org.mockito.ArgumentMatchers.eq(start), any(Timestamp.class), anyLong()))
+                .thenReturn(resultSet1);
+        when(changeStreamDao.streamQuery(any(), org.mockito.ArgumentMatchers.eq(end), any(Timestamp.class), anyLong()))
+                .thenReturn(resultSet2);
+
+        when(resultSet1.next()).thenReturn(true, false);
+        when(resultSet2.next()).thenReturn(true, true, false);
+
+        StreamEventMetadata meta = StreamEventMetadata.newBuilder().withPartitionToken("token").build();
+
+        io.debezium.connector.spanner.db.model.event.DataChangeEvent eventFirst = new io.debezium.connector.spanner.db.model.event.DataChangeEvent(
+                "token", end, "tx1", true, "963d1af435fb3e79-00000000", "MyTable",
+                List.of(), List.of(), io.debezium.connector.spanner.db.model.ModType.INSERT,
+                io.debezium.connector.spanner.db.model.ValueCaptureType.NEW_ROW,
+                1L, 1L, "", false, meta);
+        io.debezium.connector.spanner.db.model.event.DataChangeEvent eventSecond = new io.debezium.connector.spanner.db.model.event.DataChangeEvent(
+                "token", end, "tx2", true, "963d1af435fb3e79-00000001", "MyTable",
+                List.of(), List.of(), io.debezium.connector.spanner.db.model.ModType.INSERT,
+                io.debezium.connector.spanner.db.model.ValueCaptureType.NEW_ROW,
+                1L, 1L, "", false, meta);
+
+        when(mapper.toChangeStreamEvents(any(), org.mockito.ArgumentMatchers.eq(resultSet1), any()))
+                .thenReturn(List.of(eventFirst));
+        // Window 2 re-delivers the already-seen record (must be filtered) followed by a
+        // genuinely new record at the exact same boundary timestamp (must not be filtered).
+        when(mapper.toChangeStreamEvents(any(), org.mockito.ArgumentMatchers.eq(resultSet2), any()))
+                .thenReturn(List.of(eventFirst), List.of(eventSecond));
+
+        ChangeStreamEventConsumer consumer = mock(ChangeStreamEventConsumer.class);
+        PartitionEventListener listener = mock(PartitionEventListener.class);
+        doNothing().when(listener).onRun(any());
+
+        SpannerChangeStreamService service = new SpannerChangeStreamService(
+                "TaskUid", changeStreamDao, mapper, Duration.ofMillis(1000),
+                mock(MetricsEventPublisher.class));
+
+        Partition partition = new Partition("token", new HashSet<>(), start, end, "origin");
+        service.getEvents(partition, consumer, listener);
+
+        // eventFirst is delivered exactly once (from window 1); window 2's re-delivery of the
+        // same record at the boundary is correctly filtered as an already-seen duplicate.
+        verify(consumer, org.mockito.Mockito.times(1)).acceptChangeStreamEvent(
+                org.mockito.ArgumentMatchers.eq(eventFirst));
+        // eventSecond is a genuinely new record at the same boundary timestamp and must be kept.
+        verify(consumer, org.mockito.Mockito.times(1)).acceptChangeStreamEvent(
+                org.mockito.ArgumentMatchers.eq(eventSecond));
+    }
+
+    @Test
+    void testGetEventsMutablePausesOnMoveInEvent() throws Exception {
+        ChangeStreamDao changeStreamDao = mock(ChangeStreamDao.class);
+        ChangeStreamResultSet resultSet = mock(ChangeStreamResultSet.class);
+        ChangeStreamRecordMapper mapper = mock(ChangeStreamRecordMapper.class);
+        MetricsEventPublisher metricsEventPublisher = mock(MetricsEventPublisher.class);
+
+        when(changeStreamDao.isMutableKeyRange()).thenReturn(true);
+        when(changeStreamDao.streamQuery(any(), any(), any(), anyLong())).thenReturn(resultSet);
+        when(resultSet.next()).thenReturn(true, false);
+
+        Timestamp start = Timestamp.ofTimeSecondsAndNanos(0, 0);
+        Timestamp commitTimestamp = Timestamp.ofTimeSecondsAndNanos(600, 0);
+        StreamEventMetadata meta = StreamEventMetadata.newBuilder().withPartitionToken("dst").build();
+        PartitionEventEvent moveInEvent = new PartitionEventEvent(
+                commitTimestamp, "00001", "dst", List.of("src1"), List.of(), meta);
+        when(mapper.toChangeStreamEvents(any(), any(), any())).thenReturn(List.of(moveInEvent));
+
+        SpannerChangeStreamService service = new SpannerChangeStreamService(
+                "TaskUid", changeStreamDao, mapper, Duration.ofMillis(1000), metricsEventPublisher);
+
+        Partition partition = new Partition("dst", new HashSet<>(), start, null, "origin");
+
+        ChangeStreamEventConsumer consumer = mock(ChangeStreamEventConsumer.class);
+        PartitionEventListener listener = mock(PartitionEventListener.class);
+        doNothing().when(listener).onRun(any());
+
+        service.getEvents(partition, consumer, listener);
+
+        verify(listener).onMoveIn(partition, commitTimestamp, "00001", List.of("src1"));
+        verify(listener, org.mockito.Mockito.never()).onFinish(any());
+        verify(consumer, org.mockito.Mockito.never()).acceptChangeStreamEvent(any(FinishPartitionEvent.class));
+        verify(consumer).acceptChangeStreamEvent(moveInEvent);
+    }
+
+    @Test
+    void testGetEventsMutableIgnoresMoveInEventWhenOrderingDisabled() throws Exception {
+        ChangeStreamDao changeStreamDao = mock(ChangeStreamDao.class);
+        ChangeStreamResultSet resultSet = mock(ChangeStreamResultSet.class);
+        ChangeStreamRecordMapper mapper = mock(ChangeStreamRecordMapper.class);
+        MetricsEventPublisher metricsEventPublisher = mock(MetricsEventPublisher.class);
+
+        when(changeStreamDao.isMutableKeyRange()).thenReturn(true);
+        when(changeStreamDao.streamQuery(any(), any(), any(), anyLong())).thenReturn(resultSet);
+        when(resultSet.next()).thenReturn(true, false);
+
+        Timestamp start = Timestamp.ofTimeSecondsAndNanos(0, 0);
+        Timestamp commitTimestamp = Timestamp.ofTimeSecondsAndNanos(600, 0);
+        StreamEventMetadata meta = StreamEventMetadata.newBuilder().withPartitionToken("dst").build();
+        PartitionEventEvent moveInEvent = new PartitionEventEvent(
+                commitTimestamp, "00001", "dst", List.of("src1"), List.of(), meta);
+        when(mapper.toChangeStreamEvents(any(), any(), any())).thenReturn(List.of(moveInEvent));
+
+        SpannerChangeStreamService service = new SpannerChangeStreamService(
+                "TaskUid", changeStreamDao, mapper, Duration.ofMillis(1000), metricsEventPublisher,
+                20, MutableStreamOptions.orderingDisabled());
+
+        Partition partition = new Partition("dst", new HashSet<>(), start, start, "origin");
+
+        ChangeStreamEventConsumer consumer = mock(ChangeStreamEventConsumer.class);
+        PartitionEventListener listener = mock(PartitionEventListener.class);
+        doNothing().when(listener).onRun(any());
+
+        service.getEvents(partition, consumer, listener);
+
+        verify(listener, org.mockito.Mockito.never()).onMoveIn(any(), any(), any(), any());
+        verify(listener).onFinish(partition);
+        verify(consumer).acceptChangeStreamEvent(any(FinishPartitionEvent.class));
+        verify(consumer).acceptChangeStreamEvent(moveInEvent);
+    }
+
+    @Test
+    void testGetEventsImmutablePathUsedWhenNotMutable() throws Exception {
+        ChangeStreamDao changeStreamDao = mock(ChangeStreamDao.class);
+        ChangeStreamResultSet resultSet = mock(ChangeStreamResultSet.class);
+        ChangeStreamRecordMapper mapper = mock(ChangeStreamRecordMapper.class);
+
+        when(changeStreamDao.isMutableKeyRange()).thenReturn(false);
+        when(changeStreamDao.streamQuery(any(), any(), any(), anyLong())).thenReturn(resultSet);
+        when(resultSet.next()).thenReturn(false);
+
+        SpannerChangeStreamService service = new SpannerChangeStreamService(
+                "TaskUid", changeStreamDao, mapper, Duration.ofMillis(1000),
+                mock(MetricsEventPublisher.class));
+
+        Partition partition = new Partition("token", new HashSet<>(),
+                Timestamp.ofTimeMicroseconds(1L), null, "origin");
+
+        ChangeStreamEventConsumer consumer = mock(ChangeStreamEventConsumer.class);
+        PartitionEventListener listener = mock(PartitionEventListener.class);
+        doNothing().when(listener).onRun(any());
+
+        assertThrows(ChangeStreamException.class, () -> service.getEvents(partition, consumer, listener));
+
+        verify(consumer, never()).acceptChangeStreamEvent(any(FinishPartitionEvent.class));
+        verify(changeStreamDao, times(1)).streamQuery(any(), any(), any(), anyLong());
+    }
+
+    /**
+     * When the post-window spin-wait exceeds {@code moveInGateTimeoutMs} the streaming thread
+     * must stop waiting and fall back to the close/reopen path (i.e. call
+     * {@link PartitionEventListener#onMoveIn} and return without calling
+     * {@link PartitionEventListener#onFinish}).
+     *
+     * <p>Setup: one MoveIn event is seen inside the result-set window; the source is never
+     * confirmed (empty context), so the gate never drains.  A 50 ms timeout with a 2 ms poll
+     * interval keeps the test fast while still exercising the real sleep loop.
+     */
+    @Test
+    void testGetEventsMutableGateTimesOutAndFallsBackToCloseReopenPath() throws Exception {
+        ChangeStreamDao changeStreamDao = mock(ChangeStreamDao.class);
+        ChangeStreamResultSet resultSet = mock(ChangeStreamResultSet.class);
+        ChangeStreamRecordMapper mapper = mock(ChangeStreamRecordMapper.class);
+        MetricsEventPublisher metricsEventPublisher = mock(MetricsEventPublisher.class);
+
+        when(changeStreamDao.isMutableKeyRange()).thenReturn(true);
+        when(changeStreamDao.streamQuery(any(), any(), any(), anyLong())).thenReturn(resultSet);
+        // One event (the MoveIn), then result-set exhausted → triggers spin-wait.
+        when(resultSet.next()).thenReturn(true, false);
+
+        Timestamp start = Timestamp.ofTimeSecondsAndNanos(0, 0);
+        Timestamp end = Timestamp.ofTimeSecondsAndNanos(0, 0);
+        Timestamp commitTimestamp = Timestamp.ofTimeSecondsAndNanos(0, 0);
+        StreamEventMetadata meta = StreamEventMetadata.newBuilder().withPartitionToken("dst").build();
+        PartitionEventEvent moveInEvent = new PartitionEventEvent(
+                commitTimestamp, "00001", "dst", List.of("src1"), List.of(), meta);
+        when(mapper.toChangeStreamEvents(any(), any(), any())).thenReturn(List.of(moveInEvent));
+
+        // Context where src1 is never confirmed → gate will never drain.
+        TaskState emptyTaskState = mock(TaskState.class);
+        when(emptyTaskState.getPartitions()).thenReturn(List.of());
+        when(emptyTaskState.getSharedPartitions()).thenReturn(List.of());
+        TaskSyncContext neverConfirmedCtx = mock(TaskSyncContext.class);
+        when(neverConfirmedCtx.getCurrentTaskState()).thenReturn(emptyTaskState);
+        when(neverConfirmedCtx.getTaskStates()).thenReturn(Map.of());
+
+        SpannerChangeStreamService service = new SpannerChangeStreamService(
+                "TaskUid", changeStreamDao, mapper, Duration.ofMillis(1000), metricsEventPublisher,
+                20, MutableStreamOptions.of(
+                        () -> neverConfirmedCtx,
+                        5000, // buffer max events — large so we don't overflow
+                        2, // gate check interval ms — fast polling
+                        50)); // gate timeout ms — short so the test completes quickly
+
+        Partition partition = new Partition("dst", new HashSet<>(), start, end, "origin");
+        ChangeStreamEventConsumer consumer = mock(ChangeStreamEventConsumer.class);
+        PartitionEventListener listener = mock(PartitionEventListener.class);
+        doNothing().when(listener).onRun(any());
+
+        service.getEvents(partition, consumer, listener);
+
+        // Timeout must trigger the close/reopen fallback: onMoveIn is called with the
+        // accumulated sources and onFinish is never called.
+        verify(listener).onMoveIn(partition, commitTimestamp, "00001", List.of("src1"));
+        verify(listener, never()).onFinish(any());
+        verify(consumer, never()).acceptChangeStreamEvent(any(FinishPartitionEvent.class));
+    }
+
+    /**
+     * Regression test for the deferred interrupt restore.
+     *
+     * <p>When the streaming thread is interrupted while the {@code MoveInBufferGate} spin-wait
+     * is running, the old code restored {@code Thread.currentThread().interrupt()} immediately.
+     * That caused {@code BlockingQueue.put()} (reached via {@code onMoveIn →
+     * notifyMoveIn → queue.put()}) to fail with {@link InterruptedException} via
+     * {@code lockInterruptibly()} before the notification was enqueued — silently losing
+     * the MoveIn state transition and leaving the partition stuck in CREATED.
+     *
+     * <p>The fix defers the interrupt restore until the {@code finally} block that wraps
+     * {@code onMoveIn()}.  This test verifies that:
+     * <ol>
+     *   <li>{@code onMoveIn} is called even when the thread is interrupted mid-spin-wait.</li>
+     *   <li>The interrupt flag is clear when {@code onMoveIn} is entered (deferred restore).</li>
+     *   <li>The interrupt flag is re-set on the streaming thread after {@code onMoveIn} returns.</li>
+     * </ol>
+     */
+    @Test
+    void testGetEventsMutableInterruptDuringGateSpinWaitStillDeliversOnMoveIn() throws Exception {
+        ChangeStreamDao changeStreamDao = mock(ChangeStreamDao.class);
+        ChangeStreamResultSet resultSet = mock(ChangeStreamResultSet.class);
+        ChangeStreamRecordMapper mapper = mock(ChangeStreamRecordMapper.class);
+        MetricsEventPublisher metricsEventPublisher = mock(MetricsEventPublisher.class);
+
+        when(changeStreamDao.isMutableKeyRange()).thenReturn(true);
+        when(changeStreamDao.streamQuery(any(), any(), any(), anyLong())).thenReturn(resultSet);
+        when(resultSet.next()).thenReturn(true, false);
+
+        Timestamp start = Timestamp.ofTimeSecondsAndNanos(0, 0);
+        Timestamp end = Timestamp.ofTimeSecondsAndNanos(0, 0);
+        Timestamp commitTimestamp = Timestamp.ofTimeSecondsAndNanos(0, 0);
+        StreamEventMetadata meta = StreamEventMetadata.newBuilder().withPartitionToken("dst").build();
+        PartitionEventEvent moveInEvent = new PartitionEventEvent(
+                commitTimestamp, "00001", "dst", List.of("src1"), List.of(), meta);
+        when(mapper.toChangeStreamEvents(any(), any(), any())).thenReturn(List.of(moveInEvent));
+
+        // src1 is never confirmed — the gate never drains on its own.
+        TaskState emptyTaskState = mock(TaskState.class);
+        when(emptyTaskState.getPartitions()).thenReturn(List.of());
+        when(emptyTaskState.getSharedPartitions()).thenReturn(List.of());
+        TaskSyncContext neverConfirmedCtx = mock(TaskSyncContext.class);
+        when(neverConfirmedCtx.getCurrentTaskState()).thenReturn(emptyTaskState);
+        when(neverConfirmedCtx.getTaskStates()).thenReturn(Map.of());
+
+        // Check interval of Integer.MAX_VALUE ms means the spin-wait will block in
+        // Thread.sleep() until interrupted — no timeout needed.
+        SpannerChangeStreamService service = new SpannerChangeStreamService(
+                "TaskUid", changeStreamDao, mapper, Duration.ofMillis(1000), metricsEventPublisher,
+                20, MutableStreamOptions.of(
+                        () -> neverConfirmedCtx,
+                        5000, // buffer max — won't overflow
+                        Integer.MAX_VALUE, // check interval so large the thread blocks; interrupted instead
+                        60_000));
+
+        // Latch opened by the streaming thread just before it enters Thread.sleep() in the
+        // spin-wait, signalling that the thread is safely blocked and ready to be interrupted.
+        CountDownLatch spinWaitEntered = new CountDownLatch(1);
+
+        Partition partition = new Partition("dst", new HashSet<>(), start, end, "origin");
+        ChangeStreamEventConsumer consumer = mock(ChangeStreamEventConsumer.class);
+        PartitionEventListener listener = mock(PartitionEventListener.class);
+        doNothing().when(listener).onRun(any());
+
+        // Capture the interrupt flag at the moment onMoveIn is entered to verify the deferred
+        // restore — the flag must be CLEAR here so that any downstream BlockingQueue.put()
+        // would succeed without throwing InterruptedException via lockInterruptibly().
+        AtomicReference<Boolean> interruptFlagDuringOnMoveIn = new AtomicReference<>();
+        org.mockito.Mockito.doAnswer(inv -> {
+            interruptFlagDuringOnMoveIn.set(Thread.currentThread().isInterrupted());
+            return null;
+        }).when(listener).onMoveIn(any(), any(), any(), any());
+
+        // Capture the interrupt flag AFTER getEvents() returns, from inside the streaming
+        // thread (t.isInterrupted() is unreliable once the thread has died).
+        AtomicReference<Boolean> interruptFlagAfterGetEvents = new AtomicReference<>(false);
+
+        Thread t = new Thread(() -> {
+            spinWaitEntered.countDown(); // fires before getEvents(); 50ms slack lets the thread reach sleep()
+            try {
+                service.getEvents(partition, consumer, listener);
+            }
+            catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+            finally {
+                interruptFlagAfterGetEvents.set(Thread.currentThread().isInterrupted());
+            }
+        });
+        t.start();
+
+        // Wait until the thread has started, then give it ~50ms to reach Thread.sleep().
+        // All steps before the sleep are synchronous and mocked, so this is ample time.
+        spinWaitEntered.await();
+        Thread.sleep(50);
+        t.interrupt();
+        t.join(5_000);
+
+        // 1. onMoveIn must have been called despite the interruption.
+        verify(listener).onMoveIn(partition, commitTimestamp, "00001", List.of("src1"));
+        // 2. The interrupt flag must have been CLEAR when onMoveIn was entered (deferred restore).
+        assertEquals(Boolean.FALSE, interruptFlagDuringOnMoveIn.get());
+        // 3. The interrupt flag must be re-set after onMoveIn returns (finally block fires).
+        assertEquals(Boolean.TRUE, interruptFlagAfterGetEvents.get());
+        verify(listener, never()).onFinish(any());
     }
 }

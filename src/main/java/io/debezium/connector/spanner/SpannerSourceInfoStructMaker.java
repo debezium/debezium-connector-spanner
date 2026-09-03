@@ -30,6 +30,7 @@ public class SpannerSourceInfoStructMaker extends AbstractSourceInfoStructMaker<
                 .field(SourceInfo.CHANGE_STREAM_NAME_KEY, Schema.STRING_SCHEMA)
                 .field(SourceInfo.TABLE_KEY, Schema.STRING_SCHEMA)
                 .field(SourceInfo.SERVER_TRANSACTIONAL_ID_KEY, Schema.OPTIONAL_STRING_SCHEMA)
+                .field(SourceInfo.RECORD_SEQUENCE_PREFIX_KEY, Schema.OPTIONAL_STRING_SCHEMA)
                 .field(SourceInfo.LOW_WATERMARK_KEY, Schema.OPTIONAL_INT64_SCHEMA)
                 .field(SourceInfo.READ_AT_TIMESTAMP_KEY, Schema.OPTIONAL_INT64_SCHEMA)
                 .field(SourceInfo.NUMBER_OF_RECORDS_IN_TRANSACTION, Schema.OPTIONAL_INT64_SCHEMA)
@@ -86,6 +87,10 @@ public class SpannerSourceInfoStructMaker extends AbstractSourceInfoStructMaker<
 
         if (sourceInfo.getServerTransactionId() != null) {
             result.put(SourceInfo.SERVER_TRANSACTIONAL_ID_KEY, sourceInfo.getServerTransactionId());
+        }
+
+        if (sourceInfo.getRecordSequencePrefix() != null) {
+            result.put(SourceInfo.RECORD_SEQUENCE_PREFIX_KEY, sourceInfo.getRecordSequencePrefix());
         }
 
         if (sourceInfo.getNumberRecordsInTransaction() != null) {

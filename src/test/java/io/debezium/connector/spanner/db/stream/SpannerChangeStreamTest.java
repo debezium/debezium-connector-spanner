@@ -17,6 +17,7 @@ import static org.mockito.Mockito.when;
 
 import java.time.Duration;
 import java.util.HashSet;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 import org.awaitility.Awaitility;
@@ -180,6 +181,14 @@ class SpannerChangeStreamTest {
                     @Override
                     public boolean onStuckPartition(String token) {
                         return false;
+                    }
+
+                    @Override
+                    public void onWindowAdvanced(Partition partition, Timestamp windowEnd, String lastBoundaryRecordSequence) {
+                    }
+
+                    @Override
+                    public void onMoveIn(Partition partition, Timestamp commitTimestamp, String recordSequence, List<String> sourcePartitionTokens) {
                     }
                 });
 

@@ -104,28 +104,24 @@ public class ChangeStreamRecordMapper {
     public List<ChangeStreamEvent> toChangeStreamEvents(
                                                         Partition partition, ChangeStreamResultSet resultSet,
                                                         ChangeStreamResultSetMetadata resultSetMetadata) {
-        if (this.isPostgres()) {
-            if (this.isMutableKeyRange) {
-                throw new IllegalStateException("Mutable key range change stream is not supported in Postgres dialect");
-            }
-            else {
-                // In PostgresQL, immutable key range change stream records are returned as
-                // JsonB.
-                return Collections.singletonList(
-                        toStreamEventJson(partition, resultSet.getPgJsonb(0), resultSetMetadata));
-            }
-        }
         if (this.isMutableKeyRange) {
+            // Mutable key range change stream records are returned as a serialized ChangeStreamRecord
+            // proto, in both GoogleSQL (via the READ_<name> TVF) and PostgreSQL (via the
+            // "spanner"."read_proto_bytes_<name>" function) dialects.
             return Collections.singletonList(
                     toStreamEventProto(partition, resultSet.getProtoChangeStreamRecord(0), resultSetMetadata));
         }
-        else {
-            // In GoogleSQL, immutable key range change stream records are returned as an
-            // array of structs.
-            return resultSet.getCurrentRowAsStruct().getStructList(0).stream()
-                    .flatMap(struct -> toStreamEvent(partition, struct, resultSetMetadata))
-                    .collect(Collectors.toList());
+        if (this.isPostgres()) {
+            // In PostgresQL, immutable key range change stream records are returned as
+            // JsonB.
+            return Collections.singletonList(
+                    toStreamEventJson(partition, resultSet.getPgJsonb(0), resultSetMetadata));
         }
+        // In GoogleSQL, immutable key range change stream records are returned as an
+        // array of structs.
+        return resultSet.getCurrentRowAsStruct().getStructList(0).stream()
+                .flatMap(struct -> toStreamEvent(partition, struct, resultSetMetadata))
+                .collect(Collectors.toList());
     }
 
     Stream<ChangeStreamEvent> toStreamEvent(Partition partition, Struct row,

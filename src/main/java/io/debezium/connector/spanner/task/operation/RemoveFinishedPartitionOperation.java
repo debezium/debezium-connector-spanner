@@ -22,6 +22,7 @@ import io.debezium.connector.spanner.SpannerConnectorConfig;
 import io.debezium.connector.spanner.SpannerPartition;
 import io.debezium.connector.spanner.context.offset.PartitionOffset;
 import io.debezium.connector.spanner.context.offset.SpannerOffsetContext;
+import io.debezium.connector.spanner.kafka.internal.model.MoveOutState;
 import io.debezium.connector.spanner.kafka.internal.model.PartitionState;
 import io.debezium.connector.spanner.kafka.internal.model.PartitionStateEnum;
 import io.debezium.connector.spanner.kafka.internal.model.TaskState;
@@ -62,8 +63,10 @@ public class RemoveFinishedPartitionOperation implements Operation {
 
                                 if (deletionTime.compareTo(currentTime) < 0) {
 
-                                    if (allChildrenFinished(
-                                            taskSyncContext, partitionState.getToken())) {
+                                    List<PartitionState> allPartitionStates = allPartitionStates(taskSyncContext);
+
+                                    if (allChildrenFinished(allPartitionStates, partitionState.getToken())
+                                            && moveOutDestinationsHaveResumed(allPartitionStates, partitionState)) {
                                         LOGGER.info(
                                                 "Partition {} will be removed from the task with finished timestamp {},"
                                                         + " deletion timestamp {} and current time {}",
@@ -105,8 +108,8 @@ public class RemoveFinishedPartitionOperation implements Operation {
                 .build();
     }
 
-    private static boolean allChildrenFinished(TaskSyncContext taskSyncContext, String token) {
-        List<PartitionState> allPartitionStates = Stream.concat(
+    private static List<PartitionState> allPartitionStates(TaskSyncContext taskSyncContext) {
+        return Stream.concat(
                 Stream.concat(
                         taskSyncContext.getTaskStates().values().stream()
                                 .flatMap(taskState -> taskState.getPartitions().stream()),
@@ -116,7 +119,9 @@ public class RemoveFinishedPartitionOperation implements Operation {
                                 .flatMap(taskState -> taskState.getSharedPartitions().stream()),
                         taskSyncContext.getCurrentTaskState().getSharedPartitions().stream()))
                 .collect(Collectors.toList());
+    }
 
+    private static boolean allChildrenFinished(List<PartitionState> allPartitionStates, String token) {
         Set<String> children = allPartitionStates.stream()
                 .filter(partitionState -> partitionState.getParents().contains(token))
                 .map(PartitionState::getToken)
@@ -132,6 +137,50 @@ public class RemoveFinishedPartitionOperation implements Operation {
                                                     partitionState -> PartitionStateEnum.FINISHED.equals(partitionState.getState())
                                                             || PartitionStateEnum.REMOVED.equals(partitionState.getState()));
                                 });
+    }
+
+    /**
+     * Mutable key range only: a partition that recorded a {@link MoveOutState} must not be
+     * deleted (losing that state) until every destination it lists has itself streamed past the
+     * move's commit timestamp. A destination that hasn't yet reached that point in its own
+     * stream has not discovered the dependency at all - its {@code moveInState} is still
+     * {@code null}, indistinguishable from "already resumed" - so presence/absence of
+     * {@code moveInState} alone cannot be used here. Comparing against the destination's own
+     * {@code processedTimestamp} is the only reliable signal. Once a destination's
+     * {@code processedTimestamp} reaches the move's timestamp, {@link MoveInStateUpdateOperation}
+     * has, by construction, already updated its {@code parents} to include this source token in
+     * that same step, so {@link #allChildrenFinished} takes over correctly from that point on.
+     *
+     * <p>A source partition never pauses for its own MoveOut events, so it can accumulate
+     * several independent, still-pending {@link MoveOutState} entries (to different destinations,
+     * at different commit timestamps) over its lifetime - see {@code getMoveOutStates()}. Every
+     * entry must individually be resolved before the source can be deleted.
+     *
+     * <p>This is purely additive for the immutable key range path: partitions created via
+     * {@link ChildPartitionOperation} never populate {@code moveOutStates}, so this check
+     * trivially returns {@code true} and the deletion condition is unchanged from before
+     * mutable key range support was added.
+     */
+    private static boolean moveOutDestinationsHaveResumed(List<PartitionState> allPartitionStates, PartitionState partitionState) {
+        for (MoveOutState moveOutState : partitionState.getMoveOutStates()) {
+            Timestamp moveOutTimestamp = moveOutState.getTimestamp();
+            for (String destToken : moveOutState.getDestPartitionTokens()) {
+                PartitionState dest = allPartitionStates.stream()
+                        .filter(p -> destToken.equals(p.getToken()))
+                        .findFirst()
+                        .orElse(null);
+                if (dest == null) {
+                    // Destination not tracked anywhere - nothing left depending on this source.
+                    continue;
+                }
+                boolean destHasReachedThisMove = dest.getProcessedTimestamp() != null
+                        && dest.getProcessedTimestamp().compareTo(moveOutTimestamp) >= 0;
+                if (!destHasReachedThisMove) {
+                    return false;
+                }
+            }
+        }
+        return true;
     }
 
     @Override
