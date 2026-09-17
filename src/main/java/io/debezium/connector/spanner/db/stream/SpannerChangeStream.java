@@ -184,6 +184,11 @@ public class SpannerChangeStream implements ChangeStream {
     }
 
     @Override
+    public boolean isMutableKeyRange() {
+        return streamService.isMutableKeyRange();
+    }
+
+    @Override
     public void stop() {
         LOGGER.info("Task {}, closing Spanner", this.taskUid);
         databaseClientFactory.closeSpanner();

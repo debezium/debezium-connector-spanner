@@ -189,7 +189,7 @@ public class SchemaDao {
                     "  and csc.table_name = cst.table_name\n" +
                     "where cs.change_stream_name = $1")
                     .bind("p1")
-                    .to(streamName)
+                    .to(normalizeIdentifier(streamName))
                     .build();
         }
         else {
@@ -227,7 +227,7 @@ public class SchemaDao {
                     "  information_schema.change_stream_options\n" +
                     "where change_stream_name = $1")
                     .bind("p1")
-                    .to(streamName)
+                    .to(normalizeIdentifier(streamName))
                     .build();
         }
         else {
@@ -246,5 +246,15 @@ public class SchemaDao {
 
     public boolean isPostgres() {
         return this.databaseClient.getDialect() == Dialect.POSTGRESQL;
+    }
+
+    /**
+     * PostgreSQL-dialect Spanner databases fold unquoted identifiers (e.g. change stream names) to
+     * lowercase, same as standard PostgreSQL. Callers configure the change stream name as it was
+     * written in DDL (typically unquoted, e.g. {@code MyChangeStream}), so it must be normalized to
+     * match what's actually stored in {@code information_schema} before it's used in a lookup.
+     */
+    private String normalizeIdentifier(String identifier) {
+        return isPostgres() ? identifier.toLowerCase() : identifier;
     }
 }

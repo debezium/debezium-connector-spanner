@@ -8,7 +8,11 @@ package io.debezium.connector.spanner.util;
 import static io.debezium.connector.spanner.util.Database.isSpannerOmniEndpoint;
 import static org.awaitility.Awaitility.await;
 
+import java.io.ByteArrayInputStream;
+import java.io.FileInputStream;
+import java.io.IOException;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
@@ -19,6 +23,8 @@ import org.slf4j.LoggerFactory;
 
 import com.google.api.client.util.Strings;
 import com.google.api.gax.longrunning.OperationFuture;
+import com.google.api.gax.rpc.ResourceExhaustedException;
+import com.google.auth.oauth2.GoogleCredentials;
 import com.google.cloud.NoCredentials;
 import com.google.cloud.spanner.DatabaseAdminClient;
 import com.google.cloud.spanner.DatabaseClient;
@@ -32,7 +38,12 @@ import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.Spanner;
 import com.google.cloud.spanner.SpannerOptions;
 import com.google.cloud.spanner.Statement;
+import com.google.protobuf.ListValue;
+import com.google.protobuf.Timestamp;
+import com.google.protobuf.Value;
 import com.google.spanner.admin.database.v1.CreateDatabaseMetadata;
+import com.google.spanner.admin.database.v1.DatabaseName;
+import com.google.spanner.admin.database.v1.SplitPoints;
 import com.google.spanner.admin.database.v1.UpdateDatabaseDdlMetadata;
 import com.google.spanner.admin.instance.v1.CreateInstanceMetadata;
 
@@ -49,16 +60,31 @@ public class Connection {
     private final String databaseId;
     public static final String emulatorHost = "http://localhost:9010";
 
+    private static final String REAL_SPANNER_PROPERTY = "spanner.test.real";
+    private static final String CREDENTIALS_PATH_PROPERTY = "gcp.spanner.credentials.path";
+    private static final String CREDENTIALS_JSON_PROPERTY = "gcp.spanner.credentials.json";
+    private static final String HOST_PROPERTY = "gcp.spanner.host";
+
+    private static long ddlWaitTimeSeconds() {
+        return Long.parseLong(System.getProperty("debezium.test.spanner.ddl.waittime", "60"));
+    }
+
     public DatabaseClient databaseClient;
     private Spanner spanner;
     private SchemaDao schemaDao;
     private final Dialect dialect;
+    private final boolean realSpanner;
 
     protected Connection(Database database) {
+        this(database, false);
+    }
+
+    protected Connection(Database database, boolean realSpanner) {
         this.projectId = database.getProjectId();
         this.instanceId = database.getInstanceId();
         this.databaseId = database.getDatabaseId();
         this.dialect = database.getDialect();
+        this.realSpanner = realSpanner;
     }
 
     public ResultSet executeSelect(String query) {
@@ -118,31 +144,235 @@ public class Connection {
         this.updateDDL(List.of("create table " + tableDefinition));
     }
 
+    public void createTable(String table, String tableParams) throws ExecutionException, InterruptedException {
+        if (isPostgres()) {
+            tableParams = ToPostgresTableParams(tableParams);
+        }
+        this.updateDDL(List.of("create table " + table + tableParams));
+    }
+
+    public void updateTable(String table, String tableParams) throws ExecutionException, InterruptedException {
+        if (isPostgres()) {
+            tableParams = ToPostgresTypes(tableParams);
+        }
+        this.updateDDL(List.of("alter table " + table + tableParams));
+    }
+
     public void createChangeStream(String changeStreamName, String... tables) throws ExecutionException,
             InterruptedException {
         this.updateDDL(List.of("create change stream " + changeStreamName + " for " +
                 (tables.length == 0 ? "ALL" : String.join(",", tables))));
+        await().atMost(Duration.ofSeconds(ddlWaitTimeSeconds())).until(() -> isStreamExist(changeStreamName));
+    }
+
+    public void createChangeStream(String changeStreamName, PartitionMode partitionMode, String... tables)
+            throws ExecutionException, InterruptedException {
+        String optionsClause = isPostgres() ? " WITH " : " OPTIONS ";
+        this.updateDDL(List.of("create change stream " + changeStreamName + " for " +
+                (tables.length == 0 ? "ALL" : String.join(",", tables)) +
+                optionsClause + "( partition_mode = '" + partitionMode.name() + "' )"));
         await().atMost(Duration.ofSeconds(60)).until(() -> isStreamExist(changeStreamName));
     }
 
-    public void createChangeStreamNewValue(String changeStreamName, String... tables) throws ExecutionException,
+    public void createMutableKeyRangeChangeStream(String changeStreamName, String... tables) throws ExecutionException,
             InterruptedException {
+        String optionsClause = isPostgres() ? " WITH " : " OPTIONS ";
         this.updateDDL(List.of("create change stream " + changeStreamName + " for " +
                 (tables.length == 0 ? "ALL" : String.join(",", tables)) +
-                " OPTIONS (\n" +
-                "            value_capture_type = 'NEW_VALUES'\n" +
-                "        ) "));
-        await().atMost(Duration.ofSeconds(60)).until(() -> isStreamExist(changeStreamName));
+                optionsClause + "(partition_mode = 'MUTABLE_KEY_RANGE')"));
+        await().atMost(Duration.ofSeconds(ddlWaitTimeSeconds())).until(() -> isStreamExist(changeStreamName));
     }
 
-    public void createChangeStreamNewRow(String changeStreamName, String... tables) throws ExecutionException,
-            InterruptedException {
+    private static final Duration DEFAULT_SPLIT_EXPIRY = Duration.ofMinutes(30);
+
+    public void forceSplit(String tableName, String... keyParts) {
+        forceSplit(tableName, DEFAULT_SPLIT_EXPIRY, keyParts);
+    }
+
+    /**
+     * Forces Spanner to split the key range of {@code tableName} at the given key value(s),
+     * triggering a mutable key range move (MoveOut/MoveIn) for change streams tracking the table.
+     * Uses the {@code AddSplitPoints} admin API, which requires the
+     * {@code spanner.databases.addSplitPoints} permission (granted by the
+     * {@code roles/spanner.databaseAdmin} IAM role).
+     *
+     * <p>Cloud Spanner enforces a strict per-minute quota on the number of split points that can
+     * be processed (as low as 1/minute on small test instances), so calls are retried with a
+     * cooldown when the request is throttled with {@code RESOURCE_EXHAUSTED}.
+     */
+    public void forceSplit(String tableName, Duration expiry, String... keyParts) {
+        // PostgreSQL-dialect Spanner folds unquoted identifiers to lowercase, so the table name
+        // stored internally (and required by the AddSplitPoints admin API) is the lowercase form.
+        String normalizedTableName = dialect == Dialect.POSTGRESQL ? tableName.toLowerCase() : tableName;
+        int maxAttempts = 4;
+        for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+            try (com.google.cloud.spanner.admin.database.v1.DatabaseAdminClient adminClient = spanner.createDatabaseAdminClient()) {
+                Instant expiryInstant = Instant.now().plus(expiry);
+                Timestamp expireTime = Timestamp.newBuilder()
+                        .setSeconds(expiryInstant.getEpochSecond())
+                        .setNanos(expiryInstant.getNano())
+                        .build();
+
+                ListValue.Builder keyValues = ListValue.newBuilder();
+                for (String keyPart : keyParts) {
+                    keyValues.addValues(Value.newBuilder().setStringValue(keyPart).build());
+                }
+
+                SplitPoints splitPoint = SplitPoints.newBuilder()
+                        .setTable(normalizedTableName)
+                        .setExpireTime(expireTime)
+                        .addKeys(SplitPoints.Key.newBuilder().setKeyParts(keyValues))
+                        .build();
+
+                adminClient.addSplitPoints(DatabaseName.of(projectId, instanceId, databaseId), List.of(splitPoint));
+                LOG.info("Forced split on table {} at key {}", normalizedTableName, List.of(keyParts));
+                return;
+            }
+            catch (ResourceExhaustedException e) {
+                if (attempt == maxAttempts) {
+                    throw new RuntimeException("Failed to force split for table " + normalizedTableName
+                            + " after " + maxAttempts + " attempts (split point quota exhausted)", e);
+                }
+                LOG.warn("Split point quota exhausted for table {}, retrying in 65s (attempt {}/{})", normalizedTableName, attempt, maxAttempts);
+                try {
+                    Thread.sleep(65_000);
+                }
+                catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                    throw new RuntimeException("Interrupted while waiting to retry split for table " + normalizedTableName, interrupted);
+                }
+            }
+            catch (Exception e) {
+                throw new RuntimeException("Failed to force split for table " + normalizedTableName, e);
+            }
+        }
+    }
+
+    public void createChangeStreamNewValue(String changeStreamName, PartitionMode partitionMode, String... tables)
+            throws ExecutionException, InterruptedException {
+        createChangeStreamWithValueCaptureType(changeStreamName, "NEW_VALUES", partitionMode, tables);
+    }
+
+    public void createChangeStreamNewRow(String changeStreamName, PartitionMode partitionMode, String... tables)
+            throws ExecutionException, InterruptedException {
+        createChangeStreamWithValueCaptureType(changeStreamName, "NEW_ROW", partitionMode, tables);
+    }
+
+    public void createChangeStreamNewRowAndOldValues(String changeStreamName, PartitionMode partitionMode, String... tables)
+            throws ExecutionException, InterruptedException {
+        createChangeStreamWithValueCaptureType(changeStreamName, "NEW_ROW_AND_OLD_VALUES", partitionMode, tables);
+    }
+
+    private void createChangeStreamWithValueCaptureType(String changeStreamName, String valueCaptureType,
+                                                        PartitionMode partitionMode, String... tables)
+            throws ExecutionException, InterruptedException {
+        String optionsClause = isPostgres() ? " WITH " : " OPTIONS ";
         this.updateDDL(List.of("create change stream " + changeStreamName + " for " +
                 (tables.length == 0 ? "ALL" : String.join(",", tables)) +
-                " OPTIONS (\n" +
-                "            value_capture_type = 'NEW_ROW'\n" +
+                optionsClause + "(\n" +
+                "            value_capture_type = '" + valueCaptureType + "',\n" +
+                "            partition_mode = '" + partitionMode.name() + "'\n" +
                 "        ) "));
-        await().atMost(Duration.ofSeconds(60)).until(() -> isStreamExist(changeStreamName));
+        await().atMost(Duration.ofSeconds(ddlWaitTimeSeconds())).until(() -> isStreamExist(changeStreamName));
+    }
+
+    public void createChangeStreamExcludeDelete(String changeStreamName, PartitionMode partitionMode, String... tables)
+            throws ExecutionException, InterruptedException {
+        createChangeStreamWithBooleanOption(changeStreamName, "exclude_delete", partitionMode, tables);
+    }
+
+    public void createChangeStreamExcludeInsert(String changeStreamName, PartitionMode partitionMode, String... tables)
+            throws ExecutionException, InterruptedException {
+        createChangeStreamWithBooleanOption(changeStreamName, "exclude_insert", partitionMode, tables);
+    }
+
+    public void createChangeStreamExcludeUpdate(String changeStreamName, PartitionMode partitionMode, String... tables)
+            throws ExecutionException, InterruptedException {
+        createChangeStreamWithBooleanOption(changeStreamName, "exclude_update", partitionMode, tables);
+    }
+
+    public void createChangeStreamAllowTxnExclusion(String changeStreamName, PartitionMode partitionMode, String... tables)
+            throws ExecutionException, InterruptedException {
+        createChangeStreamWithBooleanOption(changeStreamName, "allow_txn_exclusion", partitionMode, tables);
+    }
+
+    private void createChangeStreamWithBooleanOption(String changeStreamName, String optionName,
+                                                     PartitionMode partitionMode, String... tables)
+            throws ExecutionException, InterruptedException {
+        String optionsClause = isPostgres() ? " WITH " : " OPTIONS ";
+        this.updateDDL(List.of("create change stream " + changeStreamName + " for " +
+                (tables.length == 0 ? "ALL" : String.join(",", tables)) +
+                optionsClause + "(\n" +
+                "            " + optionName + " = true,\n" +
+                "            partition_mode = '" + partitionMode.name() + "'\n" +
+                "        ) "));
+        await().atMost(Duration.ofSeconds(ddlWaitTimeSeconds())).until(() -> isStreamExist(changeStreamName));
+    }
+
+    public void createChangeStreamExcludeTtlDeletes(String changeStreamName, PartitionMode partitionMode, String... tables)
+            throws ExecutionException, InterruptedException {
+        createChangeStreamWithBooleanOption(changeStreamName, "exclude_ttl_deletes", partitionMode, tables);
+    }
+
+    public void createPlacement(String placementName, String instancePartitionId) throws ExecutionException, InterruptedException {
+        if (!instancePartitionExists(instancePartitionId)) {
+            throw new IllegalStateException(
+                    "Instance partition '" + instancePartitionId + "' does not exist on instance '" + instanceId
+                            + "'. Provision it first - see doc/real-spanner-testing.md, e.g.:\n"
+                            + "  gcloud spanner instance-partitions create " + instancePartitionId
+                            + " --instance=" + instanceId + " --project=" + projectId + " --config=<config> --nodes=1");
+        }
+        String optionsClause = isPostgres() ? " WITH " : " OPTIONS ";
+        String ddlPlacementName = isPostgres() ? "\"" + placementName + "\"" : placementName;
+        this.updateDDL(List.of("create placement " + ddlPlacementName +
+                optionsClause + "( instance_partition = '" + instancePartitionId + "' )"));
+        await().atMost(Duration.ofSeconds(ddlWaitTimeSeconds())).until(() -> placementExists(placementName));
+    }
+
+    private boolean instancePartitionExists(String instancePartitionId) {
+        String name = String.format("projects/%s/instances/%s/instancePartitions/%s", projectId, instanceId, instancePartitionId);
+        try (com.google.cloud.spanner.admin.instance.v1.InstanceAdminClient adminClient = spanner.createInstanceAdminClient()) {
+            adminClient.getInstancePartition(name);
+            return true;
+        }
+
+        catch (com.google.api.gax.rpc.NotFoundException e) {
+            return false;
+        }
+    }
+
+    public boolean dropPlacement(String placementName) throws InterruptedException {
+        try {
+            if (!placementExists(placementName)) {
+                return false;
+            }
+            String ddlPlacementName = isPostgres() ? "\"" + placementName + "\"" : placementName;
+            this.updateDDL(List.of("drop placement " + ddlPlacementName));
+        }
+        catch (ExecutionException ex) {
+            LOG.warn("Can`t drop placement", ex);
+            return false;
+        }
+        return true;
+    }
+
+    private boolean placementExists(String placementName) {
+        Statement statement;
+        if (isPostgres()) {
+            statement = Statement.newBuilder("select placement_name " +
+                    "from information_schema.placements " +
+                    "where placement_name = $1")
+                    .bind("p1").to(placementName).build();
+        }
+        else {
+            statement = Statement.newBuilder("select placement_name " +
+                    "from information_schema.placements " +
+                    "where placement_name = @placementName")
+                    .bind("placementName").to(placementName).build();
+        }
+        try (ResultSet resultSet = this.executeSelect(statement)) {
+            return resultSet.next();
+        }
     }
 
     private String createInstance() {
@@ -150,14 +380,14 @@ public class Connection {
             return DatabaseClientFactory.SPANNER_OMNI_DEFAULT_ID;
         }
         for (Instance value : this.spanner.getInstanceAdminClient().listInstances().iterateAll()) {
-            if (value.getId().getInstance().equals("test-instance")) {
-                return "test-instance";
+            if (value.getId().getInstance().equals(instanceId)) {
+                return instanceId;
             }
         }
         String configId = "regional-us-central1";
         String displayName = "For IT";
         int nodeCount = 1;
-        InstanceInfo instanceInfo = InstanceInfo.newBuilder(InstanceId.of(projectId, "test-instance"))
+        InstanceInfo instanceInfo = InstanceInfo.newBuilder(InstanceId.of(projectId, instanceId))
                 .setInstanceConfigId(InstanceConfigId.of(projectId, configId))
                 .setNodeCount(nodeCount)
                 .setDisplayName(displayName)
@@ -171,12 +401,12 @@ public class Connection {
         catch (InterruptedException | ExecutionException e) {
             throw new RuntimeException(e);
         }
-        return "test-instance";
+        return instanceId;
     }
 
     private boolean isStreamExist(String streamName) {
         Statement statement;
-        if (schemaDao.isPostgres()) {
+        if (isPostgres()) {
             statement = Statement.newBuilder("select change_stream_name " +
                     "from information_schema.change_streams cs " +
                     "where cs.change_stream_name = $1")
@@ -225,7 +455,7 @@ public class Connection {
 
     public boolean isChangeStreamExist(String changeStreamName) {
         Statement statement;
-        if (schemaDao.isPostgres()) {
+        if (isPostgres()) {
             statement = Statement.newBuilder("select * from information_schema.change_streams " +
                     "where change_stream_name = $1")
                     .bind("p1").to(changeStreamName).build();
@@ -242,7 +472,7 @@ public class Connection {
 
     public boolean isTableExist(String tableName) {
         Statement statement;
-        if (schemaDao.isPostgres()) {
+        if (isPostgres()) {
             statement = Statement
                     .newBuilder(
                             "select * from information_schema.tables where table_schema = '' and table_catalog = '' " +
@@ -276,7 +506,7 @@ public class Connection {
     }
 
     public void createDatabase(String databaseId, Dialect dialect) throws InterruptedException {
-        if (!isSpannerOmniEndpoint()) {
+        if (!isSpannerOmniEndpoint() && !realSpanner) {
             createInstance();
         }
         DatabaseAdminClient dbAdminClient = this.spanner.getDatabaseAdminClient();
@@ -315,13 +545,93 @@ public class Connection {
         return this;
     }
 
+    public static boolean isRealSpanner() {
+        return Boolean.parseBoolean(System.getProperty(REAL_SPANNER_PROPERTY, "false"));
+    }
+
+    public boolean isPostgres() {
+        return schemaDao.isPostgres();
+    }
+
+    private String ToPostgresTypes(String value) {
+        return value
+                // Arrays must be converted before their element types.
+                .replaceAll("(?i)\\bARRAY<STRING\\(MAX\\)>", "text[]")
+                .replaceAll("(?i)\\bARRAY<STRING\\((\\d+)\\)>", "varchar($1)[]")
+
+                // Scalar types.
+                .replaceAll("(?i)\\bINT64\\b", "bigint")
+                .replaceAll("(?i)\\bFLOAT32\\b", "real")
+                .replaceAll("(?i)\\bFLOAT64\\b", "double precision")
+                .replaceAll("(?i)\\bSTRING\\(MAX\\)", "text")
+                .replaceAll("(?i)\\bSTRING\\((\\d+)\\)", "varchar($1)")
+                .replaceAll("(?i)\\bBOOL\\b", "boolean")
+                .replaceAll("(?i)\\bTIMESTAMP\\b", "timestamptz")
+                .replaceAll("(?i)\\bDATE\\b", "date")
+                .replaceAll("(?i)\\bBYTES\\(MAX\\)", "bytea")
+                .replaceAll("(?i)\\bBYTES\\((\\d+)\\)", "bytea")
+                .replaceAll("(?i)\\bNUMERIC\\b", "numeric")
+                .replaceAll("(?i)\\bJSON\\b", "jsonb");
+    }
+
+    private String ToPostgresTableParams(String tableParams) {
+        String result = tableParams;
+
+        // Remove GoogleSQL-specific ROW DELETION POLICY
+        // (not supported in the PostgreSQL dialect).
+        int rowDeletionPolicyIndex = result.indexOf(", ROW DELETION POLICY");
+        if (rowDeletionPolicyIndex >= 0) {
+            result = result.substring(0, rowDeletionPolicyIndex);
+        }
+
+        // INTERLEAVE IN PARENT is supported in the PostgreSQL dialect but goes after the
+        // closing parenthesis rather than as a trailing clause alongside PRIMARY KEY.
+        String interleaveClause = "";
+        int interleaveIndex = result.indexOf(", INTERLEAVE IN PARENT");
+        if (interleaveIndex >= 0) {
+            interleaveClause = " " + result.substring(interleaveIndex + 2);
+            result = result.substring(0, interleaveIndex);
+        }
+
+        // Remove GoogleSQL-specific TOKENLIST column.
+        result = result.replaceAll(
+                ",?\\s*tokenlistcol\\s+TOKENLIST\\s+AS\\s*\\(TOKENIZE_FULLTEXT\\([^)]*\\)\\)\\s+HIDDEN\\s*,?",
+                "");
+
+        // Convert GoogleSQL types.
+        result = ToPostgresTypes(result);
+
+        // Move PRIMARY KEY into the column definition.
+        result = result.replaceFirst(
+                "(?i)\\)\\s*PRIMARY KEY\\s*\\(([^)]+)\\)\\s*$",
+                ", PRIMARY KEY ($1))");
+
+        return result + interleaveClause;
+    }
+
+    private GoogleCredentials getCredentials() {
+        String credentialsPath = System.getProperty(CREDENTIALS_PATH_PROPERTY);
+        String credentialsJson = System.getProperty(CREDENTIALS_JSON_PROPERTY);
+        try {
+            if (!Strings.isNullOrEmpty(credentialsPath)) {
+                return GoogleCredentials.fromStream(new FileInputStream(credentialsPath));
+            }
+            if (!Strings.isNullOrEmpty(credentialsJson)) {
+                return GoogleCredentials.fromStream(new ByteArrayInputStream(credentialsJson.getBytes()));
+            }
+            return GoogleCredentials.getApplicationDefault();
+        }
+        catch (IOException e) {
+            throw new RuntimeException("Failed to load Google credentials for real Spanner tests", e);
+        }
+    }
+
     private void init() {
         SpannerOptions.Builder builder = SpannerOptions.newBuilder();
 
-        builder.setCredentials(NoCredentials.getInstance());
         builder.setProjectId(projectId);
         if (isSpannerOmniEndpoint()) {
-            builder.setExperimentalHost(System.getProperty("gcp.spanner.host"));
+            builder.setExperimentalHost(System.getProperty(HOST_PROPERTY));
             if (Boolean.parseBoolean(System.getProperty("spanner.omni.use.plaintext", "false"))) {
                 builder.setChannelConfigurator(ManagedChannelBuilder::usePlaintext);
             }
@@ -332,7 +642,15 @@ public class Connection {
             builder.setBuiltInMetricsEnabled(false)
                     .setCredentials(NoCredentials.getInstance());
         }
+        else if (realSpanner) {
+            builder.setCredentials(getCredentials());
+            String host = System.getProperty(HOST_PROPERTY);
+            if (!Strings.isNullOrEmpty(host)) {
+                builder.setHost(host);
+            }
+        }
         else {
+            builder.setCredentials(NoCredentials.getInstance());
             builder.setEmulatorHost(emulatorHost);
         }
 

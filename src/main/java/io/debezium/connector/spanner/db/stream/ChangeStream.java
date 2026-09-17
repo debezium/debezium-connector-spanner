@@ -22,4 +22,8 @@ public interface ChangeStream {
     void run(BooleanSupplier runningFlagSupplier, ChangeStreamEventConsumer changeStreamEventConsumer,
              PartitionEventListener partitionEventListener)
             throws ChangeStreamException, InterruptedException;
+
+    default boolean isMutableKeyRange() {
+        return false;
+    }
 }

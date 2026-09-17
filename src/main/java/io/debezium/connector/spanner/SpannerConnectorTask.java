@@ -35,6 +35,7 @@ import io.debezium.connector.spanner.db.SpannerChangeStreamFactory;
 import io.debezium.connector.spanner.db.metadata.SchemaRegistry;
 import io.debezium.connector.spanner.db.metadata.TableId;
 import io.debezium.connector.spanner.db.stream.ChangeStream;
+import io.debezium.connector.spanner.db.stream.MutableStreamOptions;
 import io.debezium.connector.spanner.kafka.KafkaAdminClientFactory;
 import io.debezium.connector.spanner.kafka.KafkaPartitionInfoProvider;
 import io.debezium.connector.spanner.metrics.SpannerChangeEventSourceMetricsFactory;
@@ -174,10 +175,23 @@ public class SpannerConnectorTask extends SpannerBaseSourceTask {
                 connectorConfig.getConnectorName(),
                 databaseClientFactory);
 
+        MutableStreamOptions streamOptions = connectorConfig.isMutablePartitionOrderingEnabled()
+                // Supplier evaluated at call-time so it safely refers to synchronizationTaskContext
+                // even though that field is assigned after this line.
+                ? MutableStreamOptions.of(
+                        () -> this.synchronizationTaskContext.getTaskSyncContextHolder().get(),
+                        connectorConfig.getMutableMoveInBufferMaxEvents(),
+                        connectorConfig.getMutableMoveInGateCheckIntervalMs(),
+                        connectorConfig.getMutableMoveInGateTimeoutMs())
+                : MutableStreamOptions.orderingDisabled();
+
         this.changeStream = spannerChangeStreamFactory.getStream(
                 connectorConfig.changeStreamName(),
                 connectorConfig.getHeartbeatInterval(),
-                connectorConfig.getMaxMissedHeartbeats());
+                connectorConfig.getMaxMissedHeartbeats(),
+                connectorConfig.getMutableWindowMinutes(),
+                streamOptions,
+                connectorConfig.getHeartbeatLagWarnThreshold());
 
         final SourceInfoFactory sourceInfoFactory = new SourceInfoFactory(connectorConfig, lowWatermarkHolder);
 

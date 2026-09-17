@@ -123,6 +123,8 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
 
     private static final String MAX_MISSED_HEARTBEATS_PROPERTY_NAME = "connector.spanner.max.missed.heartbeats";
 
+    private static final String HEARTBEAT_LAG_WARN_THRESHOLD_MS_PROPERTY_NAME = "connector.spanner.heartbeat.lag.warn.threshold.ms";
+
     private static final String MAX_TASKS_PROPERTY_NAME = "tasks.max";
     private static final String MIN_TASKS_PROPERTY_NAME = "tasks.min";
     private static final String DESIRED_PARTITIONS_TASKS_PROPERTY_NAME = "tasks.desired.partitions";
@@ -142,6 +144,66 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
     private static final String TASKS_FAIL_OVERLOADED_CHECK_INTERVAL_PROPERTY_NAME = "tasks.fail.overloaded.check.interval";
 
     private static final String CONNECTOR_SPANNER_SYNC_TOPIC_MAX_MESSAGE_BYTES_PROPERTY_NAME = "connector.spanner.sync.max.message.bytes";
+
+    private static final String MUTABLE_PARTITION_ORDERING_ENABLED_PROPERTY_NAME = "gcp.spanner.mutable.partition.ordering.enabled";
+
+    public static final String MUTABLE_WINDOW_MINUTES_PROPERTY_NAME = "gcp.spanner.mutable.window.minutes";
+
+    private static final String MUTABLE_MOVE_IN_BUFFER_MAX_EVENTS_PROPERTY_NAME = "gcp.spanner.mutable.move.in.buffer.max.events";
+
+    private static final String MUTABLE_MOVE_IN_GATE_CHECK_INTERVAL_MS_PROPERTY_NAME = "gcp.spanner.mutable.move.in.gate.check.interval.ms";
+
+    private static final String MUTABLE_MOVE_IN_GATE_TIMEOUT_MS_PROPERTY_NAME = "gcp.spanner.mutable.move.in.gate.timeout.ms";
+
+    public static final Field MUTABLE_PARTITION_ORDERING_ENABLED = Field.create(MUTABLE_PARTITION_ORDERING_ENABLED_PROPERTY_NAME)
+            .withDisplayName("Mutable partition move-in/move-out ordering enabled")
+            .withType(Type.BOOLEAN)
+            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR))
+            .withWidth(Width.SHORT)
+            .withImportance(Importance.MEDIUM)
+            .withDefault(true)
+            .withDescription("When true, enables move-in/move-out ordering for mutable key range change streams. Default true.");
+
+    public static final Field MUTABLE_WINDOW_MINUTES = Field.create(MUTABLE_WINDOW_MINUTES_PROPERTY_NAME)
+            .withDisplayName("Mutable key range sliding window size (minutes)")
+            .withType(Type.INT)
+            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR))
+            .withWidth(Width.SHORT)
+            .withImportance(Importance.LOW)
+            .withDefault(20)
+            .withValidation(BaseSpannerConnectorConfig::validateMutableWindowMinutes)
+            .withDescription("Size in minutes of each sliding query window for mutable key range change streams. Must be between 1 and 30. Default 20.");
+
+    public static final Field MUTABLE_MOVE_IN_BUFFER_MAX_EVENTS = Field.create(MUTABLE_MOVE_IN_BUFFER_MAX_EVENTS_PROPERTY_NAME)
+            .withDisplayName("MoveIn buffer maximum event count")
+            .withType(Type.INT)
+            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR, 0))
+            .withWidth(Width.SHORT)
+            .withImportance(Importance.LOW)
+            .withDefault(5000)
+            .withDescription("Maximum number of change-stream events to buffer in memory while a mutable key range "
+                    + "destination partition waits for its source(s) to confirm their MoveOut. When the buffer reaches "
+                    + "this limit the connector falls back to the standard close/reopen path. Default 5000.");
+
+    public static final Field MUTABLE_MOVE_IN_GATE_CHECK_INTERVAL_MS = Field.create(MUTABLE_MOVE_IN_GATE_CHECK_INTERVAL_MS_PROPERTY_NAME)
+            .withDisplayName("MoveIn gate check interval (ms)")
+            .withType(Type.INT)
+            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR, 0))
+            .withWidth(Width.SHORT)
+            .withImportance(Importance.LOW)
+            .withDefault(10)
+            .withDescription("How often (in milliseconds) the streaming thread checks whether the MoveIn gate has "
+                    + "opened when the Spanner result-set has been exhausted before the gate opened. Default 10 ms.");
+
+    public static final Field MUTABLE_MOVE_IN_GATE_TIMEOUT_MS = Field.create(MUTABLE_MOVE_IN_GATE_TIMEOUT_MS_PROPERTY_NAME)
+            .withDisplayName("MoveIn gate timeout (ms)")
+            .withType(Type.INT)
+            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR, 0))
+            .withWidth(Width.SHORT)
+            .withImportance(Importance.LOW)
+            .withDefault(60000)
+            .withDescription("Maximum time (in milliseconds) the streaming thread waits for an active MoveIn gate after "
+                    + "the Spanner result-set is exhausted before falling back to the close/reopen path. Default 60000 ms.");
 
     protected static final Field LOW_WATERMARK_ENABLED_FIELD = Field.create(LOW_WATERMARK_ENABLED)
             .withDisplayName(LOW_WATERMARK_ENABLED)
@@ -319,6 +381,15 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
             .withDescription("Maximum missed heartbeats to identify that partition gets stuck")
             .withDefault(10)
             .withValidation(Field::isNonNegativeInteger);
+
+    protected static final Field HEARTBEAT_LAG_WARN_THRESHOLD_MS = Field.createInternal(HEARTBEAT_LAG_WARN_THRESHOLD_MS_PROPERTY_NAME)
+            .withDisplayName("Heartbeat lag warning threshold (milli-seconds)")
+            .withType(Type.LONG)
+            .withWidth(Width.SHORT)
+            .withImportance(Importance.LOW)
+            .withDescription("Lag, in milliseconds, between the current time and a heartbeat event's timestamp above which a warning is logged")
+            .withDefault(60_000L)
+            .withValidation(Field::isNonNegativeLong);
 
     private static final Field VALUE_CAPTURE_MODE = Field.create(VALUE_CAPTURE_MODE_PROPERTY_NAME)
             .withDisplayName("Value capture mode")
@@ -713,6 +784,14 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
                     TASKS_FAIL_OVERLOADED_CHECK_INTERVAL,
                     SCALER_MONITOR_ENABLED,
                     LOGGING_JSON_ENABLED,
+                    MUTABLE_PARTITION_ORDERING_ENABLED,
+                    MUTABLE_WINDOW_MINUTES,
+                    MUTABLE_MOVE_IN_BUFFER_MAX_EVENTS,
+                    MUTABLE_MOVE_IN_GATE_CHECK_INTERVAL_MS,
+                    MUTABLE_MOVE_IN_GATE_TIMEOUT_MS,
+                    TABLE_EXCLUDE_LIST,
+                    TABLE_INCLUDE_LIST,
+                    CUSTOM_CONVERTERS,
                     TOMBSTONES_ON_DELETE,
                     SOURCE_INFO_STRUCT_MAKER)
             .group(Field.Group.CONNECTION_ADVANCED,
@@ -751,5 +830,14 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
 
     public static ConfigDef configDef() {
         return CONFIG_DEFINITION.configDef();
+    }
+
+    static int validateMutableWindowMinutes(Configuration config, Field field, Field.ValidationOutput problems) {
+        int value = config.getInteger(field, 20);
+        if (value < 1 || value > 30) {
+            problems.accept(field, value, "Must be between 1 and 30 minutes (inclusive). Got: " + value);
+            return 1;
+        }
+        return 0;
     }
 }

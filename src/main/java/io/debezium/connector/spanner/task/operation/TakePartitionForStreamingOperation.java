@@ -75,6 +75,7 @@ public class TakePartitionForStreamingOperation implements Operation {
                         if (toSchedule.contains(partitionState.getToken())) {
                             return partitionState.toBuilder()
                                     .state(PartitionStateEnum.SCHEDULED)
+                                    .moveInState(null)
                                     .build();
                         }
                         return partitionState;

@@ -64,6 +64,8 @@ public class SynchronizationTaskContext {
 
     private final PartitionFactory partitionFactory;
 
+    private final PartitionOffsetProvider partitionOffsetProvider;
+
     private final LowWatermarkStampPublisher lowWatermarkStampPublisher;
 
     private final Runnable finishingHandler;
@@ -100,6 +102,8 @@ public class SynchronizationTaskContext {
         this.task = task;
 
         this.connectorConfig = connectorConfig;
+
+        this.partitionOffsetProvider = partitionOffsetProvider;
 
         this.errorHandler = errorHandler;
 
@@ -239,11 +243,19 @@ public class SynchronizationTaskContext {
             this.taskStateChangeEventProcessor.stopProcessing();
             LOGGER.info("Task {}, Shut down TaskStateChangeEventProcessor", this.taskSyncContextHolder.get().getTaskUid());
 
+            // Shut down the partition-scheduling executor only after the event processor is stopped
+            // so no new schedulePendingPartitionsAsync() calls can arrive after this point.
+            this.taskStateChangeEventHandler.shutdown();
+            LOGGER.info("Task {}, Shut down TaskStateChangeEventHandler partition scheduler", this.taskSyncContextHolder.get().getTaskUid());
+
             this.lowWatermarkCalculationJob.stop();
             LOGGER.info("Task {}, Shut down LowWatermarkCalculationJob", this.taskSyncContextHolder.get().getTaskUid());
 
             this.rebalanceHandler.destroy();
             LOGGER.info("Task {}, Shut down rebalance handler", this.taskSyncContextHolder.get().getTaskUid());
+
+            this.partitionOffsetProvider.shutdown();
+            LOGGER.info("Task {}, Shut down PartitionOffsetProvider", this.taskSyncContextHolder.get().getTaskUid());
 
         }
         catch (Exception ex) {
@@ -253,6 +265,15 @@ public class SynchronizationTaskContext {
             LOGGER.info("Task {}, SynchronizationTaskContext end", this.taskSyncContextHolder.get().getTaskUid());
         }
 
+    }
+
+    /**
+     * Returns the {@link TaskSyncContextHolder} so that components outside this class (e.g.
+     * {@link io.debezium.connector.spanner.db.stream.MoveInBufferGate}) can obtain a live,
+     * non-blocking snapshot of the current {@link TaskSyncContext}.
+     */
+    public TaskSyncContextHolder getTaskSyncContextHolder() {
+        return taskSyncContextHolder;
     }
 
     public void publishEvent(TaskStateChangeEvent event) throws InterruptedException {

@@ -7,11 +7,13 @@ package io.debezium.connector.spanner.db.model.schema;
 
 import java.util.Objects;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 /**
  * DTO for Spanner DB column type
  */
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class ColumnType {
     @JsonProperty("code")
     private DataType type;

@@ -27,7 +27,7 @@ public class ChangeStreamResultSet implements AutoCloseable {
 
     ChangeStreamResultSet(ResultSet resultSet) {
         this.resultSet = resultSet;
-        this.queryStartedAt = Timestamp.MIN_VALUE;
+        this.queryStartedAt = Timestamp.now();
         this.recordStreamStartedAt = Timestamp.MIN_VALUE;
         this.recordStreamEndedAt = Timestamp.MIN_VALUE;
         this.recordReadAt = Timestamp.MIN_VALUE;
@@ -36,13 +36,11 @@ public class ChangeStreamResultSet implements AutoCloseable {
     }
 
     public boolean next() {
-        if (queryStartedAt == null) {
-            queryStartedAt = Timestamp.now();
-        }
         recordStreamStartedAt = Timestamp.now();
         final boolean hasNext = resultSet.next();
         numberOfRecordsRead++;
         recordStreamEndedAt = Timestamp.now();
+        recordReadAt = recordStreamEndedAt;
         totalStreamDuration = totalStreamDuration.withDurationAdded(
                 new Duration(
                         recordStreamStartedAt.toSqlTimestamp().getTime(),

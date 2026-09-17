@@ -56,18 +56,18 @@ class SourceInfoFactoryTest {
 
         DataChangeEvent dataChangeEvent = new DataChangeEvent("token", commitTimestamp,
                 "testId", true,
-                "1", "Table Name", rowType, new ArrayList<>(), ModType.INSERT,
+                "0000000000000000-00000001", "Table Name", rowType, new ArrayList<>(), ModType.INSERT,
                 ValueCaptureType.OLD_AND_NEW_VALUES, 1L, 1L,
                 "testTag=test", false, streamEventMetadata);
 
         SourceInfo expected = new SourceInfo(connectorConfig, dataChangeEvent.getTableName(), recordTimestamp,
-                commitTimestamp.toSqlTimestamp().toInstant(), readAtTimestamp, serverTransactionId, recordSequence,
+                commitTimestamp.toSqlTimestamp().toInstant(), readAtTimestamp, serverTransactionId, recordSequence, "0000000000000000",
                 lowWatermark, numberRecordsInTransaction, "testTag=test", false,
                 ValueCaptureType.OLD_AND_NEW_VALUES.name(), "testToken", 0, false, 1L);
 
         SourceInfo sourceInfo = sourceInfoFactory.getSourceInfo(0,
                 new DataChangeEvent("token", commitTimestamp, "testId",
-                        true, "1", "Table Name", rowType,
+                        true, "0000000000000000-00000001", "Table Name", rowType,
                         new ArrayList<>(), ModType.INSERT, ValueCaptureType.OLD_AND_NEW_VALUES, 1L,
                         1L, "testTag=test", false, streamEventMetadata));
 
@@ -80,6 +80,7 @@ class SourceInfoFactoryTest {
         assertEquals(expected.getCommitTimestamp(), sourceInfo.getCommitTimestamp());
         assertEquals(expected.getServerTransactionId(), sourceInfo.getServerTransactionId());
         assertEquals(expected.getRecordSequence(), sourceInfo.getRecordSequence());
+        assertEquals(expected.getRecordSequencePrefix(), sourceInfo.getRecordSequencePrefix());
         assertEquals(expected.getLowWatermark(), sourceInfo.getLowWatermark());
         assertEquals(expected.getReadAtTimestamp(), sourceInfo.getReadAtTimestamp());
         assertEquals(expected.getNumberRecordsInTransaction(), sourceInfo.getNumberRecordsInTransaction());
@@ -108,19 +109,19 @@ class SourceInfoFactoryTest {
 
         DataChangeEvent dataChangeEvent = new DataChangeEvent("token", commitTimestamp,
                 "testId", true,
-                "1", "Table Name", rowType, new ArrayList<>(), ModType.INSERT,
+                "0000000000000000-00000001", "Table Name", rowType, new ArrayList<>(), ModType.INSERT,
                 ValueCaptureType.NEW_ROW_AND_OLD_VALUES, 1L, 1L,
                 "testTag=test", false, streamEventMetadata);
 
         SourceInfo expected = new SourceInfo(connectorConfig, dataChangeEvent.getTableName(), recordTimestamp,
                 commitTimestamp.toSqlTimestamp().toInstant(), readAtTimestamp, serverTransactionId,
-                recordSequence,
+                recordSequence, "0000000000000000",
                 lowWatermark, numberRecordsInTransaction, "testTag=test", false,
                 ValueCaptureType.NEW_ROW_AND_OLD_VALUES.name(), "testToken", 0, false, 1L);
 
         SourceInfo sourceInfo = sourceInfoFactory.getSourceInfo(0,
                 new DataChangeEvent("token", commitTimestamp, "testId",
-                        true, "1", "Table Name", rowType,
+                        true, "0000000000000000-00000001", "Table Name", rowType,
                         new ArrayList<>(), ModType.INSERT, ValueCaptureType.OLD_AND_NEW_VALUES, 1L,
                         1L, "testTag=test", false, streamEventMetadata));
 
@@ -133,6 +134,7 @@ class SourceInfoFactoryTest {
         assertEquals(expected.getCommitTimestamp(), sourceInfo.getCommitTimestamp());
         assertEquals(expected.getServerTransactionId(), sourceInfo.getServerTransactionId());
         assertEquals(expected.getRecordSequence(), sourceInfo.getRecordSequence());
+        assertEquals(expected.getRecordSequencePrefix(), sourceInfo.getRecordSequencePrefix());
         assertEquals(expected.getLowWatermark(), sourceInfo.getLowWatermark());
         assertEquals(expected.getReadAtTimestamp(), sourceInfo.getReadAtTimestamp());
         assertEquals(expected.getNumberRecordsInTransaction(), sourceInfo.getNumberRecordsInTransaction());
@@ -161,18 +163,18 @@ class SourceInfoFactoryTest {
 
         DataChangeEvent dataChangeEvent = new DataChangeEvent("token", commitTimestamp,
                 "testId", true,
-                "1", "Table Name", rowType, new ArrayList<>(), ModType.INSERT,
+                "0000000000000000-00000001", "Table Name", rowType, new ArrayList<>(), ModType.INSERT,
                 ValueCaptureType.NEW_ROW, 1L, 1L,
                 "testTag=test", false, streamEventMetadata);
 
         SourceInfo expected = new SourceInfo(connectorConfig, dataChangeEvent.getTableName(), recordTimestamp,
-                commitTimestamp.toSqlTimestamp().toInstant(), readAtTimestamp, serverTransactionId, recordSequence,
+                commitTimestamp.toSqlTimestamp().toInstant(), readAtTimestamp, serverTransactionId, recordSequence, "0000000000000000",
                 lowWatermark, numberRecordsInTransaction, "testTag=test", false,
                 ValueCaptureType.NEW_ROW.name(), "testToken", 0, false, 1L);
 
         SourceInfo sourceInfo = sourceInfoFactory.getSourceInfo(0,
                 new DataChangeEvent("token", commitTimestamp, "testId",
-                        true, "1", "Table Name", rowType,
+                        true, "0000000000000000-00000001", "Table Name", rowType,
                         new ArrayList<>(), ModType.INSERT, ValueCaptureType.NEW_ROW, 1L,
                         1L, "testTag=test", false, streamEventMetadata));
 
@@ -186,6 +188,7 @@ class SourceInfoFactoryTest {
         assertEquals(expected.getCommitTimestamp(), sourceInfo.getCommitTimestamp());
         assertEquals(expected.getServerTransactionId(), sourceInfo.getServerTransactionId());
         assertEquals(expected.getRecordSequence(), sourceInfo.getRecordSequence());
+        assertEquals(expected.getRecordSequencePrefix(), sourceInfo.getRecordSequencePrefix());
         assertEquals(expected.getLowWatermark(), sourceInfo.getLowWatermark());
         assertEquals(expected.getReadAtTimestamp(), sourceInfo.getReadAtTimestamp());
         assertEquals(expected.getNumberRecordsInTransaction(), sourceInfo.getNumberRecordsInTransaction());
@@ -214,19 +217,19 @@ class SourceInfoFactoryTest {
 
         DataChangeEvent dataChangeEvent = new DataChangeEvent("token", commitTimestamp,
                 "testId", true,
-                "1", "Table Name", rowType, new ArrayList<>(), ModType.INSERT,
+                "0000000000000000-00000001", "Table Name", rowType, new ArrayList<>(), ModType.INSERT,
                 ValueCaptureType.NEW_VALUES, 1L, 1L,
                 "testTag=test", false, streamEventMetadata);
 
         SourceInfo expected = new SourceInfo(connectorConfig, dataChangeEvent.getTableName(), recordTimestamp,
                 commitTimestamp.toSqlTimestamp().toInstant(), readAtTimestamp, serverTransactionId,
-                recordSequence,
+                recordSequence, "0000000000000000",
                 lowWatermark, numberRecordsInTransaction, "testTag=test", false,
                 ValueCaptureType.NEW_VALUES.name(), "testToken", 0, false, 1L);
 
         SourceInfo sourceInfo = sourceInfoFactory.getSourceInfo(0,
                 new DataChangeEvent("token", commitTimestamp, "testId",
-                        true, "1", "Table Name", rowType,
+                        true, "0000000000000000-00000001", "Table Name", rowType,
                         new ArrayList<>(), ModType.INSERT, ValueCaptureType.NEW_VALUES, 1L,
                         1L, "testTag=test", false, streamEventMetadata));
 
@@ -240,6 +243,7 @@ class SourceInfoFactoryTest {
         assertEquals(expected.getCommitTimestamp(), sourceInfo.getCommitTimestamp());
         assertEquals(expected.getServerTransactionId(), sourceInfo.getServerTransactionId());
         assertEquals(expected.getRecordSequence(), sourceInfo.getRecordSequence());
+        assertEquals(expected.getRecordSequencePrefix(), sourceInfo.getRecordSequencePrefix());
         assertEquals(expected.getLowWatermark(), sourceInfo.getLowWatermark());
         assertEquals(expected.getReadAtTimestamp(), sourceInfo.getReadAtTimestamp());
         assertEquals(expected.getNumberRecordsInTransaction(), sourceInfo.getNumberRecordsInTransaction());

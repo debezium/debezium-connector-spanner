@@ -70,6 +70,7 @@ public class PartitionFactory {
                     .startTimestamp(startTime)
                     .endTimestamp(partitionState.getEndTimestamp())
                     .parentTokens(partitionState.getParents())
+                    .lastBoundaryRecordSequence(resolveLastBoundaryRecordSequence(partitionState))
                     .build());
         }
         return partitionMap;
@@ -82,26 +83,53 @@ public class PartitionFactory {
                 .startTimestamp(resolveOffset(partitionState, offset))
                 .endTimestamp(partitionState.getEndTimestamp())
                 .parentTokens(partitionState.getParents())
+                .lastBoundaryRecordSequence(resolveLastBoundaryRecordSequence(partitionState))
                 .build();
     }
 
-    private Timestamp resolveOffset(PartitionState partitionState, Timestamp offset) {
-        Timestamp startTime;
+    private String resolveLastBoundaryRecordSequence(PartitionState partitionState) {
+        if (partitionState.getLastBoundaryRecordSequence() != null) {
+            return partitionState.getLastBoundaryRecordSequence();
+        }
+        if (partitionState.getMoveInState() != null) {
+            return partitionState.getMoveInState().getRecordSequence();
+        }
+        return null;
+    }
 
+    private Timestamp resolveOffset(PartitionState partitionState, Timestamp offset) {
+        Timestamp startTimestamp = partitionState.getStartTimestamp();
+        Timestamp processedTimestamp = partitionState.getProcessedTimestamp();
+
+        if (offset != null && offset.compareTo(startTimestamp) < 0) {
+            LOGGER.warn("Incorrect offset {}, ignoring for partition {}", offset, partitionState.getToken());
+            offset = null;
+        }
+
+        Timestamp startTime;
         if (offset != null) {
-            if (offset.toSqlTimestamp().before(partitionState.getStartTimestamp().toSqlTimestamp())) {
-                LOGGER.warn("Incorrect offset {}, start time will be taken for partition {}", offset, partitionState.getToken());
-                startTime = partitionState.getStartTimestamp();
-            }
-            else {
-                LOGGER.info("Found previous offset {}", Map.of(partitionState.getToken(), offset.toString()));
-                startTime = offset;
-            }
+            startTime = offset;
+            LOGGER.info("Resuming partition {} from committed offset {} (processedTimestamp={})",
+                    partitionState.getToken(), offset, processedTimestamp);
+        }
+        else if (processedTimestamp != null && processedTimestamp.compareTo(startTimestamp) > 0) {
+            LOGGER.info("Resuming partition {} from processedTimestamp {} (no committed offset found)",
+                    partitionState.getToken(), processedTimestamp);
+            startTime = processedTimestamp;
         }
         else {
-            LOGGER.info("Previous offset not found, start time will be taken {}",
-                    Map.of(partitionState.getToken(), partitionState.getStartTimestamp()));
-            startTime = partitionState.getStartTimestamp();
+            LOGGER.info("No previous offset found, using startTimestamp {} for partition {}",
+                    startTimestamp, partitionState.getToken());
+            startTime = startTimestamp;
+        }
+
+        if (partitionState.getMoveInState() != null) {
+            Timestamp moveInTimestamp = partitionState.getMoveInState().getTimestamp();
+            if (startTime.compareTo(moveInTimestamp) < 0) {
+                LOGGER.info("Partition {} has MoveInState at {}, adjusting startTime from {} to moveInTimestamp",
+                        partitionState.getToken(), moveInTimestamp, startTime);
+                startTime = moveInTimestamp;
+            }
         }
 
         metricsEventPublisher.publishMetricEvent(PartitionOffsetLagMetricEvent.from(partitionState.getToken(), startTime));

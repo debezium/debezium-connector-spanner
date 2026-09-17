@@ -1,6 +1,8 @@
 syntax = "proto3";
 package io.debezium.connector.spanner.scale.proto;
 
+import "google/protobuf/timestamp.proto";
+
 option java_package = "io.debezium.connector.spanner.kafka.event.proto";
 option java_outer_classname = "SyncEventProtos";
 
@@ -31,6 +33,17 @@ message TaskState {
   repeated PartitionState sharedPartitions = 6;
 }
 
+message MoveInState {
+  google.protobuf.Timestamp commit_timestamp = 1;
+  string record_sequence = 2;
+  repeated string sourcePartitionTokens = 3;
+}
+
+message MoveOutState {
+  google.protobuf.Timestamp commit_timestamp = 1;
+  repeated string destPartitionTokens = 2;
+}
+
 message PartitionState {
   string token = 1;
   string startTimestamp = 2;
@@ -44,6 +57,13 @@ message PartitionState {
   string finishedTimestamp = 7;
 
   string originParent = 8;
+
+  MoveInState moveInState = 9;
+  repeated MoveOutState moveOutStates = 10;
+
+  string processedTimestamp = 11;
+
+  string lastBoundaryRecordSequence = 12;
 }
 
 enum State {
