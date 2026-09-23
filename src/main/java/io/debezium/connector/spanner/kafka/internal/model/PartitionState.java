@@ -11,6 +11,8 @@ import java.util.Set;
 
 import com.google.cloud.Timestamp;
 
+import io.debezium.connector.spanner.db.model.PartitionKey;
+
 /**
  * Contains information about the current state
  * of the Spanner partition
@@ -34,6 +36,8 @@ public class PartitionState implements Comparable<PartitionState> {
     private final Timestamp processedTimestamp;
 
     private final String lastBoundaryRecordSequence;
+
+    private final String tvfName;
 
     public PartitionState(final String token, final Timestamp startTimestamp,
                           final Timestamp endTimestamp, final PartitionStateEnum state,
@@ -62,6 +66,15 @@ public class PartitionState implements Comparable<PartitionState> {
                           final Set<String> parents, final String assigneeTaskUid, final Timestamp finishedTimestamp,
                           final String originParent, final MoveInState moveInState, final List<MoveOutState> moveOutStates,
                           final Timestamp processedTimestamp, final String lastBoundaryRecordSequence) {
+        this(token, startTimestamp, endTimestamp, state, parents, assigneeTaskUid, finishedTimestamp, originParent, moveInState, moveOutStates,
+                processedTimestamp, lastBoundaryRecordSequence, null);
+    }
+
+    public PartitionState(final String token, final Timestamp startTimestamp,
+                          final Timestamp endTimestamp, final PartitionStateEnum state,
+                          final Set<String> parents, final String assigneeTaskUid, final Timestamp finishedTimestamp,
+                          final String originParent, final MoveInState moveInState, final List<MoveOutState> moveOutStates,
+                          final Timestamp processedTimestamp, final String lastBoundaryRecordSequence, final String tvfName) {
         this.token = token;
         this.startTimestamp = startTimestamp;
         this.endTimestamp = endTimestamp;
@@ -74,6 +87,7 @@ public class PartitionState implements Comparable<PartitionState> {
         this.moveOutStates = moveOutStates == null ? List.of() : moveOutStates;
         this.processedTimestamp = processedTimestamp;
         this.lastBoundaryRecordSequence = lastBoundaryRecordSequence;
+        this.tvfName = tvfName;
     }
 
     public static class PartitionStateBuilder {
@@ -101,6 +115,8 @@ public class PartitionState implements Comparable<PartitionState> {
         private Timestamp processedTimestamp;
 
         private String lastBoundaryRecordSequence;
+
+        private String tvfName;
 
         PartitionStateBuilder() {
         }
@@ -165,12 +181,17 @@ public class PartitionState implements Comparable<PartitionState> {
             return this;
         }
 
+        public PartitionState.PartitionStateBuilder tvfName(final String tvfName) {
+            this.tvfName = tvfName;
+            return this;
+        }
+
         public PartitionState build() {
             return new PartitionState(this.token, this.startTimestamp,
                     this.endTimestamp, this.state, this.parents,
                     this.assigneeTaskUid, this.finishedTimestamp, this.originParent,
                     this.moveInState, this.moveOutStates, this.processedTimestamp,
-                    this.lastBoundaryRecordSequence);
+                    this.lastBoundaryRecordSequence, this.tvfName);
         }
 
     }
@@ -192,7 +213,8 @@ public class PartitionState implements Comparable<PartitionState> {
                 .moveInState(this.moveInState)
                 .moveOutStates(this.moveOutStates)
                 .processedTimestamp(this.processedTimestamp)
-                .lastBoundaryRecordSequence(this.lastBoundaryRecordSequence);
+                .lastBoundaryRecordSequence(this.lastBoundaryRecordSequence)
+                .tvfName(this.tvfName);
     }
 
     public String getToken() {
@@ -243,6 +265,18 @@ public class PartitionState implements Comparable<PartitionState> {
         return lastBoundaryRecordSequence;
     }
 
+    /**
+     * The name of the placement table-valued function (TVF) this partition originated from, when the
+     * change stream is configured with {@code gcp.spanner.placement.tvf.names}, or null otherwise.
+     */
+    public String getTvfName() {
+        return tvfName;
+    }
+
+    public PartitionKey getKey() {
+        return new PartitionKey(token, tvfName);
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) {
@@ -252,20 +286,18 @@ public class PartitionState implements Comparable<PartitionState> {
             return false;
         }
         PartitionState that = (PartitionState) o;
-        return Objects.equals(token, that.token);
+        return Objects.equals(token, that.token) && Objects.equals(tvfName, that.tvfName);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(token);
+        return Objects.hash(token, tvfName);
     }
 
     @Override
     public int compareTo(PartitionState partitionState) {
-        if (!Objects.equals(partitionState.getToken(), token)) {
-            return token.compareTo(partitionState.getToken());
-        }
-        return state.compareTo(partitionState.state);
+        int keyComparison = getKey().compareTo(partitionState.getKey());
+        return keyComparison != 0 ? keyComparison : state.compareTo(partitionState.state);
     }
 
     @Override
@@ -283,6 +315,7 @@ public class PartitionState implements Comparable<PartitionState> {
                 ", moveOutStates=" + moveOutStates +
                 ", processedTimestamp=" + processedTimestamp +
                 ", lastBoundaryRecordSequence='" + lastBoundaryRecordSequence + '\'' +
+                ", tvfName='" + tvfName + '\'' +
                 '}';
     }
 }

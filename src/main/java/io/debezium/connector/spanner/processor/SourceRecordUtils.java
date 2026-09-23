@@ -56,6 +56,13 @@ public class SourceRecordUtils {
         return SpannerPartition.extractToken(sourceRecord.sourcePartition());
     }
 
+    public static String extractTvfName(SourceRecord sourceRecord) {
+        if (sourceRecord.sourcePartition() == null) {
+            return null;
+        }
+        return SpannerPartition.extractTvfName(sourceRecord.sourcePartition());
+    }
+
     public static String extractRecordUid(SourceRecord sourceRecord) {
         return (String) extract(RECORD_UID, sourceRecord);
     }

@@ -31,7 +31,7 @@ public class TaskScalerUtil {
                 .stream()
                 .flatMap(t -> t.getPartitions().stream())
                 .filter(p -> inProgressPartitionState(p.getState()))
-                .map(PartitionState::getToken)
+                .map(PartitionState::getKey)
                 .distinct()
                 .count();
     }

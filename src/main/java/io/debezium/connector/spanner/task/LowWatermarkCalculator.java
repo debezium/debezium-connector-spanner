@@ -22,6 +22,7 @@ import com.google.cloud.Timestamp;
 import io.debezium.connector.spanner.SpannerConnectorConfig;
 import io.debezium.connector.spanner.SpannerErrorHandler;
 import io.debezium.connector.spanner.db.model.InitialPartition;
+import io.debezium.connector.spanner.db.model.PartitionKey;
 import io.debezium.connector.spanner.kafka.internal.model.PartitionState;
 import io.debezium.connector.spanner.kafka.internal.model.PartitionStateEnum;
 
@@ -52,14 +53,18 @@ public class LowWatermarkCalculator {
             return null;
         }
 
-        Map<String, List<PartitionState>> partitionsMap = taskSyncContext.getAllTaskStates().values().stream()
+        boolean placementTvfsConfigured = !spannerConnectorConfig.placementTvfNames().isEmpty();
+
+        Map<PartitionKey, List<PartitionState>> partitionsMap = taskSyncContext.getAllTaskStates().values().stream()
                 .flatMap(taskState -> taskState.getPartitions().stream())
                 .filter(
                         partitionState -> !partitionState.getState().equals(PartitionStateEnum.FINISHED)
                                 && !partitionState.getState().equals(PartitionStateEnum.REMOVED))
-                .collect(Collectors.groupingBy(PartitionState::getToken));
+                .filter(partitionState -> !placementTvfsConfigured
+                        || partitionState.getTvfName() != null && !partitionState.getTvfName().isBlank())
+                .collect(Collectors.groupingBy(PartitionState::getKey));
 
-        Set<String> duplicatesInPartitions = checkDuplication(partitionsMap);
+        Set<PartitionKey> duplicatesInPartitions = checkDuplication(partitionsMap);
 
         if (!duplicatesInPartitions.isEmpty()) {
             LOGGER.warn(
@@ -67,16 +72,21 @@ public class LowWatermarkCalculator {
             return null;
         }
 
-        Map<String, PartitionState> partitions = partitionsMap.entrySet().stream()
+        Map<PartitionKey, PartitionState> partitions = partitionsMap.entrySet().stream()
                 .map(entry -> new AbstractMap.SimpleEntry<>(entry.getKey(), entry.getValue().get(0)))
                 .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
 
-        Map<String, List<PartitionState>> sharedPartitionsMap = taskSyncContext.getAllTaskStates().values().stream()
+        Map<PartitionKey, List<PartitionState>> sharedPartitionsMap = taskSyncContext.getAllTaskStates().values().stream()
                 .flatMap(taskState -> taskState.getSharedPartitions().stream())
-                .filter(partitionState -> !partitions.containsKey(partitionState.getToken()))
-                .collect(Collectors.groupingBy(PartitionState::getToken));
+                .filter(
+                        partitionState -> !partitionState.getState().equals(PartitionStateEnum.FINISHED)
+                                && !partitionState.getState().equals(PartitionStateEnum.REMOVED))
+                .filter(partitionState -> !placementTvfsConfigured
+                        || partitionState.getTvfName() != null && !partitionState.getTvfName().isBlank())
+                .filter(partitionState -> !partitions.containsKey(partitionState.getKey()))
+                .collect(Collectors.groupingBy(PartitionState::getKey));
 
-        Set<String> duplicatesInSharedPartitions = checkDuplication(sharedPartitionsMap);
+        Set<PartitionKey> duplicatesInSharedPartitions = checkDuplication(sharedPartitionsMap);
         if (!duplicatesInSharedPartitions.isEmpty()) {
             LOGGER.warn(
                     "Task {}, calculateLowWatermark: found duplication in sharedPartitionsMap: {}",
@@ -84,39 +94,42 @@ public class LowWatermarkCalculator {
             return null;
         }
 
-        Map<String, PartitionState> sharedPartitions = sharedPartitionsMap.entrySet().stream()
+        Map<PartitionKey, PartitionState> sharedPartitions = sharedPartitionsMap.entrySet().stream()
                 .map(entry -> new AbstractMap.SimpleEntry<>(entry.getKey(), entry.getValue().get(0)))
                 .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
 
-        Map<String, PartitionState> allPartitions = new HashMap<>();
+        Map<PartitionKey, PartitionState> allPartitions = new HashMap<>();
 
         allPartitions.putAll(partitions);
 
         allPartitions.putAll(sharedPartitions);
 
-        if (allPartitions.containsKey(InitialPartition.PARTITION_TOKEN)) {
+        List<PartitionState> initialPartitions = allPartitions.values().stream()
+                .filter(partitionState -> InitialPartition.isInitialPartition(partitionState.getToken()))
+                .collect(Collectors.toList());
+        if (!initialPartitions.isEmpty()) {
             final long now = new Date().getTime();
-            long lag = now
-                    - allPartitions
-                            .get(InitialPartition.PARTITION_TOKEN)
-                            .getStartTimestamp()
-                            .toDate()
-                            .getTime();
             long acceptedLag = spannerConnectorConfig.getHeartbeatInterval().toMillis() + OFFSET_MONITORING_LAG_MAX_MS;
-            if (lag > acceptedLag) {
-                LOGGER.warn(
-                        "task: {}, Partition has a very old start timestamp, lag: {}, token: {}",
-                        taskSyncContextHolder.get().getTaskUid(),
-                        lag,
-                        InitialPartition.PARTITION_TOKEN);
+            for (PartitionState partitionState : initialPartitions) {
+                long lag = now - partitionState.getStartTimestamp().toDate().getTime();
+                if (lag > acceptedLag) {
+                    LOGGER.warn(
+                            "task: {}, Partition has a very old start timestamp, lag: {}, partition: {}",
+                            taskSyncContextHolder.get().getTaskUid(),
+                            lag,
+                            partitionState.getKey());
+                }
             }
-            return allPartitions.get(InitialPartition.PARTITION_TOKEN).getStartTimestamp();
+            return initialPartitions.stream()
+                    .map(PartitionState::getStartTimestamp)
+                    .min(Timestamp::compareTo)
+                    .orElse(null);
         }
 
-        Map<String, Timestamp> offsets;
+        Map<PartitionKey, Timestamp> offsets;
 
         try {
-            offsets = partitionOffsetProvider.getOffsets(allPartitions.keySet());
+            offsets = partitionOffsetProvider.getOffsets(allPartitions.values());
         }
         catch (ConnectException e) {
             if (e.getCause() != null && e.getCause() instanceof InterruptedException) {
@@ -154,7 +167,7 @@ public class LowWatermarkCalculator {
         return allPartitions.values().stream()
                 .map(
                         partitionState -> {
-                            Timestamp timestamp = offsets.get(partitionState.getToken());
+                            Timestamp timestamp = offsets.get(partitionState.getKey());
                             if (timestamp != null) {
                                 return timestamp;
                             }
@@ -168,7 +181,7 @@ public class LowWatermarkCalculator {
                 .orElse(spannerConnectorConfig.startTime());
     }
 
-    private void monitorOffsets(Map<String, Timestamp> offsets, Map<String, PartitionState> allPartitions) {
+    private void monitorOffsets(Map<PartitionKey, Timestamp> offsets, Map<PartitionKey, PartitionState> allPartitions) {
         if (offsets == null) {
             return;
         }
@@ -176,27 +189,26 @@ public class LowWatermarkCalculator {
 
         allPartitions.values().forEach(
                 partitionState -> {
-                    Timestamp timestamp = offsets.get(partitionState.getToken());
+                    Timestamp timestamp = offsets.get(partitionState.getKey());
                     long acceptedLag = spannerConnectorConfig.getHeartbeatInterval().toMillis() + OFFSET_MONITORING_LAG_MAX_MS;
                     if (timestamp != null) {
-                        String token = partitionState.getToken();
                         long lag = now - timestamp.toDate().getTime();
                         if (lag > acceptedLag) {
-                            LOGGER.warn("Task {}, Partition has a very old offset, lag: {}, token: {}", taskSyncContextHolder.get().getTaskUid(), lag, partitionState);
+                            LOGGER.warn("Task {}, Partition has a very old offset, lag: {}, partition: {}", taskSyncContextHolder.get().getTaskUid(), lag,
+                                    partitionState);
                         }
                     }
                     else if (partitionState.getStartTimestamp() != null) {
-                        String token = partitionState.getToken();
                         long lag = now - partitionState.getStartTimestamp().toDate().getTime();
                         if (lag > acceptedLag) {
-                            LOGGER.warn("Task {}, Partition has a very old start time, lag: {}, token: {}", taskSyncContextHolder.get().getTaskUid(), lag,
+                            LOGGER.warn("Task {}, Partition has a very old start time, lag: {}, partition: {}", taskSyncContextHolder.get().getTaskUid(), lag,
                                     partitionState);
                         }
                     }
                 });
     }
 
-    private Set<String> checkDuplication(Map<String, List<PartitionState>> map) {
+    private Set<PartitionKey> checkDuplication(Map<PartitionKey, List<PartitionState>> map) {
         return map.entrySet().stream()
                 .filter(entry -> entry.getValue().size() > 1)
                 .map(Map.Entry::getKey)

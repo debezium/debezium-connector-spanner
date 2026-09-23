@@ -648,6 +648,7 @@ public class ChangeStreamRecordMapper {
                 .withRecordReadAt(resultSetMetadata.getRecordReadAt())
                 .withTotalStreamTimeMillis(resultSetMetadata.getTotalStreamDuration().getMillis())
                 .withNumberOfRecordsRead(resultSetMetadata.getNumberOfRecordsRead())
+                .withTvfName(partition.getTvfName())
                 .build();
     }
 

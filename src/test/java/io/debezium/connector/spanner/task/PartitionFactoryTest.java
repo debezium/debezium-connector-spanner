@@ -7,6 +7,7 @@ package io.debezium.connector.spanner.task;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -21,7 +22,9 @@ import org.junit.jupiter.api.Test;
 
 import com.google.cloud.Timestamp;
 
+import io.debezium.connector.spanner.db.model.InitialPartition;
 import io.debezium.connector.spanner.db.model.Partition;
+import io.debezium.connector.spanner.db.model.PartitionKey;
 import io.debezium.connector.spanner.kafka.internal.model.PartitionState;
 import io.debezium.connector.spanner.kafka.internal.model.PartitionStateEnum;
 import io.debezium.connector.spanner.metrics.MetricsEventPublisher;
@@ -51,6 +54,23 @@ class PartitionFactoryTest {
     }
 
     @Test
+    void testInitPartitionsUsesRawParent0ForEachTvf() {
+        PartitionFactory factory = new PartitionFactory(null, new MetricsEventPublisher(), List.of("tvfA", "tvfB"));
+
+        List<Partition> roots = factory.initPartitions(START, null);
+
+        assertEquals(2, roots.size());
+
+        PartitionKey keyA = new PartitionKey(InitialPartition.PARTITION_TOKEN, "tvfA");
+        PartitionKey keyB = new PartitionKey(InitialPartition.PARTITION_TOKEN, "tvfB");
+
+        assertTrue(roots.stream().anyMatch(p -> p.getKey().equals(keyA)));
+        assertTrue(roots.stream().anyMatch(p -> p.getKey().equals(keyB)));
+        assertTrue(roots.stream().allMatch(p -> InitialPartition.PARTITION_TOKEN.equals(p.getToken())),
+                "per-TVF roots must keep the raw Parent0 token and store the TVF separately");
+    }
+
+    @Test
     void testGetPartitionsBatchResolution() {
         Map<Map<String, String>, Map<String, Object>> offsets = new HashMap<>();
         offsets.put(Map.of("partitionToken", "token1"), Map.of("offset", OFFSET.toString()));
@@ -59,13 +79,13 @@ class PartitionFactoryTest {
         PartitionFactory factory = buildFactory(offsets);
 
         List<PartitionState> states = List.of(buildPartitionState("token1"), buildPartitionState("token2"));
-        Map<String, Partition> result = factory.getPartitions(states);
+        Map<PartitionKey, Partition> result = factory.getPartitions(states);
 
         assertEquals(2, result.size());
-        assertNotNull(result.get("token1"));
-        assertNotNull(result.get("token2"));
-        assertEquals(OFFSET, result.get("token1").getStartTimestamp());
-        assertEquals(OFFSET, result.get("token2").getStartTimestamp());
+        assertNotNull(result.get(new PartitionKey("token1", null)));
+        assertNotNull(result.get(new PartitionKey("token2", null)));
+        assertEquals(OFFSET, result.get(new PartitionKey("token1", null)).getStartTimestamp());
+        assertEquals(OFFSET, result.get(new PartitionKey("token2", null)).getStartTimestamp());
     }
 
     @Test
@@ -73,10 +93,10 @@ class PartitionFactoryTest {
         PartitionFactory factory = buildFactory(new HashMap<>());
 
         List<PartitionState> states = List.of(buildPartitionState("token1"));
-        Map<String, Partition> result = factory.getPartitions(states);
+        Map<PartitionKey, Partition> result = factory.getPartitions(states);
 
         assertEquals(1, result.size());
-        assertEquals(START, result.get("token1").getStartTimestamp());
+        assertEquals(START, result.get(new PartitionKey("token1", null)).getStartTimestamp());
     }
 
     @Test
@@ -88,10 +108,10 @@ class PartitionFactoryTest {
         PartitionFactory factory = buildFactory(offsets);
 
         List<PartitionState> states = List.of(buildPartitionState("token1"));
-        Map<String, Partition> result = factory.getPartitions(states);
+        Map<PartitionKey, Partition> result = factory.getPartitions(states);
 
         assertEquals(1, result.size());
-        assertEquals(START, result.get("token1").getStartTimestamp());
+        assertEquals(START, result.get(new PartitionKey("token1", null)).getStartTimestamp());
     }
 
     @Test
@@ -108,10 +128,10 @@ class PartitionFactoryTest {
         PartitionState state = buildPartitionState("token1").toBuilder()
                 .processedTimestamp(processedTimestamp)
                 .build();
-        Map<String, Partition> result = factory.getPartitions(List.of(state));
+        Map<PartitionKey, Partition> result = factory.getPartitions(List.of(state));
 
         assertEquals(1, result.size());
-        assertEquals(OFFSET, result.get("token1").getStartTimestamp());
+        assertEquals(OFFSET, result.get(new PartitionKey("token1", null)).getStartTimestamp());
     }
 
     @Test
@@ -122,9 +142,9 @@ class PartitionFactoryTest {
         PartitionState state = buildPartitionState("token1").toBuilder()
                 .processedTimestamp(processedTimestamp)
                 .build();
-        Map<String, Partition> result = factory.getPartitions(List.of(state));
+        Map<PartitionKey, Partition> result = factory.getPartitions(List.of(state));
 
         assertEquals(1, result.size());
-        assertEquals(processedTimestamp, result.get("token1").getStartTimestamp());
+        assertEquals(processedTimestamp, result.get(new PartitionKey("token1", null)).getStartTimestamp());
     }
 }

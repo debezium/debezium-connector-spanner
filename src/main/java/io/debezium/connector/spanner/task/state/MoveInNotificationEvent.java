@@ -17,12 +17,18 @@ import com.google.cloud.Timestamp;
  */
 public class MoveInNotificationEvent implements TaskStateChangeEvent {
     private final String token;
+    private final String tvfName;
     private final Timestamp commitTimestamp;
     private final String recordSequence;
     private final List<String> sourcePartitionTokens;
 
     public MoveInNotificationEvent(String token, Timestamp commitTimestamp, String recordSequence, List<String> sourcePartitionTokens) {
+        this(token, null, commitTimestamp, recordSequence, sourcePartitionTokens);
+    }
+
+    public MoveInNotificationEvent(String token, String tvfName, Timestamp commitTimestamp, String recordSequence, List<String> sourcePartitionTokens) {
         this.token = token;
+        this.tvfName = tvfName;
         this.commitTimestamp = commitTimestamp;
         this.recordSequence = recordSequence;
         this.sourcePartitionTokens = sourcePartitionTokens;
@@ -30,6 +36,10 @@ public class MoveInNotificationEvent implements TaskStateChangeEvent {
 
     public String getToken() {
         return token;
+    }
+
+    public String getTvfName() {
+        return tvfName;
     }
 
     public Timestamp getCommitTimestamp() {

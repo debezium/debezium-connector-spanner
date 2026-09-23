@@ -6,6 +6,7 @@
 package io.debezium.connector.spanner.task.operation;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
@@ -24,10 +25,16 @@ import io.debezium.connector.spanner.task.TaskSyncContext;
 public class PartitionStatusUpdateOperation implements Operation {
     private static final Logger LOGGER = LoggerFactory.getLogger(PartitionStatusUpdateOperation.class);
     private final String token;
+    private final String tvfName;
     private final PartitionStateEnum partitionStateEnum;
 
     public PartitionStatusUpdateOperation(String token, PartitionStateEnum partitionStateEnum) {
+        this(token, null, partitionStateEnum);
+    }
+
+    public PartitionStatusUpdateOperation(String token, String tvfName, PartitionStateEnum partitionStateEnum) {
         this.token = token;
+        this.tvfName = tvfName;
         this.partitionStateEnum = partitionStateEnum;
     }
 
@@ -46,7 +53,7 @@ public class PartitionStatusUpdateOperation implements Operation {
 
         List<PartitionState> partitionsList = currentTaskState.getPartitions().stream()
                 .map(partitionState -> {
-                    if (partitionState.getToken().equals(token)) {
+                    if (partitionState.getToken().equals(token) && Objects.equals(partitionState.getTvfName(), tvfName)) {
                         if (PartitionStateEnum.FINISHED.equals(partitionStateEnum)) {
                             return partitionState.toBuilder().state(partitionStateEnum)
                                     .finishedTimestamp(Timestamp.now())

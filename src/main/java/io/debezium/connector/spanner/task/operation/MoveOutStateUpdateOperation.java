@@ -10,6 +10,7 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
@@ -40,11 +41,17 @@ public class MoveOutStateUpdateOperation implements Operation {
     private static final Logger LOGGER = LoggerFactory.getLogger(MoveOutStateUpdateOperation.class);
 
     private final String token;
+    private final String tvfName;
     private final Timestamp commitTimestamp;
     private final List<String> destinationTokens;
 
     public MoveOutStateUpdateOperation(String token, Timestamp commitTimestamp, List<String> destinationTokens) {
+        this(token, null, commitTimestamp, destinationTokens);
+    }
+
+    public MoveOutStateUpdateOperation(String token, String tvfName, Timestamp commitTimestamp, List<String> destinationTokens) {
         this.token = token;
+        this.tvfName = tvfName;
         this.commitTimestamp = commitTimestamp;
         this.destinationTokens = destinationTokens;
     }
@@ -62,7 +69,7 @@ public class MoveOutStateUpdateOperation implements Operation {
 
         List<PartitionState> updatedPartitions = currentTaskState.getPartitions().stream()
                 .map(partitionState -> {
-                    if (partitionState.getToken().equals(token)) {
+                    if (partitionState.getToken().equals(token) && Objects.equals(partitionState.getTvfName(), tvfName)) {
                         return partitionState.toBuilder()
                                 .moveOutStates(mergeMoveOutStates(partitionState.getMoveOutStates(), newMoveOutState))
                                 .build();

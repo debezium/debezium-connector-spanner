@@ -12,15 +12,25 @@ import io.debezium.connector.spanner.kafka.internal.model.PartitionStateEnum;
  */
 public class PartitionStatusUpdateEvent implements TaskStateChangeEvent {
     private final String token;
+    private final String tvfName;
     private final PartitionStateEnum state;
 
     public PartitionStatusUpdateEvent(String token, PartitionStateEnum state) {
+        this(token, null, state);
+    }
+
+    public PartitionStatusUpdateEvent(String token, String tvfName, PartitionStateEnum state) {
         this.token = token;
+        this.tvfName = tvfName;
         this.state = state;
     }
 
     public String getToken() {
         return token;
+    }
+
+    public String getTvfName() {
+        return tvfName;
     }
 
     public PartitionStateEnum getState() {

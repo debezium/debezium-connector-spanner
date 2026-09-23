@@ -6,6 +6,7 @@
 package io.debezium.connector.spanner.task.operation;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -224,6 +225,73 @@ class PublishMoveInStateOperationTest {
                         .sharedPartitions(List.of())
                         .build())
                 .build();
+    }
+
+    @Test
+    void tvfScoping_onlyUpdatesPartitionWithMatchingTvfName() {
+        PartitionState dstTvfA = destPartitionWithTvf("dst", "tvfA", OLD_PROCESSED_TS);
+        PartitionState dstTvfB = destPartitionWithTvf("dst", "tvfB", OLD_PROCESSED_TS);
+        TaskSyncContext context = contextWith(dstTvfA, dstTvfB);
+
+        TaskSyncContext result = new PublishMoveInStateOperation(
+                "dst", "tvfA", MOVE_IN_TS, "00001", List.of("src1"), true).doOperation(context);
+
+        PartitionState updatedA = findPartition(result, "dst", "tvfA");
+        PartitionState updatedB = findPartition(result, "dst", "tvfB");
+
+        assertNotNull(updatedA);
+        assertNotNull(updatedB);
+        assertEquals(MOVE_IN_TS, updatedA.getProcessedTimestamp());
+        assertEquals(MOVE_IN_TS, updatedA.getMoveInState().getTimestamp());
+        assertEquals(OLD_PROCESSED_TS, updatedB.getProcessedTimestamp(), "partition in a different TVF must remain untouched");
+        assertNull(updatedB.getMoveInState());
+    }
+
+    @Test
+    void legacyNullTvfName_onlyUpdatesNullTvfPartition() {
+        PartitionState dstLegacy = destPartitionWithTvf("dst", null, OLD_PROCESSED_TS);
+        PartitionState dstTvfA = destPartitionWithTvf("dst", "tvfA", OLD_PROCESSED_TS);
+        TaskSyncContext context = contextWith(dstLegacy, dstTvfA);
+
+        TaskSyncContext result = new PublishMoveInStateOperation(
+                "dst", MOVE_IN_TS, "00001", List.of("src1"), true).doOperation(context);
+
+        PartitionState updatedLegacy = findPartition(result, "dst", null);
+        PartitionState updatedTvfA = findPartition(result, "dst", "tvfA");
+
+        assertNotNull(updatedLegacy);
+        assertNotNull(updatedTvfA);
+        assertEquals(MOVE_IN_TS, updatedLegacy.getProcessedTimestamp());
+        assertNull(updatedTvfA.getMoveInState(), "per-TVF partition must not be affected by legacy operation");
+        assertEquals(OLD_PROCESSED_TS, updatedTvfA.getProcessedTimestamp());
+    }
+
+    private static TaskSyncContext contextWith(PartitionState... partitions) {
+        return TaskSyncContext.builder()
+                .taskUid("task0")
+                .currentTaskState(TaskState.builder()
+                        .taskUid("task0")
+                        .partitions(List.of(partitions))
+                        .sharedPartitions(List.of())
+                        .build())
+                .build();
+    }
+
+    private static PartitionState destPartitionWithTvf(String token, String tvfName, Timestamp processedTimestamp) {
+        return PartitionState.builder()
+                .token(token)
+                .tvfName(tvfName)
+                .state(PartitionStateEnum.RUNNING)
+                .parents(Set.of("originalParent"))
+                .processedTimestamp(processedTimestamp)
+                .build();
+    }
+
+    private static PartitionState findPartition(TaskSyncContext ctx, String token, String tvfName) {
+        return ctx.getCurrentTaskState().getPartitions().stream()
+                .filter(p -> p.getToken().equals(token) && (tvfName == null ? p.getTvfName() == null : tvfName.equals(p.getTvfName())))
+                .findFirst()
+                .orElse(null);
     }
 
     private static PartitionState destPartition(TaskSyncContext ctx) {

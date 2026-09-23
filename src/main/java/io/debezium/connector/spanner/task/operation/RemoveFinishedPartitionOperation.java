@@ -22,6 +22,7 @@ import io.debezium.connector.spanner.SpannerConnectorConfig;
 import io.debezium.connector.spanner.SpannerPartition;
 import io.debezium.connector.spanner.context.offset.PartitionOffset;
 import io.debezium.connector.spanner.context.offset.SpannerOffsetContext;
+import io.debezium.connector.spanner.db.model.PartitionKey;
 import io.debezium.connector.spanner.kafka.internal.model.MoveOutState;
 import io.debezium.connector.spanner.kafka.internal.model.PartitionState;
 import io.debezium.connector.spanner.kafka.internal.model.PartitionStateEnum;
@@ -65,7 +66,7 @@ public class RemoveFinishedPartitionOperation implements Operation {
 
                                     List<PartitionState> allPartitionStates = allPartitionStates(taskSyncContext);
 
-                                    if (allChildrenFinished(allPartitionStates, partitionState.getToken())
+                                    if (allChildrenFinished(allPartitionStates, partitionState)
                                             && moveOutDestinationsHaveResumed(allPartitionStates, partitionState)) {
                                         LOGGER.info(
                                                 "Partition {} will be removed from the task with finished timestamp {},"
@@ -79,7 +80,7 @@ public class RemoveFinishedPartitionOperation implements Operation {
                                                 partitionState.getToken());
                                         PartitionOffset partitionOffset = new PartitionOffset();
                                         SpannerOffsetContext spannerOffsetContext = new SpannerOffsetContext(partitionOffset, new TransactionContext());
-                                        SpannerPartition partition = new SpannerPartition(partitionState.getToken());
+                                        SpannerPartition partition = new SpannerPartition(partitionState.getToken(), partitionState.getTvfName());
                                         try {
                                             spannerEventDispatcher.alwaysDispatchHeartbeatEvent(partition, spannerOffsetContext);
                                         }
@@ -121,18 +122,19 @@ public class RemoveFinishedPartitionOperation implements Operation {
                 .collect(Collectors.toList());
     }
 
-    private static boolean allChildrenFinished(List<PartitionState> allPartitionStates, String token) {
-        Set<String> children = allPartitionStates.stream()
-                .filter(partitionState -> partitionState.getParents().contains(token))
-                .map(PartitionState::getToken)
+    private static boolean allChildrenFinished(List<PartitionState> allPartitionStates, PartitionState source) {
+        Set<PartitionKey> children = allPartitionStates.stream()
+                .filter(partitionState -> Objects.equals(source.getTvfName(), partitionState.getTvfName()))
+                .filter(partitionState -> partitionState.getParents().contains(source.getToken()))
+                .map(PartitionState::getKey)
                 .collect(Collectors.toSet());
 
         return children.isEmpty()
                 || children.stream()
                         .allMatch(
-                                childToken -> {
+                                childIdentity -> {
                                     return allPartitionStates.stream()
-                                            .filter(partitionState -> childToken.equals(partitionState.getToken()))
+                                            .filter(partitionState -> childIdentity.equals(partitionState.getKey()))
                                             .allMatch(
                                                     partitionState -> PartitionStateEnum.FINISHED.equals(partitionState.getState())
                                                             || PartitionStateEnum.REMOVED.equals(partitionState.getState()));
@@ -167,6 +169,7 @@ public class RemoveFinishedPartitionOperation implements Operation {
             for (String destToken : moveOutState.getDestPartitionTokens()) {
                 PartitionState dest = allPartitionStates.stream()
                         .filter(p -> destToken.equals(p.getToken()))
+                        .filter(p -> Objects.equals(partitionState.getTvfName(), p.getTvfName()))
                         .findFirst()
                         .orElse(null);
                 if (dest == null) {

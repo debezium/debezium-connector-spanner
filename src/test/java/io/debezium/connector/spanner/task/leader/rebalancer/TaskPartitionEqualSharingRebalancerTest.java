@@ -16,11 +16,54 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
+import io.debezium.connector.spanner.db.model.PartitionKey;
 import io.debezium.connector.spanner.kafka.internal.model.PartitionState;
 import io.debezium.connector.spanner.kafka.internal.model.PartitionStateEnum;
 import io.debezium.connector.spanner.kafka.internal.model.TaskState;
 
 class TaskPartitionEqualSharingRebalancerTest {
+
+    @Test
+    void greedyRebalancerKeepsSameTokenFromDifferentTvfs() {
+        TaskState leader = taskState("leader", partition("token", "tvfA"));
+        TaskState obsolete = taskState("obsolete", partition("token", "tvfB"));
+
+        TaskState result = new TaskPartitionGreedyLeaderRebalancer()
+                .rebalance(leader, Map.of("leader", leader), Map.of("obsolete", obsolete));
+
+        Assertions.assertEquals(Set.of(new PartitionKey("token", "tvfA"), new PartitionKey("token", "tvfB")), result.getPartitions().stream()
+                .map(PartitionState::getKey)
+                .collect(Collectors.toSet()));
+    }
+
+    @Test
+    void equalSharingRebalancerKeepsSameTokenFromDifferentTvfs() {
+        TaskState leader = taskState("leader", partition("token", "tvfA"));
+        TaskState obsolete = taskState("obsolete", partition("token", "tvfB"));
+
+        TaskState result = new TaskPartitionEqualSharingRebalancer()
+                .rebalance(leader, Map.of("leader", leader), Map.of("obsolete", obsolete));
+
+        Assertions.assertEquals(Set.of(new PartitionKey("token", "tvfA"), new PartitionKey("token", "tvfB")), result.getPartitions().stream()
+                .map(PartitionState::getKey)
+                .collect(Collectors.toSet()));
+    }
+
+    private static PartitionState partition(String token, String tvfName) {
+        return PartitionState.builder()
+                .token(token)
+                .tvfName(tvfName)
+                .state(PartitionStateEnum.CREATED)
+                .build();
+    }
+
+    private static TaskState taskState(String taskUid, PartitionState partition) {
+        return TaskState.builder()
+                .taskUid(taskUid)
+                .partitions(List.of(partition))
+                .sharedPartitions(List.of())
+                .build();
+    }
 
     @Test
     // TODO: check

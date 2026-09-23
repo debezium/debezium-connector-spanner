@@ -15,17 +15,27 @@ import com.google.cloud.Timestamp;
 public class WindowAdvancedEvent implements TaskStateChangeEvent {
 
     private final String token;
+    private final String tvfName;
     private final Timestamp processedTimestamp;
     private final String lastBoundaryRecordSequence;
 
     public WindowAdvancedEvent(String token, Timestamp processedTimestamp, String lastBoundaryRecordSequence) {
+        this(token, null, processedTimestamp, lastBoundaryRecordSequence);
+    }
+
+    public WindowAdvancedEvent(String token, String tvfName, Timestamp processedTimestamp, String lastBoundaryRecordSequence) {
         this.token = token;
+        this.tvfName = tvfName;
         this.processedTimestamp = processedTimestamp;
         this.lastBoundaryRecordSequence = lastBoundaryRecordSequence;
     }
 
     public String getToken() {
         return token;
+    }
+
+    public String getTvfName() {
+        return tvfName;
     }
 
     public Timestamp getProcessedTimestamp() {

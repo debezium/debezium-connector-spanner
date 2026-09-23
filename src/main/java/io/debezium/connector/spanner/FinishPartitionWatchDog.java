@@ -18,6 +18,7 @@ import java.util.function.Consumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import io.debezium.connector.spanner.db.model.PartitionKey;
 import io.debezium.util.Clock;
 import io.debezium.util.Metronome;
 
@@ -25,7 +26,7 @@ public class FinishPartitionWatchDog {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(FinishPartitionWatchDog.class);
     private volatile Thread thread;
-    private final Map<String, Instant> partition = new HashMap<>();
+    private final Map<PartitionKey, Instant> partition = new HashMap<>();
     private final Duration pollInterval = Duration.ofMillis(60000);
     private final Duration sleepInterval = Duration.ofMillis(100);
     private final Clock clock;
@@ -40,8 +41,8 @@ public class FinishPartitionWatchDog {
             Instant lastUpdatedTime = Instant.now();
             while (!Thread.currentThread().isInterrupted()) {
 
-                Set<String> pendingToFinish = finishingPartitionManager.getPendingFinishPartitions();
-                Set<String> pending = finishingPartitionManager.getPendingPartitions();
+                Set<PartitionKey> pendingToFinish = finishingPartitionManager.getPendingFinishPartitions();
+                Set<PartitionKey> pending = finishingPartitionManager.getPendingPartitions();
 
                 pendingToFinish.forEach(
                         token -> partition.computeIfAbsent(token, token1 -> Instant.now()));
@@ -52,9 +53,9 @@ public class FinishPartitionWatchDog {
                     lastUpdatedTime = Instant.now();
                 }
 
-                Iterator<Map.Entry<String, Instant>> itr = partition.entrySet().iterator();
+                Iterator<Map.Entry<PartitionKey, Instant>> itr = partition.entrySet().iterator();
                 while (itr.hasNext()) {
-                    Map.Entry<String, Instant> entry = itr.next();
+                    Map.Entry<PartitionKey, Instant> entry = itr.next();
                     if (!pendingToFinish.contains(entry.getKey())) {
                         itr.remove();
                     }
@@ -66,7 +67,7 @@ public class FinishPartitionWatchDog {
                 partition.forEach(
                         (token, instant) -> {
                             if (currentTime.isAfter(instant.plus(timeout))) {
-                                tokens.add(token);
+                                tokens.add(token.getToken());
                             }
                         });
 

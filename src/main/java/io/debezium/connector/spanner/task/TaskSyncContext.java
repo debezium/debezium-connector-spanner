@@ -21,6 +21,7 @@ import org.slf4j.Logger;
 import com.google.cloud.Timestamp;
 
 import io.debezium.connector.spanner.SpannerConnectorConfig;
+import io.debezium.connector.spanner.db.model.PartitionKey;
 import io.debezium.connector.spanner.kafka.internal.model.MessageTypeEnum;
 import io.debezium.connector.spanner.kafka.internal.model.PartitionState;
 import io.debezium.connector.spanner.kafka.internal.model.PartitionStateEnum;
@@ -415,32 +416,32 @@ public class TaskSyncContext {
     }
 
     public int getNumPartitions() {
-        Map<String, List<PartitionState>> partitionsMap = getAllTaskStates().values().stream()
+        Map<PartitionKey, List<PartitionState>> partitionsMap = getAllTaskStates().values().stream()
                 .flatMap(taskState -> taskState.getPartitions().stream())
                 .filter(
                         partitionState -> !partitionState.getState().equals(PartitionStateEnum.FINISHED)
                                 && !partitionState.getState().equals(PartitionStateEnum.REMOVED))
-                .collect(Collectors.groupingBy(PartitionState::getToken));
+                .collect(Collectors.groupingBy(PartitionState::getKey));
 
         return partitionsMap.size();
     }
 
     public int getNumSharedPartitions() {
-        Map<String, List<PartitionState>> partitionsMap = getAllTaskStates().values().stream()
+        Map<PartitionKey, List<PartitionState>> partitionsMap = getAllTaskStates().values().stream()
                 .flatMap(taskState -> taskState.getPartitions().stream())
                 .filter(
                         partitionState -> !partitionState.getState().equals(PartitionStateEnum.FINISHED)
                                 && !partitionState.getState().equals(PartitionStateEnum.REMOVED))
-                .collect(Collectors.groupingBy(PartitionState::getToken));
+                .collect(Collectors.groupingBy(PartitionState::getKey));
 
-        Map<String, PartitionState> partitions = partitionsMap.entrySet().stream()
+        Map<PartitionKey, PartitionState> partitions = partitionsMap.entrySet().stream()
                 .map(entry -> new AbstractMap.SimpleEntry<>(entry.getKey(), entry.getValue().get(0)))
                 .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
 
-        Map<String, List<PartitionState>> sharedPartitionsMap = getAllTaskStates().values().stream()
+        Map<PartitionKey, List<PartitionState>> sharedPartitionsMap = getAllTaskStates().values().stream()
                 .flatMap(taskState -> taskState.getSharedPartitions().stream())
-                .filter(partitionState -> !partitions.containsKey(partitionState.getToken()))
-                .collect(Collectors.groupingBy(PartitionState::getToken));
+                .filter(partitionState -> !partitions.containsKey(partitionState.getKey()))
+                .collect(Collectors.groupingBy(PartitionState::getKey));
 
         return sharedPartitionsMap.size();
     }
@@ -448,17 +449,17 @@ public class TaskSyncContext {
     // Debug function used to check if there is any partiton or shared partition duplication
     // inside the TaskSyncContext.
     public boolean checkDuplication(boolean printOffsets, String loggingString) {
-        Map<String, List<PartitionState>> partitionsMap = getAllTaskStates().values().stream()
+        Map<PartitionKey, List<PartitionState>> partitionsMap = getAllTaskStates().values().stream()
                 .flatMap(taskState -> taskState.getPartitions().stream())
                 .filter(
                         partitionState -> !partitionState.getState().equals(PartitionStateEnum.FINISHED)
                                 && !partitionState.getState().equals(PartitionStateEnum.REMOVED))
-                .collect(Collectors.groupingBy(PartitionState::getToken));
+                .collect(Collectors.groupingBy(PartitionState::getKey));
 
         int numPartitions = partitionsMap.size();
 
         // Check that there are no duplicate partitions in the partitions map.
-        Set<String> duplicatesInPartitions = checkDuplicationInMap(partitionsMap);
+        Set<PartitionKey> duplicatesInPartitions = checkDuplicationInMap(partitionsMap);
         if (!duplicatesInPartitions.isEmpty()) {
             if (printOffsets) {
                 LOGGER.warn(
@@ -468,19 +469,19 @@ public class TaskSyncContext {
             return true;
         }
 
-        Map<String, PartitionState> partitions = partitionsMap.entrySet().stream()
+        Map<PartitionKey, PartitionState> partitions = partitionsMap.entrySet().stream()
                 .map(entry -> new AbstractMap.SimpleEntry<>(entry.getKey(), entry.getValue().get(0)))
                 .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
 
-        Map<String, List<PartitionState>> sharedPartitionsMap = getAllTaskStates().values().stream()
+        Map<PartitionKey, List<PartitionState>> sharedPartitionsMap = getAllTaskStates().values().stream()
                 .flatMap(taskState -> taskState.getSharedPartitions().stream())
-                .filter(partitionState -> !partitions.containsKey(partitionState.getToken()))
-                .collect(Collectors.groupingBy(PartitionState::getToken));
+                .filter(partitionState -> !partitions.containsKey(partitionState.getKey()))
+                .collect(Collectors.groupingBy(PartitionState::getKey));
 
         int numSharedPartitions = sharedPartitionsMap.size();
 
         // Check that there are no duplicate partitions in the shared partitions map.
-        Set<String> duplicatesInSharedPartitions = checkDuplicationInMap(sharedPartitionsMap);
+        Set<PartitionKey> duplicatesInSharedPartitions = checkDuplicationInMap(sharedPartitionsMap);
         if (!duplicatesInSharedPartitions.isEmpty()) {
             if (printOffsets) {
                 LOGGER.warn(
@@ -512,7 +513,7 @@ public class TaskSyncContext {
                 ", currentTaskState=" + this.getCurrentTaskState() + ")";
     }
 
-    private Set<String> checkDuplicationInMap(Map<String, List<PartitionState>> map) {
+    private Set<PartitionKey> checkDuplicationInMap(Map<PartitionKey, List<PartitionState>> map) {
         return map.entrySet().stream()
                 .filter(entry -> entry.getValue().size() > 1)
                 .map(Map.Entry::getKey)

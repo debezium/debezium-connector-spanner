@@ -6,6 +6,7 @@
 package io.debezium.connector.spanner.task.operation;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -45,6 +46,7 @@ import io.debezium.connector.spanner.task.TaskSyncContext;
 public class PublishMoveInStateOperation implements Operation {
 
     private final String token;
+    private final String tvfName;
     private final Timestamp commitTimestamp;
     private final String recordSequence;
     private final List<String> sourcePartitionTokens;
@@ -52,7 +54,13 @@ public class PublishMoveInStateOperation implements Operation {
 
     public PublishMoveInStateOperation(String token, Timestamp commitTimestamp, String recordSequence,
                                        List<String> sourcePartitionTokens, boolean isFirstMoveIn) {
+        this(token, null, commitTimestamp, recordSequence, sourcePartitionTokens, isFirstMoveIn);
+    }
+
+    public PublishMoveInStateOperation(String token, String tvfName, Timestamp commitTimestamp, String recordSequence,
+                                       List<String> sourcePartitionTokens, boolean isFirstMoveIn) {
         this.token = token;
+        this.tvfName = tvfName;
         this.commitTimestamp = commitTimestamp;
         this.recordSequence = recordSequence;
         this.sourcePartitionTokens = sourcePartitionTokens;
@@ -70,7 +78,7 @@ public class PublishMoveInStateOperation implements Operation {
 
         List<PartitionState> updatedPartitions = currentTaskState.getPartitions().stream()
                 .map(partitionState -> {
-                    if (!partitionState.getToken().equals(token)) {
+                    if (!partitionState.getToken().equals(token) || !Objects.equals(partitionState.getTvfName(), tvfName)) {
                         return partitionState;
                     }
                     List<String> effectiveSourcePartitionTokens = sourcePartitionTokens;

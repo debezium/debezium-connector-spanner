@@ -7,6 +7,7 @@ package io.debezium.connector.spanner.task;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -15,6 +16,7 @@ import org.slf4j.LoggerFactory;
 
 import com.google.cloud.Timestamp;
 
+import io.debezium.connector.spanner.db.model.PartitionKey;
 import io.debezium.connector.spanner.kafka.internal.model.MoveOutState;
 import io.debezium.connector.spanner.kafka.internal.model.PartitionState;
 import io.debezium.connector.spanner.kafka.internal.model.PartitionStateEnum;
@@ -40,10 +42,12 @@ public final class MoveInGateChecker {
     }
 
     /**
-     * Returns the set of partition tokens that are in {@code FINISHED} or {@code REMOVED}
-     * state across all task states visible in {@code taskSyncContext}.
+     * Returns the set of partition identities that are in {@code FINISHED} or {@code REMOVED}
+     * state across all task states visible in {@code taskSyncContext}. The identity is the
+     * same as {@link PartitionState#getKey()} so callers can scope membership checks by
+     * the destination partition's TVF name.
      */
-    public static Set<String> getFinishedPartitions(TaskSyncContext taskSyncContext) {
+    public static Set<PartitionKey> getFinishedPartitions(TaskSyncContext taskSyncContext) {
         List<PartitionState> all = new ArrayList<>();
         all.addAll(taskSyncContext.getCurrentTaskState().getPartitions());
         taskSyncContext.getTaskStates().values()
@@ -52,7 +56,7 @@ public final class MoveInGateChecker {
         return all.stream()
                 .filter(ps -> PartitionStateEnum.FINISHED.equals(ps.getState())
                         || PartitionStateEnum.REMOVED.equals(ps.getState()))
-                .map(PartitionState::getToken)
+                .map(PartitionState::getKey)
                 .collect(Collectors.toSet());
     }
 
@@ -62,15 +66,16 @@ public final class MoveInGateChecker {
      *
      * @param taskSyncContext   live snapshot of the task's known state
      * @param destToken         destination partition token
+     * @param destTvfName       destination partition TVF name (may be {@code null} for legacy streams)
      * @param moveInTimestamp   commit timestamp of the MoveIn event
      * @param sourceTokens      all source partition tokens referenced by the MoveIn
-     * @param finishedPartitions pre-computed set from {@link #getFinishedPartitions}
+     * @param finishedPartitions pre-computed set of identities from {@link #getFinishedPartitions}
      */
-    public static boolean canContinue(TaskSyncContext taskSyncContext, String destToken,
+    public static boolean canContinue(TaskSyncContext taskSyncContext, String destToken, String destTvfName,
                                       Timestamp moveInTimestamp, List<String> sourceTokens,
-                                      Set<String> finishedPartitions) {
+                                      Set<PartitionKey> finishedPartitions) {
         for (String sourceToken : sourceTokens) {
-            if (!sourceHasResumedThisMove(taskSyncContext, sourceToken, moveInTimestamp, destToken, finishedPartitions)) {
+            if (!sourceHasResumedThisMove(taskSyncContext, sourceToken, moveInTimestamp, destToken, finishedPartitions, destTvfName)) {
                 return false;
             }
         }
@@ -80,13 +85,16 @@ public final class MoveInGateChecker {
     /**
      * Mirrors the logic documented on
      * {@code FindPartitionForStreamingOperation#sourceHasResumedThisMove}.
+     *
+     * @param tvfName the TVF name shared by the source and destination partitions
      */
     public static boolean sourceHasResumedThisMove(TaskSyncContext taskSyncContext,
                                                    String sourceToken,
                                                    Timestamp moveInTimestamp,
                                                    String destToken,
-                                                   Set<String> finishedPartitions) {
-        boolean satisfiedByMoveOutState = findMoveOutStates(taskSyncContext, sourceToken).stream()
+                                                   Set<PartitionKey> finishedPartitions,
+                                                   String tvfName) {
+        boolean satisfiedByMoveOutState = findMoveOutStates(taskSyncContext, sourceToken, tvfName).stream()
                 .anyMatch(mos -> {
                     int cmp = mos.getTimestamp().compareTo(moveInTimestamp);
                     return cmp > 0 || (cmp == 0 && mos.getDestPartitionTokens().contains(destToken));
@@ -94,52 +102,58 @@ public final class MoveInGateChecker {
         if (satisfiedByMoveOutState) {
             return true;
         }
-        if (finishedPartitions.contains(sourceToken)) {
+        PartitionKey sourceIdentity = new PartitionKey(sourceToken, tvfName);
+        if (finishedPartitions.contains(sourceIdentity)) {
             LOGGER.info("Source partition {} already finished/removed, treating MoveOut as satisfied for destination {}",
-                    sourceToken, destToken);
+                    sourceIdentity, destToken);
             return true;
         }
-        PartitionState sourceState = findPartitionState(taskSyncContext, sourceToken);
+        PartitionState sourceState = findPartitionState(taskSyncContext, sourceToken, tvfName);
         if (sourceState != null && sourceState.getProcessedTimestamp() != null
                 && sourceState.getProcessedTimestamp().compareTo(moveInTimestamp) > 0) {
             LOGGER.info(
                     "Source partition {} already streamed past MoveIn timestamp {} (processedTimestamp={}), "
                             + "treating MoveOut as satisfied for destination {}",
-                    sourceToken, moveInTimestamp, sourceState.getProcessedTimestamp(), destToken);
+                    sourceIdentity, moveInTimestamp, sourceState.getProcessedTimestamp(), destToken);
             return true;
         }
         return false;
     }
 
-    private static List<MoveOutState> findMoveOutStates(TaskSyncContext taskSyncContext, String token) {
-        PartitionState ps = findPartitionState(taskSyncContext, token);
+    private static List<MoveOutState> findMoveOutStates(TaskSyncContext taskSyncContext, String token, String tvfName) {
+        PartitionState ps = findPartitionState(taskSyncContext, token, tvfName);
         return ps == null ? List.of() : ps.getMoveOutStates();
     }
 
-    /** Searches all task states (partitions and shared partitions) for a matching token. */
-    public static PartitionState findPartitionState(TaskSyncContext taskSyncContext, String token) {
+    /** Searches all task states (partitions and shared partitions) for a matching token and TVF name. */
+    public static PartitionState findPartitionState(TaskSyncContext taskSyncContext, String token, String tvfName) {
         for (PartitionState ps : taskSyncContext.getCurrentTaskState().getPartitions()) {
-            if (ps.getToken().equals(token)) {
+            if (matches(ps, token, tvfName)) {
                 return ps;
             }
         }
         for (PartitionState ps : taskSyncContext.getCurrentTaskState().getSharedPartitions()) {
-            if (ps.getToken().equals(token)) {
+            if (matches(ps, token, tvfName)) {
                 return ps;
             }
         }
         for (TaskState ts : taskSyncContext.getTaskStates().values()) {
             for (PartitionState ps : ts.getPartitions()) {
-                if (ps.getToken().equals(token)) {
+                if (matches(ps, token, tvfName)) {
                     return ps;
                 }
             }
             for (PartitionState ps : ts.getSharedPartitions()) {
-                if (ps.getToken().equals(token)) {
+                if (matches(ps, token, tvfName)) {
                     return ps;
                 }
             }
         }
         return null;
     }
+
+    private static boolean matches(PartitionState partition, String token, String tvfName) {
+        return partition.getToken().equals(token) && Objects.equals(partition.getTvfName(), tvfName);
+    }
+
 }
