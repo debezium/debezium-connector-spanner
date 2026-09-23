@@ -17,6 +17,7 @@ import java.util.Map;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
+import io.debezium.connector.spanner.db.model.PartitionKey;
 import io.debezium.connector.spanner.kafka.internal.model.PartitionState;
 import io.debezium.connector.spanner.kafka.internal.model.PartitionStateEnum;
 import io.debezium.connector.spanner.kafka.internal.model.RebalanceState;
@@ -40,19 +41,19 @@ class SyncEventMergerTest {
         Assertions.assertEquals(taskState1.getTaskUid(), "task0");
 
         Assertions.assertEquals(taskState1.getPartitionsMap().size(), 4);
-        PartitionState partition1 = taskState1.getPartitionsMap().get("token0");
+        PartitionState partition1 = taskState1.getPartitionsMap().get(new PartitionKey("token0", null));
         Assertions.assertEquals(partition1.getState(), PartitionStateEnum.CREATED);
-        PartitionState partition2 = taskState1.getPartitionsMap().get("token1");
+        PartitionState partition2 = taskState1.getPartitionsMap().get(new PartitionKey("token1", null));
         Assertions.assertEquals(partition2.getState(), PartitionStateEnum.REMOVED);
-        PartitionState partition3 = taskState1.getPartitionsMap().get("token2");
+        PartitionState partition3 = taskState1.getPartitionsMap().get(new PartitionKey("token2", null));
         Assertions.assertEquals(partition3.getState(), PartitionStateEnum.RUNNING);
-        PartitionState partition4 = taskState1.getPartitionsMap().get("token3");
+        PartitionState partition4 = taskState1.getPartitionsMap().get(new PartitionKey("token3", null));
         Assertions.assertEquals(partition4.getState(), PartitionStateEnum.FINISHED);
 
         Assertions.assertEquals(taskState1.getSharedPartitions().size(), 2);
-        PartitionState partition5 = taskState1.getSharedPartitionsMap().get("token4");
+        PartitionState partition5 = taskState1.getSharedPartitionsMap().get(new PartitionKey("token4", null));
         Assertions.assertEquals(partition5.getState(), PartitionStateEnum.CREATED);
-        PartitionState partition6 = taskState1.getSharedPartitionsMap().get("token5");
+        PartitionState partition6 = taskState1.getSharedPartitionsMap().get(new PartitionKey("token5", null));
         Assertions.assertEquals(partition6.getState(), PartitionStateEnum.REMOVED);
 
         TaskState taskState2 = mergedRebalanceAnswer.getCurrentTaskState();
@@ -81,19 +82,19 @@ class SyncEventMergerTest {
         Assertions.assertEquals(taskState1.getTaskUid(), "task0");
 
         Assertions.assertEquals(taskState1.getPartitionsMap().size(), 4);
-        PartitionState partition1 = taskState1.getPartitionsMap().get("token0");
+        PartitionState partition1 = taskState1.getPartitionsMap().get(new PartitionKey("token0", null));
         Assertions.assertEquals(partition1.getState(), PartitionStateEnum.CREATED);
-        PartitionState partition2 = taskState1.getPartitionsMap().get("token1");
+        PartitionState partition2 = taskState1.getPartitionsMap().get(new PartitionKey("token1", null));
         Assertions.assertEquals(partition2.getState(), PartitionStateEnum.REMOVED);
-        PartitionState partition3 = taskState1.getPartitionsMap().get("token2");
+        PartitionState partition3 = taskState1.getPartitionsMap().get(new PartitionKey("token2", null));
         Assertions.assertEquals(partition3.getState(), PartitionStateEnum.RUNNING);
-        PartitionState partition4 = taskState1.getPartitionsMap().get("token3");
+        PartitionState partition4 = taskState1.getPartitionsMap().get(new PartitionKey("token3", null));
         Assertions.assertEquals(partition4.getState(), PartitionStateEnum.FINISHED);
 
         Assertions.assertEquals(taskState1.getSharedPartitions().size(), 2);
-        PartitionState partition5 = taskState1.getSharedPartitionsMap().get("token4");
+        PartitionState partition5 = taskState1.getSharedPartitionsMap().get(new PartitionKey("token4", null));
         Assertions.assertEquals(partition5.getState(), PartitionStateEnum.CREATED);
-        PartitionState partition6 = taskState1.getSharedPartitionsMap().get("token5");
+        PartitionState partition6 = taskState1.getSharedPartitionsMap().get(new PartitionKey("token5", null));
         Assertions.assertEquals(partition6.getState(), PartitionStateEnum.REMOVED);
 
         TaskState taskState2 = mergeIncrementalAnswer.getCurrentTaskState();
@@ -126,19 +127,19 @@ class SyncEventMergerTest {
         Assertions.assertEquals(taskState1.getTaskUid(), "task0");
 
         Assertions.assertEquals(taskState1.getPartitionsMap().size(), 4);
-        PartitionState partition1 = taskState1.getPartitionsMap().get("token0");
+        PartitionState partition1 = taskState1.getPartitionsMap().get(new PartitionKey("token0", null));
         Assertions.assertEquals(partition1.getState(), PartitionStateEnum.CREATED);
-        PartitionState partition2 = taskState1.getPartitionsMap().get("token1");
+        PartitionState partition2 = taskState1.getPartitionsMap().get(new PartitionKey("token1", null));
         Assertions.assertEquals(partition2.getState(), PartitionStateEnum.REMOVED);
-        PartitionState partition3 = taskState1.getPartitionsMap().get("token2");
+        PartitionState partition3 = taskState1.getPartitionsMap().get(new PartitionKey("token2", null));
         Assertions.assertEquals(partition3.getState(), PartitionStateEnum.RUNNING);
-        PartitionState partition4 = taskState1.getPartitionsMap().get("token3");
+        PartitionState partition4 = taskState1.getPartitionsMap().get(new PartitionKey("token3", null));
         Assertions.assertEquals(partition4.getState(), PartitionStateEnum.FINISHED);
 
         Assertions.assertEquals(taskState1.getSharedPartitions().size(), 2);
-        PartitionState partition5 = taskState1.getSharedPartitionsMap().get("token4");
+        PartitionState partition5 = taskState1.getSharedPartitionsMap().get(new PartitionKey("token4", null));
         Assertions.assertEquals(partition5.getState(), PartitionStateEnum.CREATED);
-        PartitionState partition6 = taskState1.getSharedPartitionsMap().get("token5");
+        PartitionState partition6 = taskState1.getSharedPartitionsMap().get(new PartitionKey("token5", null));
         Assertions.assertEquals(partition6.getState(), PartitionStateEnum.REMOVED);
 
         TaskState taskState2 = mergeNewEpoch.getCurrentTaskState();
@@ -171,19 +172,19 @@ class SyncEventMergerTest {
         Assertions.assertEquals(taskState1.getTaskUid(), "task0");
 
         Assertions.assertEquals(taskState1.getPartitionsMap().size(), 4);
-        PartitionState partition1 = taskState1.getPartitionsMap().get("token0");
+        PartitionState partition1 = taskState1.getPartitionsMap().get(new PartitionKey("token0", null));
         Assertions.assertEquals(partition1.getState(), PartitionStateEnum.CREATED);
-        PartitionState partition2 = taskState1.getPartitionsMap().get("token1");
+        PartitionState partition2 = taskState1.getPartitionsMap().get(new PartitionKey("token1", null));
         Assertions.assertEquals(partition2.getState(), PartitionStateEnum.REMOVED);
-        PartitionState partition3 = taskState1.getPartitionsMap().get("token2");
+        PartitionState partition3 = taskState1.getPartitionsMap().get(new PartitionKey("token2", null));
         Assertions.assertEquals(partition3.getState(), PartitionStateEnum.RUNNING);
-        PartitionState partition4 = taskState1.getPartitionsMap().get("token3");
+        PartitionState partition4 = taskState1.getPartitionsMap().get(new PartitionKey("token3", null));
         Assertions.assertEquals(partition4.getState(), PartitionStateEnum.FINISHED);
 
         Assertions.assertEquals(taskState1.getSharedPartitions().size(), 2);
-        PartitionState partition5 = taskState1.getSharedPartitionsMap().get("token4");
+        PartitionState partition5 = taskState1.getSharedPartitionsMap().get(new PartitionKey("token4", null));
         Assertions.assertEquals(partition5.getState(), PartitionStateEnum.CREATED);
-        PartitionState partition6 = taskState1.getSharedPartitionsMap().get("token5");
+        PartitionState partition6 = taskState1.getSharedPartitionsMap().get(new PartitionKey("token5", null));
         Assertions.assertEquals(partition6.getState(), PartitionStateEnum.REMOVED);
 
         TaskState taskState2 = mergedEpochUpdate.getCurrentTaskState();

@@ -11,6 +11,7 @@ import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Random;
 import java.util.Set;
@@ -21,6 +22,7 @@ import org.slf4j.LoggerFactory;
 
 import io.debezium.connector.spanner.db.model.InitialPartition;
 import io.debezium.connector.spanner.db.model.Partition;
+import io.debezium.connector.spanner.db.model.PartitionKey;
 import io.debezium.connector.spanner.kafka.internal.model.PartitionState;
 import io.debezium.connector.spanner.kafka.internal.model.PartitionStateEnum;
 import io.debezium.connector.spanner.kafka.internal.model.TaskState;
@@ -64,7 +66,7 @@ public class ChildPartitionOperation implements Operation {
             List<PartitionState> partitions = new ArrayList<>(taskState.getPartitions());
             List<PartitionState> sharedPartitions = new ArrayList<>(taskState.getSharedPartitions());
 
-            if (existPartition(taskSyncContext, newPartition.getToken())) {
+            if (existPartition(taskSyncContext, newPartition.getToken(), newPartition.getTvfName())) {
                 LOGGER.warn("Partition {} already exists in tasks context", newPartition.getToken());
                 continue;
             }
@@ -81,6 +83,7 @@ public class ChildPartitionOperation implements Operation {
                     .state(PartitionStateEnum.CREATED)
                     .parents(newPartition.getParentTokens())
                     .originParent(newPartition.getOriginPartitionToken())
+                    .tvfName(newPartition.getTvfName())
                     .build();
 
             if (taskSyncContext.getTaskUid().equals(taskUid)) {
@@ -101,31 +104,33 @@ public class ChildPartitionOperation implements Operation {
         return taskSyncContext;
     }
 
-    private boolean existPartition(TaskSyncContext taskSyncContext, String token) {
+    private boolean existPartition(TaskSyncContext taskSyncContext, String token, String tvfName) {
         boolean found = taskSyncContext.getCurrentTaskState().getPartitions().stream()
-                .anyMatch(partition -> token.equals(partition.getToken()));
+                .anyMatch(partition -> matches(partition, token, tvfName));
         if (found) {
             return true;
         }
 
         found = taskSyncContext.getCurrentTaskState().getSharedPartitions().stream()
-                .anyMatch(partition -> token.equals(partition.getToken()));
+                .anyMatch(partition -> matches(partition, token, tvfName));
         if (found) {
             return true;
         }
 
         found = taskSyncContext.getTaskStates().values().stream()
                 .flatMap(taskState -> taskState.getPartitions().stream())
-                .anyMatch(partition -> token.equals(partition.getToken()));
+                .anyMatch(partition -> matches(partition, token, tvfName));
         if (found) {
             return true;
         }
 
-        found = taskSyncContext.getTaskStates().values().stream()
+        return taskSyncContext.getTaskStates().values().stream()
                 .flatMap(taskState -> taskState.getSharedPartitions().stream())
-                .anyMatch(partition -> token.equals(partition.getToken()));
+                .anyMatch(partition -> matches(partition, token, tvfName));
+    }
 
-        return found;
+    private boolean matches(PartitionState partition, String token, String tvfName) {
+        return token.equals(partition.getToken()) && Objects.equals(tvfName, partition.getTvfName());
     }
 
     private String findCandidateToSharePartition(TaskSyncContext taskSyncContext) {
@@ -134,16 +139,16 @@ public class ChildPartitionOperation implements Operation {
         final Collection<TaskState> taskStates = taskSyncContext.getAllTaskStates().values();
 
         Map<String, Integer> candidateMap = taskStates.stream().map(taskState -> {
-            Set<String> tokens = taskState.getPartitions().stream()
+            Set<PartitionKey> tokens = taskState.getPartitions().stream()
                     .filter(partitionState -> !PartitionStateEnum.FINISHED.equals(partitionState.getState()) &&
                             !PartitionStateEnum.REMOVED.equals(partitionState.getState()))
-                    .map(PartitionState::getToken)
+                    .map(PartitionState::getKey)
                     .collect(Collectors.toCollection(HashSet::new));
 
-            Set<String> assignedTokens = taskStates.stream()
+            Set<PartitionKey> assignedTokens = taskStates.stream()
                     .flatMap(taskState1 -> taskState1.getSharedPartitions().stream())
                     .filter(partitionState -> partitionState.getAssigneeTaskUid().equals(taskState.getTaskUid()))
-                    .map(PartitionState::getToken)
+                    .map(PartitionState::getKey)
                     .collect(Collectors.toSet());
 
             tokens.addAll(assignedTokens);

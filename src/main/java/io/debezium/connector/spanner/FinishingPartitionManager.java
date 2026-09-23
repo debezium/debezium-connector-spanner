@@ -13,6 +13,7 @@ import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import io.debezium.connector.spanner.db.model.PartitionKey;
 import io.debezium.connector.spanner.task.TaskUid;
 import io.debezium.function.BlockingConsumer;
 
@@ -24,16 +25,20 @@ public class FinishingPartitionManager {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(FinishingPartitionManager.class);
 
-    private final BlockingConsumer<String> finishedPartitionConsumer;
+    private final FinishedPartitionConsumer finishedPartitionConsumer;
     private final SpannerConnectorConfig connectorConfig;
 
-    private final Map<String, String> lastEmittedRecord = new ConcurrentHashMap<>();
-    private final Map<String, Boolean> partitionPendingFinish = new ConcurrentHashMap<>();
+    private final Map<SpannerPartition, String> lastEmittedRecord = new ConcurrentHashMap<>();
+    private final Map<SpannerPartition, Boolean> partitionPendingFinish = new ConcurrentHashMap<>();
 
-    private final Map<String, String> lastCommittedRecord = new ConcurrentHashMap<>();
+    private final Map<SpannerPartition, String> lastCommittedRecord = new ConcurrentHashMap<>();
     private volatile String taskUid;
 
     public FinishingPartitionManager(SpannerConnectorConfig connectorConfig, BlockingConsumer<String> finishedPartitionConsumer) {
+        this(connectorConfig, (token, tvfName) -> finishedPartitionConsumer.accept(token));
+    }
+
+    public FinishingPartitionManager(SpannerConnectorConfig connectorConfig, FinishedPartitionConsumer finishedPartitionConsumer) {
         this.finishedPartitionConsumer = finishedPartitionConsumer;
         this.connectorConfig = connectorConfig;
         this.taskUid = "";
@@ -43,17 +48,31 @@ public class FinishingPartitionManager {
     }
 
     public String newRecord(String token) {
-        String recordUid = lastEmittedRecord.get(token) == null ? "aaaaaaaa" : next(lastEmittedRecord.get(token));
-        lastEmittedRecord.put(token, recordUid);
+        return newRecord(token, null);
+    }
+
+    public String newRecord(String token, String tvfName) {
+        SpannerPartition partition = new SpannerPartition(token, tvfName);
+        String recordUid = lastEmittedRecord.get(partition) == null ? "aaaaaaaa" : next(lastEmittedRecord.get(partition));
+        lastEmittedRecord.put(partition, recordUid);
         return recordUid;
     }
 
     public void registerPartition(String token) {
-        partitionPendingFinish.put(token, false);
+        registerPartition(token, null);
+    }
+
+    public void registerPartition(String token, String tvfName) {
+        partitionPendingFinish.put(new SpannerPartition(token, tvfName), false);
     }
 
     public void commitRecord(String token, String recordUid) throws InterruptedException {
-        Boolean pendingFinishFlag = partitionPendingFinish.get(token);
+        commitRecord(token, null, recordUid);
+    }
+
+    public void commitRecord(String token, String tvfName, String recordUid) throws InterruptedException {
+        SpannerPartition partition = new SpannerPartition(token, tvfName);
+        Boolean pendingFinishFlag = partitionPendingFinish.get(partition);
 
         if (pendingFinishFlag == null) {
             LOGGER.warn("Task: {}, Partition has not been registered to finish or already finished {} for task {}", taskUid, token);
@@ -61,69 +80,84 @@ public class FinishingPartitionManager {
         }
 
         if (!pendingFinishFlag) {
-            if (lastCommittedRecord.get(token) == null) {
-                lastCommittedRecord.put(token, recordUid);
+            if (lastCommittedRecord.get(partition) == null) {
+                lastCommittedRecord.put(partition, recordUid);
             }
             else {
-                if (recordUid.compareTo(lastCommittedRecord.get(token)) > 0) {
-                    lastCommittedRecord.put(token, recordUid);
+                if (recordUid.compareTo(lastCommittedRecord.get(partition)) > 0) {
+                    lastCommittedRecord.put(partition, recordUid);
                 }
             }
             return;
         }
 
-        if (lastEmittedRecord.get(token) == null || lastEmittedRecord.get(token).equals(recordUid)) {
-            LOGGER.info("Task: {}, Finished forcing the token to be finished {}", taskUid, token);
-            forceFinish(token);
+        if (lastEmittedRecord.get(partition) == null || lastEmittedRecord.get(partition).equals(recordUid)) {
+            LOGGER.info("Task: {}, Finished forcing the partition to be finished {}", taskUid, partition);
+            forceFinish(token, tvfName);
         }
     }
 
     public void onPartitionFinishEvent(String token) throws InterruptedException {
-        LOGGER.info("Task: {}, onPartitionFinishEvent: {}", taskUid, token);
+        onPartitionFinishEvent(token, null);
+    }
 
-        Boolean pendingFinishFlag = partitionPendingFinish.get(token);
+    public void onPartitionFinishEvent(String token, String tvfName) throws InterruptedException {
+        SpannerPartition partition = new SpannerPartition(token, tvfName);
+        LOGGER.info("Task: {}, onPartitionFinishEvent: {}", taskUid, partition);
+
+        Boolean pendingFinishFlag = partitionPendingFinish.get(partition);
 
         if (pendingFinishFlag == null) {
-            LOGGER.warn("Task: {}, Partition has not been registered to finish or already finished {}", taskUid, token);
+            LOGGER.warn("Task: {}, Partition has not been registered to finish or already finished {}", taskUid, partition);
             return;
         }
 
-        if (lastEmittedRecord.get(token) == null || lastEmittedRecord.get(token).equals(lastCommittedRecord.get(token))) {
-            LOGGER.info("Task: {}, Forcing the token to be finished {}", taskUid, token);
-            forceFinish(token);
-            LOGGER.info("Task: {}, Done forcing the token to be finished {}", taskUid, token);
+        if (lastEmittedRecord.get(partition) == null || lastEmittedRecord.get(partition).equals(lastCommittedRecord.get(partition))) {
+            LOGGER.info("Task: {}, Forcing the partition to be finished {}", taskUid, partition);
+            forceFinish(token, tvfName);
+            LOGGER.info("Task: {}, Done forcing the partition to be finished {}", taskUid, partition);
         }
         else {
             LOGGER.info(
-                    "Task: {}, Cannot finish the token {} due to lastCommittedRecord {} not being equal to"
+                    "Task: {}, Cannot finish the partition {} due to lastCommittedRecord {} not being equal to"
                             + " lastEmittedRecord {}",
                     taskUid,
-                    token,
-                    lastCommittedRecord.get(token),
-                    lastEmittedRecord.get(token));
-            partitionPendingFinish.put(token, true);
+                    partition,
+                    lastCommittedRecord.get(partition),
+                    lastEmittedRecord.get(partition));
+            partitionPendingFinish.put(partition, true);
         }
     }
 
     public void forceFinish(String token) throws InterruptedException {
-        finishedPartitionConsumer.accept(token);
-
-        partitionPendingFinish.remove(token);
-        lastEmittedRecord.remove(token);
-        lastCommittedRecord.remove(token);
+        forceFinish(token, null);
     }
 
-    public Set<String> getPendingFinishPartitions() {
+    public void forceFinish(String token, String tvfName) throws InterruptedException {
+        SpannerPartition partition = new SpannerPartition(token, tvfName);
+        finishedPartitionConsumer.accept(token, tvfName);
+
+        partitionPendingFinish.remove(partition);
+        lastEmittedRecord.remove(partition);
+        lastCommittedRecord.remove(partition);
+    }
+
+    public Set<PartitionKey> getPendingFinishPartitions() {
         return partitionPendingFinish.entrySet().stream()
                 .filter(entry -> entry.getValue().equals(true))
-                .map(Map.Entry::getKey)
+                .map(entry -> entry.getKey().getKey())
                 .collect(Collectors.toSet());
     }
 
-    public Set<String> getPendingPartitions() {
-        return partitionPendingFinish.entrySet().stream()
-                .map(Map.Entry::getKey)
+    public Set<PartitionKey> getPendingPartitions() {
+        return partitionPendingFinish.keySet().stream()
+                .map(SpannerPartition::getKey)
                 .collect(Collectors.toSet());
+    }
+
+    @FunctionalInterface
+    public interface FinishedPartitionConsumer {
+        void accept(String token, String tvfName) throws InterruptedException;
     }
 
     private String next(String str) {

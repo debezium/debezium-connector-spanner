@@ -11,6 +11,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -214,7 +215,7 @@ class PlacementMoveInMoveOutTest {
                 buildRecord3DataChangeProto(),
                 metadata);
         when(changeStreamDao.isMutableKeyRange()).thenReturn(true);
-        when(changeStreamDao.streamQuery(any(), any(), any(), anyLong())).thenReturn(resultSet);
+        when(changeStreamDao.streamQuery(any(), isNull(), any(), any(), anyLong())).thenReturn(resultSet);
         when(resultSet.next()).thenReturn(true, true, false);
         when(resultSet.getMetadata()).thenReturn(metadata);
 

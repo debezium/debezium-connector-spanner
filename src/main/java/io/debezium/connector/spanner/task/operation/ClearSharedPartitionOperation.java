@@ -13,6 +13,7 @@ import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import io.debezium.connector.spanner.db.model.PartitionKey;
 import io.debezium.connector.spanner.kafka.internal.model.PartitionState;
 import io.debezium.connector.spanner.kafka.internal.model.PartitionStateEnum;
 import io.debezium.connector.spanner.kafka.internal.model.TaskState;
@@ -32,8 +33,8 @@ public class ClearSharedPartitionOperation implements Operation {
         TaskState currentTaskState = taskSyncContext.getCurrentTaskState();
 
         // Retrieve the tokens that are owned by other tasks.
-        Set<String> otherTokens = taskSyncContext.getAllTaskStates().values().stream().flatMap(taskState -> taskState.getPartitions().stream())
-                .map(PartitionState::getToken)
+        Set<PartitionKey> otherTokens = taskSyncContext.getAllTaskStates().values().stream().flatMap(taskState -> taskState.getPartitions().stream())
+                .map(PartitionState::getKey)
                 .collect(Collectors.toSet());
 
         List<PartitionState> currentSharedList = currentTaskState.getSharedPartitions().stream()
@@ -48,7 +49,7 @@ public class ClearSharedPartitionOperation implements Operation {
             // the other task has actually taken ownership — never drop it while the competing
             // task still only has a sharedPartitions claim, to avoid leaving the partition
             // unstreamed if that task crashes before it starts.
-            if (otherTokens.contains(sharedToken.getToken())) {
+            if (otherTokens.contains(sharedToken.getKey())) {
                 LOGGER.info("Task {}, removing token {} since it is already owned by other tasks", taskSyncContext.getTaskUid(), sharedToken);
             }
             else {
@@ -57,7 +58,7 @@ public class ClearSharedPartitionOperation implements Operation {
             }
         }
 
-        Set<String> lowerUidActiveTokens = lowerUidActivePartitionTokens(taskSyncContext);
+        Set<PartitionKey> lowerUidActiveTokens = lowerUidActivePartitionTokens(taskSyncContext);
 
         List<PartitionState> currentPartitions = new ArrayList<>(currentTaskState.getPartitions());
         List<PartitionState> finalPartitions = new ArrayList<>(currentPartitions.size());
@@ -66,7 +67,7 @@ public class ClearSharedPartitionOperation implements Operation {
         for (PartitionState p : currentPartitions) {
             if (!PartitionStateEnum.FINISHED.equals(p.getState())
                     && !PartitionStateEnum.REMOVED.equals(p.getState())
-                    && lowerUidActiveTokens.contains(p.getToken())) {
+                    && lowerUidActiveTokens.contains(p.getKey())) {
                 LOGGER.warn("Task {}, self-healing duplicate partition {} — a lower-UID task already owns it; marking REMOVED",
                         taskSyncContext.getTaskUid(), p.getToken());
                 finalPartitions.add(p.toBuilder().state(PartitionStateEnum.REMOVED).build());
@@ -93,14 +94,14 @@ public class ClearSharedPartitionOperation implements Operation {
      * partitions-level duplicates created by the mutable key range race condition so the
      * higher-UID task can yield.
      */
-    private Set<String> lowerUidActivePartitionTokens(TaskSyncContext context) {
+    private Set<PartitionKey> lowerUidActivePartitionTokens(TaskSyncContext context) {
         String currentUid = context.getCurrentTaskState().getTaskUid();
         return context.getTaskStates().values().stream()
                 .filter(ts -> ts.getTaskUid().compareTo(currentUid) < 0)
                 .flatMap(ts -> ts.getPartitions().stream())
                 .filter(p -> !PartitionStateEnum.FINISHED.equals(p.getState())
                         && !PartitionStateEnum.REMOVED.equals(p.getState()))
-                .map(PartitionState::getToken)
+                .map(PartitionState::getKey)
                 .collect(Collectors.toSet());
     }
 

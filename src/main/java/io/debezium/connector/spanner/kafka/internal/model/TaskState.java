@@ -11,6 +11,8 @@ import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import io.debezium.connector.spanner.db.model.PartitionKey;
+
 /**
  * Represents the internal state of connector task
  */
@@ -19,8 +21,8 @@ public class TaskState {
     private final String consumerId;
     private final long rebalanceGenerationId;
     private final long stateTimestamp;
-    private final Map<String, PartitionState> partitions;
-    private final Map<String, PartitionState> sharedPartitions;
+    private final Map<PartitionKey, PartitionState> partitions;
+    private final Map<PartitionKey, PartitionState> sharedPartitions;
 
     public static class TaskStateBuilder {
 
@@ -32,9 +34,9 @@ public class TaskState {
 
         private long stateTimestamp;
 
-        private Map<String, PartitionState> partitions;
+        private Map<PartitionKey, PartitionState> partitions;
 
-        private Map<String, PartitionState> sharedPartitions;
+        private Map<PartitionKey, PartitionState> sharedPartitions;
 
         TaskStateBuilder() {
         }
@@ -60,21 +62,21 @@ public class TaskState {
         }
 
         public TaskState.TaskStateBuilder partitions(final List<PartitionState> partitions) {
-            this.partitions = partitions.stream().collect(Collectors.toMap(PartitionState::getToken, Function.identity()));
+            this.partitions = partitions.stream().collect(Collectors.toMap(PartitionState::getKey, Function.identity()));
             return this;
         }
 
         public TaskState.TaskStateBuilder sharedPartitions(final List<PartitionState> sharedPartitions) {
-            this.sharedPartitions = sharedPartitions.stream().collect(Collectors.toMap(PartitionState::getToken, Function.identity()));
+            this.sharedPartitions = sharedPartitions.stream().collect(Collectors.toMap(PartitionState::getKey, Function.identity()));
             return this;
         }
 
-        public TaskState.TaskStateBuilder partitionsMap(final Map<String, PartitionState> partitions) {
+        public TaskState.TaskStateBuilder partitionsMap(final Map<PartitionKey, PartitionState> partitions) {
             this.partitions = partitions;
             return this;
         }
 
-        public TaskState.TaskStateBuilder sharedPartitionsMap(final Map<String, PartitionState> sharedPartitions) {
+        public TaskState.TaskStateBuilder sharedPartitionsMap(final Map<PartitionKey, PartitionState> sharedPartitions) {
             this.sharedPartitions = sharedPartitions;
             return this;
         }
@@ -113,8 +115,8 @@ public class TaskState {
                      final String consumerId,
                      final long rebalanceGenerationId,
                      final long stateTimestamp,
-                     final Map<String, PartitionState> partitions,
-                     final Map<String, PartitionState> sharedPartitions) {
+                     final Map<PartitionKey, PartitionState> partitions,
+                     final Map<PartitionKey, PartitionState> sharedPartitions) {
         this.taskUid = taskUid;
         this.consumerId = consumerId;
         this.rebalanceGenerationId = rebalanceGenerationId;
@@ -139,11 +141,11 @@ public class TaskState {
         return this.stateTimestamp;
     }
 
-    public Map<String, PartitionState> getPartitionsMap() {
+    public Map<PartitionKey, PartitionState> getPartitionsMap() {
         return this.partitions;
     }
 
-    public Map<String, PartitionState> getSharedPartitionsMap() {
+    public Map<PartitionKey, PartitionState> getSharedPartitionsMap() {
         return this.sharedPartitions;
     }
 

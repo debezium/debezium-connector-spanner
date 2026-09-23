@@ -13,6 +13,7 @@ import java.util.stream.Collectors;
 
 import com.google.cloud.Timestamp;
 
+import io.debezium.connector.spanner.db.model.PartitionKey;
 import io.debezium.connector.spanner.kafka.event.proto.SyncEventProtos;
 import io.debezium.connector.spanner.kafka.internal.model.MessageTypeEnum;
 import io.debezium.connector.spanner.kafka.internal.model.MoveInState;
@@ -55,25 +56,25 @@ public class SyncEventFromProtoMapper {
                 connectorStates);
     }
 
-    private static Map<String, PartitionState> mapPartitionsArray(SyncEventProtos.TaskState protoState) {
-        Map<String, PartitionState> partitions = new HashMap<>(protoState.getPartitionsCount());
+    private static Map<PartitionKey, PartitionState> mapPartitionsArray(SyncEventProtos.TaskState protoState) {
+        Map<PartitionKey, PartitionState> partitions = new HashMap<>(protoState.getPartitionsCount());
 
         for (int i = 0; i < protoState.getPartitionsCount(); i++) {
             var protoPartition = protoState.getPartitions(i);
             var partition = mapPartition(protoPartition);
-            partitions.put(partition.getToken(), partition);
+            partitions.put(partition.getKey(), partition);
         }
 
         return partitions;
     }
 
-    private static Map<String, PartitionState> mapSharedPartitionsArray(SyncEventProtos.TaskState protoState) {
-        Map<String, PartitionState> partitions = new HashMap<>(protoState.getSharedPartitionsCount());
+    private static Map<PartitionKey, PartitionState> mapSharedPartitionsArray(SyncEventProtos.TaskState protoState) {
+        Map<PartitionKey, PartitionState> partitions = new HashMap<>(protoState.getSharedPartitionsCount());
 
         for (int i = 0; i < protoState.getSharedPartitionsCount(); i++) {
             var protoPartition = protoState.getSharedPartitions(i);
             var partition = mapPartition(protoPartition);
-            partitions.put(partition.getToken(), partition);
+            partitions.put(partition.getKey(), partition);
         }
 
         return partitions;
@@ -108,6 +109,10 @@ public class SyncEventFromProtoMapper {
                         ? partitionState.getLastBoundaryRecordSequence()
                         : null;
 
+        String tvfName = partitionState.getTvfName() != null && !partitionState.getTvfName().isEmpty()
+                ? partitionState.getTvfName()
+                : null;
+
         return new PartitionState(
                 partitionState.getToken(),
                 Timestamp.parseTimestamp(partitionState.getStartTimestamp()),
@@ -124,6 +129,7 @@ public class SyncEventFromProtoMapper {
                 moveInState,
                 moveOutStates,
                 processedTimestamp,
-                lastBoundaryRecordSequence);
+                lastBoundaryRecordSequence,
+                tvfName);
     }
 }

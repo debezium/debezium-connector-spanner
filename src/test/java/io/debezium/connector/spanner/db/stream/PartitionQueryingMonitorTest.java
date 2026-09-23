@@ -5,6 +5,8 @@
  */
 package io.debezium.connector.spanner.db.stream;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
@@ -58,11 +60,15 @@ class PartitionQueryingMonitorTest {
 
         doReturn(streamEventMetadata).when(changeStreamEvent).getMetadata();
         doReturn("token").when(streamEventMetadata).getPartitionToken();
+        doReturn("tvfA").when(streamEventMetadata).getTvfName();
 
         partitionQueryingMonitor.acceptStreamEvent(changeStreamEvent);
 
         verify(changeStreamEvent).getMetadata();
         verify(streamEventMetadata).getPartitionToken();
+        verify(streamEventMetadata).getTvfName();
+        assertTrue(partitionQueryingMonitor.hasReceivedEvent("token", "tvfA"));
+        assertFalse(partitionQueryingMonitor.hasReceivedEvent("token", "tvfB"));
     }
 
 }

@@ -29,6 +29,7 @@ import com.google.cloud.Timestamp;
 
 import io.debezium.connector.spanner.SpannerPartition;
 import io.debezium.connector.spanner.context.offset.PartitionOffset;
+import io.debezium.connector.spanner.db.model.PartitionKey;
 import io.debezium.connector.spanner.kafka.internal.model.PartitionState;
 import io.debezium.connector.spanner.metrics.MetricsEventPublisher;
 import io.debezium.connector.spanner.metrics.event.OffsetReceivingTimeMetricEvent;
@@ -105,23 +106,23 @@ public class PartitionOffsetProvider {
         }
     }
 
-    public Timestamp getOffset(PartitionState token) {
-        Map<String, String> spannerPartition = new SpannerPartition(token.getToken()).getSourcePartition();
+    public Timestamp getOffset(PartitionState partitionState) {
+        Map<String, String> spannerPartition = new SpannerPartition(partitionState.getToken(), partitionState.getTvfName()).getSourcePartition();
 
         Map<String, ?> result = retrieveOffsetMap(spannerPartition);
         if (result == null) {
-            LOGGER.warn("Token {} no stored offset found", token);
+            LOGGER.warn("Token {} no stored offset found", partitionState);
             return null;
         }
-        LOGGER.info("Successfully retrieved offset {} for token {}", result, token);
+        LOGGER.info("Successfully retrieved offset {} for token {}", result, partitionState);
         return PartitionOffset.extractOffset(result);
     }
 
-    public Map<String, Timestamp> getOffsets(Collection<String> partitions) {
+    public Map<PartitionKey, Timestamp> getOffsets(Collection<PartitionState> partitionStates) {
         Instant startTime = Instant.now();
 
-        List<Map<String, String>> partitionsMapList = partitions.stream()
-                .map(token -> new SpannerPartition(token).getSourcePartition())
+        List<Map<String, String>> partitionsMapList = partitionStates.stream()
+                .map(partitionState -> new SpannerPartition(partitionState.getToken(), partitionState.getTvfName()).getSourcePartition())
                 .collect(Collectors.toList());
 
         Map<Map<String, String>, Map<String, Object>> result;
@@ -131,18 +132,18 @@ public class PartitionOffsetProvider {
             result = future.get(batchRetrievalTimeoutMs, TimeUnit.MILLISECONDS);
         }
         catch (TimeoutException ex) {
-            LOGGER.error("Failed to retrieve batch offsets for {} partitions in time", partitions.size(), ex);
+            LOGGER.error("Failed to retrieve batch offsets for {} partitions in time", partitionStates.size(), ex);
             future.cancel(true);
             return Map.of();
         }
         catch (InterruptedException e) {
-            LOGGER.error("Interrupted while retrieving batch offsets for {} partitions", partitions.size(), e);
+            LOGGER.error("Interrupted while retrieving batch offsets for {} partitions", partitionStates.size(), e);
             future.cancel(true);
             Thread.currentThread().interrupt();
             return Map.of();
         }
         catch (ExecutionException e) {
-            LOGGER.error("Failed to retrieve batch offsets for {} partitions: {}", partitions.size(), e.toString(), e);
+            LOGGER.error("Failed to retrieve batch offsets for {} partitions: {}", partitionStates.size(), e.toString(), e);
             future.cancel(true);
             return Map.of();
         }
@@ -153,11 +154,16 @@ public class PartitionOffsetProvider {
 
         metricsEventPublisher.publishMetricEvent(OffsetReceivingTimeMetricEvent.from(startTime));
 
-        Map<String, Timestamp> map = new HashMap<>();
+        Map<PartitionKey, Timestamp> map = new HashMap<>();
 
         for (Map.Entry<Map<String, String>, Map<String, Object>> entry : result.entrySet()) {
-            map.put(SpannerPartition.extractToken(entry.getKey()),
-                    PartitionOffset.extractOffset(entry.getValue()));
+            String token = SpannerPartition.extractToken(entry.getKey());
+            if (token == null) {
+                LOGGER.warn("Retrieved offset without a partition token {}", entry.getKey());
+                continue;
+            }
+            PartitionKey key = new PartitionKey(token, SpannerPartition.extractTvfName(entry.getKey()));
+            map.put(key, PartitionOffset.extractOffset(entry.getValue()));
         }
 
         return map;

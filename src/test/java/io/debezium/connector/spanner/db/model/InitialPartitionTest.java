@@ -15,6 +15,8 @@ class InitialPartitionTest {
     @Test
     void testIsInitialPartition() {
         assertFalse(InitialPartition.isInitialPartition("token"));
+        assertFalse(InitialPartition.isInitialPartition("Parent0#tvf"),
+                "per-TVF roots keep the raw Parent0 token plus a separate tvfName; the delimiter is no longer used");
         assertTrue(InitialPartition.isInitialPartition("Parent0"));
     }
 

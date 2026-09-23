@@ -15,6 +15,7 @@ import org.junit.jupiter.api.Test;
 import com.google.cloud.Timestamp;
 
 import io.debezium.connector.spanner.db.model.Partition;
+import io.debezium.connector.spanner.db.model.PartitionKey;
 import io.debezium.connector.spanner.kafka.internal.model.PartitionState;
 import io.debezium.connector.spanner.kafka.internal.model.PartitionStateEnum;
 import io.debezium.connector.spanner.kafka.internal.model.TaskState;
@@ -118,6 +119,90 @@ class ChildPartitionOperationTest {
                 "All mutable children with empty parents should be registered");
     }
 
+    @Test
+    void doOperationTreatsSameTokenFromDifferentTvfsAsDistinctPartitions() {
+        TaskSyncContext taskSyncContext = new ChildPartitionOperation(List.of(
+                buildPartition("sameToken", null, Set.of(), "READ_Stream_US"),
+                buildPartition("sameToken", null, Set.of(), "READ_Stream_EU")))
+                .doOperation(buildEmptyTaskSyncContext());
+
+        List<PartitionState> states = new java.util.ArrayList<>(taskSyncContext.getCurrentTaskState().getPartitions());
+        states.addAll(taskSyncContext.getCurrentTaskState().getSharedPartitions());
+
+        Assertions.assertEquals(2, states.size());
+        Assertions.assertEquals(Set.of("READ_Stream_US", "READ_Stream_EU"),
+                states.stream().map(PartitionState::getTvfName).collect(java.util.stream.Collectors.toSet()));
+    }
+
+    @Test
+    void doOperationDeduplicatesSameTokenAndSameTvf() {
+        TaskSyncContext taskSyncContext = new ChildPartitionOperation(List.of(
+                buildPartition("sameToken", null, Set.of(), "READ_Stream_US"),
+                buildPartition("sameToken", null, Set.of(), "READ_Stream_US")))
+                .doOperation(buildEmptyTaskSyncContext());
+
+        int count = taskSyncContext.getCurrentTaskState().getPartitions().size()
+                + taskSyncContext.getCurrentTaskState().getSharedPartitions().size();
+
+        Assertions.assertEquals(1, count);
+    }
+
+    @Test
+    void doOperationDeduplicatesLegacyPartitionsWithNullTvf() {
+        TaskSyncContext taskSyncContext = new ChildPartitionOperation(List.of(
+                buildPartition("sameToken", null, Set.of()),
+                buildPartition("sameToken", null, Set.of())))
+                .doOperation(buildEmptyTaskSyncContext());
+
+        int count = taskSyncContext.getCurrentTaskState().getPartitions().size()
+                + taskSyncContext.getCurrentTaskState().getSharedPartitions().size();
+
+        Assertions.assertEquals(1, count);
+    }
+
+    @Test
+    void partitionStatusUpdateTargetsOnlyMatchingTvf() {
+        TaskSyncContext context = buildContextWithSameTokenAcrossTvfs();
+
+        TaskSyncContext updated = new PartitionStatusUpdateOperation(
+                "sameToken", "READ_Stream_US", PartitionStateEnum.RUNNING).doOperation(context);
+
+        Assertions.assertEquals(PartitionStateEnum.RUNNING,
+                updated.getCurrentTaskState().getPartitionsMap().get(new PartitionKey("sameToken", "READ_Stream_US")).getState());
+        Assertions.assertEquals(PartitionStateEnum.CREATED,
+                updated.getCurrentTaskState().getPartitionsMap().get(new PartitionKey("sameToken", "READ_Stream_EU")).getState());
+    }
+
+    @Test
+    void windowAdvancedTargetsOnlyMatchingTvf() {
+        TaskSyncContext context = buildContextWithSameTokenAcrossTvfs();
+        Timestamp processedTimestamp = Timestamp.ofTimeMicroseconds(100L);
+
+        TaskSyncContext updated = new WindowAdvancedOperation(
+                "sameToken", "READ_Stream_EU", processedTimestamp, "sequence").doOperation(context);
+
+        Assertions.assertNull(updated.getCurrentTaskState().getPartitionsMap()
+                .get(new PartitionKey("sameToken", "READ_Stream_US")).getProcessedTimestamp());
+        Assertions.assertEquals(processedTimestamp, updated.getCurrentTaskState().getPartitionsMap()
+                .get(new PartitionKey("sameToken", "READ_Stream_EU")).getProcessedTimestamp());
+    }
+
+    private TaskSyncContext buildContextWithSameTokenAcrossTvfs() {
+        return TaskSyncContext.builder()
+                .taskUid("taskO")
+                .currentTaskState(TaskState.builder()
+                        .taskUid("taskO")
+                        .partitions(List.of(
+                                PartitionState.builder().token("sameToken").tvfName("READ_Stream_US")
+                                        .state(PartitionStateEnum.CREATED).build(),
+                                PartitionState.builder().token("sameToken").tvfName("READ_Stream_EU")
+                                        .state(PartitionStateEnum.CREATED).build()))
+                        .sharedPartitions(List.of())
+                        .build())
+                .taskStates(Map.of())
+                .build();
+    }
+
     private TaskSyncContext buildTaskSyncContext() {
         return TaskSyncContext.builder()
                 .taskUid("taskO")
@@ -181,7 +266,11 @@ class ChildPartitionOperationTest {
     }
 
     private Partition buildPartition(String token, String originParent, Set<String> parents) {
+        return buildPartition(token, originParent, parents, null);
+    }
+
+    private Partition buildPartition(String token, String originParent, Set<String> parents, String tvfName) {
         return Partition.builder().token(token).parentTokens(parents).startTimestamp(Timestamp.now())
-                .endTimestamp(null).originPartitionToken(originParent).build();
+                .endTimestamp(null).originPartitionToken(originParent).tvfName(tvfName).build();
     }
 }

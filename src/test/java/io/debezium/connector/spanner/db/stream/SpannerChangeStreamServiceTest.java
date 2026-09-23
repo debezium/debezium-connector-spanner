@@ -11,6 +11,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -56,7 +57,7 @@ class SpannerChangeStreamServiceTest {
         Timestamp endTimestamp = Timestamp.ofTimeMicroseconds(100L);
         HeartbeatEvent heartbeatEvent = new HeartbeatEvent(endTimestamp, mock(StreamEventMetadata.class));
         when(changeStreamResultSet.next()).thenReturn(true, false);
-        when(changeStreamDao.streamQuery(any(), any(), any(), anyLong())).thenReturn(changeStreamResultSet);
+        when(changeStreamDao.streamQuery(any(), isNull(), any(), any(), anyLong())).thenReturn(changeStreamResultSet);
         when(mapper.toChangeStreamEvents(any(), any(), any())).thenReturn(List.of(heartbeatEvent));
 
         SpannerChangeStreamService spannerChangeStreamService = new SpannerChangeStreamService("TaskUid", changeStreamDao,
@@ -87,7 +88,7 @@ class SpannerChangeStreamServiceTest {
 
         // Simulate 1 heartbeat event, then stream EOF (false)
         when(changeStreamResultSet.next()).thenReturn(true, false);
-        when(changeStreamDao.streamQuery(any(), any(), any(), anyLong())).thenReturn(changeStreamResultSet);
+        when(changeStreamDao.streamQuery(any(), isNull(), any(), any(), anyLong())).thenReturn(changeStreamResultSet);
 
         HeartbeatEvent heartbeatEvent = new HeartbeatEvent(Timestamp.now(), mock(StreamEventMetadata.class));
         when(mapper.toChangeStreamEvents(any(), any(), any())).thenReturn(List.of(heartbeatEvent));
@@ -125,7 +126,7 @@ class SpannerChangeStreamServiceTest {
         Timestamp eventTimestamp = Timestamp.ofTimeMicroseconds(50L);
         HeartbeatEvent heartbeatEvent = new HeartbeatEvent(eventTimestamp, mock(StreamEventMetadata.class));
         when(changeStreamResultSet.next()).thenReturn(true, false);
-        when(changeStreamDao.streamQuery(any(), any(), any(), anyLong())).thenReturn(changeStreamResultSet);
+        when(changeStreamDao.streamQuery(any(), isNull(), any(), any(), anyLong())).thenReturn(changeStreamResultSet);
         when(mapper.toChangeStreamEvents(any(), any(), any())).thenReturn(List.of(heartbeatEvent));
 
         SpannerChangeStreamService spannerChangeStreamService = new SpannerChangeStreamService("TaskUid", changeStreamDao,
@@ -162,7 +163,7 @@ class SpannerChangeStreamServiceTest {
         when(childPartitionsEvent.getMetadata()).thenReturn(mock(StreamEventMetadata.class));
 
         when(changeStreamResultSet.next()).thenReturn(true, false);
-        when(changeStreamDao.streamQuery(any(), any(), any(), anyLong())).thenReturn(changeStreamResultSet);
+        when(changeStreamDao.streamQuery(any(), isNull(), any(), any(), anyLong())).thenReturn(changeStreamResultSet);
         when(mapper.toChangeStreamEvents(any(), any(), any())).thenReturn(List.of(childPartitionsEvent));
 
         SpannerChangeStreamService spannerChangeStreamService = new SpannerChangeStreamService("TaskUid", changeStreamDao,
@@ -194,7 +195,7 @@ class SpannerChangeStreamServiceTest {
 
         when(changeStreamDao.isMutableKeyRange()).thenReturn(true);
         when(changeStreamResultSet.next()).thenReturn(false);
-        when(changeStreamDao.streamQuery(any(), any(), any(), anyLong())).thenReturn(changeStreamResultSet);
+        when(changeStreamDao.streamQuery(any(), isNull(), any(), any(), anyLong())).thenReturn(changeStreamResultSet);
         when(mapper.toChangeStreamEvents(any(), any(), any())).thenReturn(List.of());
 
         SpannerChangeStreamService service = new SpannerChangeStreamService(
@@ -223,7 +224,7 @@ class SpannerChangeStreamServiceTest {
         MetricsEventPublisher metricsEventPublisher = mock(MetricsEventPublisher.class);
 
         when(changeStreamDao.isMutableKeyRange()).thenReturn(true);
-        when(changeStreamDao.streamQuery(any(), any(), any(), anyLong())).thenReturn(resultSet);
+        when(changeStreamDao.streamQuery(any(), isNull(), any(), any(), anyLong())).thenReturn(resultSet);
         when(resultSet.next()).thenReturn(true, false);
 
         Timestamp start = Timestamp.ofTimeSecondsAndNanos(0, 0);
@@ -245,7 +246,7 @@ class SpannerChangeStreamServiceTest {
         service.getEvents(partition, consumer, listener);
 
         org.mockito.ArgumentCaptor<Timestamp> endTsCaptor = org.mockito.ArgumentCaptor.forClass(Timestamp.class);
-        verify(changeStreamDao, times(1)).streamQuery(any(), any(), endTsCaptor.capture(), anyLong());
+        verify(changeStreamDao, times(1)).streamQuery(any(), isNull(), any(), endTsCaptor.capture(), anyLong());
         Timestamp expectedWindowEnd = Timestamp.ofTimeSecondsAndNanos(20 * 60, 0);
         assertEquals(expectedWindowEnd, endTsCaptor.getValue());
         verify(listener).onFinish(partition);
@@ -260,7 +261,7 @@ class SpannerChangeStreamServiceTest {
         MetricsEventPublisher metricsEventPublisher = mock(MetricsEventPublisher.class);
 
         when(changeStreamDao.isMutableKeyRange()).thenReturn(true);
-        when(changeStreamDao.streamQuery(any(), any(), any(), anyLong())).thenReturn(resultSet);
+        when(changeStreamDao.streamQuery(any(), isNull(), any(), any(), anyLong())).thenReturn(resultSet);
         when(resultSet.next()).thenReturn(true, false);
 
         StreamEventMetadata meta = StreamEventMetadata.newBuilder()
@@ -285,7 +286,7 @@ class SpannerChangeStreamServiceTest {
 
         service.getEvents(partition, consumer, listener);
 
-        verify(changeStreamDao, times(1)).streamQuery(any(), any(), any(), anyLong());
+        verify(changeStreamDao, times(1)).streamQuery(any(), isNull(), any(), any(), anyLong());
         verify(listener).onFinish(partition);
     }
 
@@ -296,7 +297,7 @@ class SpannerChangeStreamServiceTest {
         ChangeStreamRecordMapper mapper = mock(ChangeStreamRecordMapper.class);
 
         when(changeStreamDao.isMutableKeyRange()).thenReturn(true);
-        when(changeStreamDao.streamQuery(any(), any(), any(), anyLong())).thenReturn(resultSet);
+        when(changeStreamDao.streamQuery(any(), isNull(), any(), any(), anyLong())).thenReturn(resultSet);
         when(resultSet.next()).thenReturn(false);
         when(mapper.toChangeStreamEvents(any(), any(), any())).thenReturn(List.of());
 
@@ -315,7 +316,7 @@ class SpannerChangeStreamServiceTest {
 
         service.getEvents(partition, consumer, listener);
 
-        verify(changeStreamDao, times(1)).streamQuery(any(), any(), any(), anyLong());
+        verify(changeStreamDao, times(1)).streamQuery(any(), isNull(), any(), any(), anyLong());
     }
 
     @Test
@@ -330,9 +331,9 @@ class SpannerChangeStreamServiceTest {
         Timestamp start = Timestamp.ofTimeSecondsAndNanos(0, 0);
         Timestamp end = Timestamp.ofTimeSecondsAndNanos(1200, 0);
 
-        when(changeStreamDao.streamQuery(any(), org.mockito.ArgumentMatchers.eq(start), any(Timestamp.class), anyLong()))
+        when(changeStreamDao.streamQuery(any(), isNull(), org.mockito.ArgumentMatchers.eq(start), any(Timestamp.class), anyLong()))
                 .thenReturn(resultSet1);
-        when(changeStreamDao.streamQuery(any(), org.mockito.ArgumentMatchers.eq(end), any(Timestamp.class), anyLong()))
+        when(changeStreamDao.streamQuery(any(), isNull(), org.mockito.ArgumentMatchers.eq(end), any(Timestamp.class), anyLong()))
                 .thenReturn(resultSet2);
 
         when(resultSet1.next()).thenReturn(true, false);
@@ -386,9 +387,9 @@ class SpannerChangeStreamServiceTest {
         Timestamp start = Timestamp.ofTimeSecondsAndNanos(0, 0);
         Timestamp end = Timestamp.ofTimeSecondsAndNanos(1200, 0);
 
-        when(changeStreamDao.streamQuery(any(), org.mockito.ArgumentMatchers.eq(start), any(Timestamp.class), anyLong()))
+        when(changeStreamDao.streamQuery(any(), isNull(), org.mockito.ArgumentMatchers.eq(start), any(Timestamp.class), anyLong()))
                 .thenReturn(resultSet1);
-        when(changeStreamDao.streamQuery(any(), org.mockito.ArgumentMatchers.eq(end), any(Timestamp.class), anyLong()))
+        when(changeStreamDao.streamQuery(any(), isNull(), org.mockito.ArgumentMatchers.eq(end), any(Timestamp.class), anyLong()))
                 .thenReturn(resultSet2);
 
         when(resultSet1.next()).thenReturn(true, false);
@@ -442,7 +443,7 @@ class SpannerChangeStreamServiceTest {
         MetricsEventPublisher metricsEventPublisher = mock(MetricsEventPublisher.class);
 
         when(changeStreamDao.isMutableKeyRange()).thenReturn(true);
-        when(changeStreamDao.streamQuery(any(), any(), any(), anyLong())).thenReturn(resultSet);
+        when(changeStreamDao.streamQuery(any(), isNull(), any(), any(), anyLong())).thenReturn(resultSet);
         when(resultSet.next()).thenReturn(true, false);
 
         Timestamp start = Timestamp.ofTimeSecondsAndNanos(0, 0);
@@ -477,7 +478,7 @@ class SpannerChangeStreamServiceTest {
         MetricsEventPublisher metricsEventPublisher = mock(MetricsEventPublisher.class);
 
         when(changeStreamDao.isMutableKeyRange()).thenReturn(true);
-        when(changeStreamDao.streamQuery(any(), any(), any(), anyLong())).thenReturn(resultSet);
+        when(changeStreamDao.streamQuery(any(), isNull(), any(), any(), anyLong())).thenReturn(resultSet);
         when(resultSet.next()).thenReturn(true, false);
 
         Timestamp start = Timestamp.ofTimeSecondsAndNanos(0, 0);
@@ -512,7 +513,7 @@ class SpannerChangeStreamServiceTest {
         ChangeStreamRecordMapper mapper = mock(ChangeStreamRecordMapper.class);
 
         when(changeStreamDao.isMutableKeyRange()).thenReturn(false);
-        when(changeStreamDao.streamQuery(any(), any(), any(), anyLong())).thenReturn(resultSet);
+        when(changeStreamDao.streamQuery(any(), isNull(), any(), any(), anyLong())).thenReturn(resultSet);
         when(resultSet.next()).thenReturn(false);
 
         SpannerChangeStreamService service = new SpannerChangeStreamService(
@@ -529,7 +530,7 @@ class SpannerChangeStreamServiceTest {
         assertThrows(ChangeStreamException.class, () -> service.getEvents(partition, consumer, listener));
 
         verify(consumer, never()).acceptChangeStreamEvent(any(FinishPartitionEvent.class));
-        verify(changeStreamDao, times(1)).streamQuery(any(), any(), any(), anyLong());
+        verify(changeStreamDao, times(1)).streamQuery(any(), isNull(), any(), any(), anyLong());
     }
 
     /**
@@ -550,7 +551,7 @@ class SpannerChangeStreamServiceTest {
         MetricsEventPublisher metricsEventPublisher = mock(MetricsEventPublisher.class);
 
         when(changeStreamDao.isMutableKeyRange()).thenReturn(true);
-        when(changeStreamDao.streamQuery(any(), any(), any(), anyLong())).thenReturn(resultSet);
+        when(changeStreamDao.streamQuery(any(), isNull(), any(), any(), anyLong())).thenReturn(resultSet);
         // One event (the MoveIn), then result-set exhausted → triggers spin-wait.
         when(resultSet.next()).thenReturn(true, false);
 
@@ -618,7 +619,7 @@ class SpannerChangeStreamServiceTest {
         MetricsEventPublisher metricsEventPublisher = mock(MetricsEventPublisher.class);
 
         when(changeStreamDao.isMutableKeyRange()).thenReturn(true);
-        when(changeStreamDao.streamQuery(any(), any(), any(), anyLong())).thenReturn(resultSet);
+        when(changeStreamDao.streamQuery(any(), isNull(), any(), any(), anyLong())).thenReturn(resultSet);
         when(resultSet.next()).thenReturn(true, false);
 
         Timestamp start = Timestamp.ofTimeSecondsAndNanos(0, 0);

@@ -15,17 +15,27 @@ import com.google.cloud.Timestamp;
  */
 public class MoveOutNotificationEvent implements TaskStateChangeEvent {
     private final String token;
+    private final String tvfName;
     private final Timestamp commitTimestamp;
     private final List<String> destinationTokens;
 
     public MoveOutNotificationEvent(String token, Timestamp commitTimestamp, List<String> destinationTokens) {
+        this(token, null, commitTimestamp, destinationTokens);
+    }
+
+    public MoveOutNotificationEvent(String token, String tvfName, Timestamp commitTimestamp, List<String> destinationTokens) {
         this.token = token;
+        this.tvfName = tvfName;
         this.commitTimestamp = commitTimestamp;
         this.destinationTokens = destinationTokens;
     }
 
     public String getToken() {
         return token;
+    }
+
+    public String getTvfName() {
+        return tvfName;
     }
 
     public Timestamp getCommitTimestamp() {

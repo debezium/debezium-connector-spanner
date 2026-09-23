@@ -36,7 +36,7 @@ class BaseSpannerConnectorConfigTest {
     void testConfigDef() {
         ConfigDef actualConfigDefResult = BaseSpannerConnectorConfig.configDef();
         Map<String, ConfigDef.ConfigKey> configKeysResult = actualConfigDefResult.configKeys();
-        assertEquals(72, configKeysResult.size());
+        assertEquals(73, configKeysResult.size());
         List<String> groupsResult = actualConfigDefResult.groups();
         assertEquals(6, groupsResult.size());
         assertEquals("CONNECTOR", groupsResult.get(0));
@@ -408,6 +408,40 @@ class BaseSpannerConnectorConfigTest {
         assertEquals(ConfigDef.Type.BOOLEAN, key.type);
         assertEquals(ConfigDef.Importance.MEDIUM, key.importance);
         assertEquals(true, key.defaultValue);
+    }
+
+    @Test
+    void testPlacementTvfNamesConfigKey() {
+        ConfigDef actualConfigDefResult = BaseSpannerConnectorConfig.configDef();
+        Map<String, ConfigDef.ConfigKey> configKeys = actualConfigDefResult.configKeys();
+        assertTrue(configKeys.containsKey("gcp.spanner.placement.tvf.names"));
+        ConfigDef.ConfigKey key = configKeys.get("gcp.spanner.placement.tvf.names");
+        assertEquals(ConfigDef.Type.LIST, key.type);
+        assertEquals(ConfigDef.Importance.MEDIUM, key.importance);
+    }
+
+    @Test
+    void testPlacementTvfNamesEmpty() {
+        Configuration configuration = mock(Configuration.class);
+        when(configuration.getString((Field) any())).thenReturn("String");
+        when(configuration.getString(anyString())).thenReturn("String");
+        when(configuration.asProperties()).thenReturn(new Properties());
+        // getString for the TVF property returns null (not set)
+        when(configuration.getString("gcp.spanner.placement.tvf.names")).thenReturn(null);
+        List<String> tvfNames = new SpannerConnectorConfig(configuration).placementTvfNames();
+        assertTrue(tvfNames.isEmpty());
+    }
+
+    @Test
+    void testPlacementTvfNamesParsed() {
+        Properties props = new Properties();
+        props.setProperty("gcp.spanner.placement.tvf.names", "READ_MyStream_US, READ_MyStream_EU");
+        Configuration configuration = mock(Configuration.class);
+        when(configuration.getString((Field) any())).thenReturn("String");
+        when(configuration.getString(anyString())).thenReturn("String");
+        when(configuration.asProperties()).thenReturn(props);
+        List<String> tvfNames = new SpannerConnectorConfig(configuration).placementTvfNames();
+        assertEquals(List.of("READ_MyStream_US", "READ_MyStream_EU"), tvfNames);
     }
 
     private static Stream<Arguments> mutableWindowMinutesProvider() {

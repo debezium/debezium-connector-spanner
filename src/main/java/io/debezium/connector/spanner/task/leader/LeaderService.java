@@ -158,10 +158,10 @@ public class LeaderService {
 
     public void newParentPartition() throws InterruptedException {
 
-        Partition partition = partitionFactory.initPartition(startTime, endTime);
+        List<Partition> partitions = partitionFactory.initPartitions(startTime, endTime);
 
-        LOGGER.info("New parent partition {}", partition);
+        LOGGER.info("New parent partition(s) {}", partitions);
 
-        eventConsumer.accept(new NewPartitionsEvent(List.of(partition)));
+        eventConsumer.accept(new NewPartitionsEvent(partitions));
     }
 }

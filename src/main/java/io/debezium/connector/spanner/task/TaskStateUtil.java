@@ -16,6 +16,7 @@ import java.util.Set;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
 
+import io.debezium.connector.spanner.db.model.PartitionKey;
 import io.debezium.connector.spanner.kafka.internal.model.PartitionState;
 import io.debezium.connector.spanner.kafka.internal.model.PartitionStateEnum;
 import io.debezium.connector.spanner.kafka.internal.model.TaskState;
@@ -68,27 +69,27 @@ public class TaskStateUtil {
         return allFilteredPartitionTokens(taskSyncContext, partition -> !inProgressPartitionState(partition.getState())).size();
     }
 
-    public static Set<String> allPartitionTokens(TaskSyncContext taskSyncContext) {
+    public static Set<PartitionKey> allPartitionTokens(TaskSyncContext taskSyncContext) {
         return allFilteredPartitionTokens(taskSyncContext, partition -> true);
     }
 
-    private static Set<String> allFilteredPartitionTokens(TaskSyncContext taskSyncContext, Predicate<PartitionState> partitionFilter) {
+    private static Set<PartitionKey> allFilteredPartitionTokens(TaskSyncContext taskSyncContext, Predicate<PartitionState> partitionFilter) {
         var allTaskStates = taskSyncContext.getAllTaskStates().values();
 
         var allOwnedPartitions = allTaskStates.stream()
                 .flatMap(t -> t.getPartitions().stream())
                 .filter(partitionFilter)
-                .map(PartitionState::getToken)
+                .map(PartitionState::getKey)
                 .collect(toSet());
 
         var allSharedPartitions = allTaskStates.stream()
                 .flatMap(t -> t.getSharedPartitions().stream())
-                .filter(p -> !allOwnedPartitions.contains(p))
+                .filter(p -> !allOwnedPartitions.contains(p.getKey()))
                 .filter(partitionFilter)
-                .map(PartitionState::getToken)
+                .map(PartitionState::getKey)
                 .collect(toSet());
 
-        Set<String> result = new HashSet<>(allOwnedPartitions.size() + allSharedPartitions.size());
+        Set<PartitionKey> result = new HashSet<>(allOwnedPartitions.size() + allSharedPartitions.size());
         result.addAll(allOwnedPartitions);
         result.addAll(allSharedPartitions);
 

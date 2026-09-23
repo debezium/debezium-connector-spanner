@@ -5,8 +5,6 @@
  */
 package io.debezium.connector.spanner.db.model;
 
-import java.util.Objects;
-
 /**
  * Utility class to determine initial partition constants and methods.
  *
@@ -31,7 +29,7 @@ public class InitialPartition {
      * @return true if the given token is the initial partition, and false otherwise
      */
     public static boolean isInitialPartition(String partitionToken) {
-        return Objects.equals(PARTITION_TOKEN, partitionToken);
+        return PARTITION_TOKEN.equals(partitionToken);
     }
 
 }
