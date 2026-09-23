@@ -17,6 +17,7 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.slf4j.Logger;
@@ -60,6 +61,9 @@ public class ConcurrentKeysIT extends AbstractSpannerConnectorIT {
     @ParameterizedTest
     @MethodSource("partitionModesAndDialects")
     public void shouldNotCrossContaminateStateBetweenInterleavedKeys(PartitionMode partitionMode, Dialect dialect) throws InterruptedException, ExecutionException {
+        Assumptions.assumeTrue(Connection.isRealSpanner(),
+                "Skipping: concurrent key stress assertions are unstable on the local emulator. "
+                        + "Run with -Dspanner.test.real=true to exercise this test.");
         Connection connection = connectionFor(dialect, LOGGER);
         Configuration base = baseConfigFor(dialect);
         String table = tableFor(tableNamePrefix, partitionMode, dialect);

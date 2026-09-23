@@ -192,7 +192,7 @@ public class TaskStateChangeEventHandler {
     private void processEvent(PartitionStatusUpdateEvent event) throws InterruptedException {
         // Fast state-machine phase: runs on the event-processor thread.
         performOperation(
-                new PartitionStatusUpdateOperation(event.getToken(), event.getState()),
+                new PartitionStatusUpdateOperation(event.getToken(), event.getTvfName(), event.getState()),
                 new ClearSharedPartitionOperation(),
                 new FindPartitionForStreamingOperation(changeStream.isMutableKeyRange()));
         // Blocking offset-fetch + stream-submission phase: offloaded to dedicated executor.
@@ -214,7 +214,7 @@ public class TaskStateChangeEventHandler {
         // Fast state-machine phase: runs on the event-processor thread.
         performOperation(
                 new MoveOutStateUpdateOperation(
-                        event.getToken(), event.getCommitTimestamp(), event.getDestinationTokens()),
+                        event.getToken(), event.getTvfName(), event.getCommitTimestamp(), event.getDestinationTokens()),
                 new FindPartitionForStreamingOperation(changeStream.isMutableKeyRange()));
         // Blocking offset-fetch + stream-submission phase: offloaded to dedicated executor.
         schedulePendingPartitionsAsync();
@@ -224,7 +224,7 @@ public class TaskStateChangeEventHandler {
         // Fast state-machine phase: runs on the event-processor thread.
         performOperation(
                 new MoveInStateUpdateOperation(
-                        event.getToken(), event.getCommitTimestamp(), event.getRecordSequence(), event.getSourcePartitionTokens()),
+                        event.getToken(), event.getTvfName(), event.getCommitTimestamp(), event.getRecordSequence(), event.getSourcePartitionTokens()),
                 new FindPartitionForStreamingOperation(changeStream.isMutableKeyRange()));
         // Blocking offset-fetch + stream-submission phase: offloaded to dedicated executor.
         schedulePendingPartitionsAsync();
@@ -236,14 +236,14 @@ public class TaskStateChangeEventHandler {
         // stays alive and self-gates. No TakePartitionForStreamingOperation is needed.
         performOperation(
                 new PublishMoveInStateOperation(
-                        event.getToken(), event.getCommitTimestamp(), event.getRecordSequence(),
+                        event.getToken(), event.getTvfName(), event.getCommitTimestamp(), event.getRecordSequence(),
                         event.getSourcePartitionTokens(), event.isFirstMoveIn()));
     }
 
     private void processEvent(WindowAdvancedEvent event) throws InterruptedException {
         // Entirely fast: pure in-memory state update, no I/O. Runs on event-processor thread.
         performOperation(new WindowAdvancedOperation(
-                event.getToken(), event.getProcessedTimestamp(), event.getLastBoundaryRecordSequence()));
+                event.getToken(), event.getTvfName(), event.getProcessedTimestamp(), event.getLastBoundaryRecordSequence()));
     }
 
     private void processSyncEvent() throws InterruptedException {

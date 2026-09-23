@@ -34,10 +34,11 @@ public abstract class SpannerBaseSourceTask
         super.commitRecord(sourceRecord, metadata);
 
         String token = SourceRecordUtils.extractToken(sourceRecord);
+        String tvfName = SourceRecordUtils.extractTvfName(sourceRecord);
         String recordUid = SourceRecordUtils.extractRecordUid(sourceRecord);
         if (token != null && recordUid != null) {
             synchronized (this) {
-                committedRecords.add(new CommittedRecord(token, recordUid));
+                committedRecords.add(new CommittedRecord(token, tvfName, recordUid));
             }
         }
 

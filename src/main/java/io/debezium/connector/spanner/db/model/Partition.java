@@ -24,6 +24,8 @@ public class Partition {
 
     private final String lastBoundaryRecordSequence;
 
+    private final String tvfName;
+
     public Partition(String partitionToken, Set<String> parentTokens, Timestamp startTimestamp,
                      Timestamp endTimestamp, String originPartitionToken) {
         this(partitionToken, parentTokens, startTimestamp, endTimestamp, originPartitionToken, null);
@@ -31,12 +33,19 @@ public class Partition {
 
     public Partition(String partitionToken, Set<String> parentTokens, Timestamp startTimestamp,
                      Timestamp endTimestamp, String originPartitionToken, String lastBoundaryRecordSequence) {
+        this(partitionToken, parentTokens, startTimestamp, endTimestamp, originPartitionToken, lastBoundaryRecordSequence, null);
+    }
+
+    public Partition(String partitionToken, Set<String> parentTokens, Timestamp startTimestamp,
+                     Timestamp endTimestamp, String originPartitionToken, String lastBoundaryRecordSequence,
+                     String tvfName) {
         this.partitionToken = partitionToken;
         this.parentTokens = parentTokens;
         this.startTimestamp = startTimestamp;
         this.endTimestamp = endTimestamp;
         this.originPartitionToken = originPartitionToken;
         this.lastBoundaryRecordSequence = lastBoundaryRecordSequence;
+        this.tvfName = tvfName;
     }
 
     public static Builder builder() {
@@ -67,6 +76,20 @@ public class Partition {
         return lastBoundaryRecordSequence;
     }
 
+    /**
+     * The name of the placement table-valued function (TVF) this partition should be queried
+     * against, or null when the change stream is not configured with
+     * {@code gcp.spanner.placement.tvf.names} (the default {@code READ_<changeStreamName>} function
+     * is used in that case).
+     */
+    public String getTvfName() {
+        return tvfName;
+    }
+
+    public PartitionKey getKey() {
+        return new PartitionKey(partitionToken, tvfName);
+    }
+
     public Builder toBuilder() {
         return new Builder(this);
     }
@@ -80,6 +103,7 @@ public class Partition {
                 ", endTimestamp=" + endTimestamp +
                 ", originPartitionToken='" + originPartitionToken + '\'' +
                 ", lastBoundaryRecordSequence='" + lastBoundaryRecordSequence + '\'' +
+                ", tvfName='" + tvfName + '\'' +
                 '}';
     }
 
@@ -94,6 +118,8 @@ public class Partition {
 
         private String lastBoundaryRecordSequence;
 
+        private String tvfName;
+
         public Builder() {
         }
 
@@ -104,6 +130,7 @@ public class Partition {
             this.endTimestamp = partition.endTimestamp;
             this.originPartitionToken = partition.originPartitionToken;
             this.lastBoundaryRecordSequence = partition.lastBoundaryRecordSequence;
+            this.tvfName = partition.tvfName;
         }
 
         public Builder token(String partitionToken) {
@@ -136,6 +163,11 @@ public class Partition {
             return this;
         }
 
+        public Builder tvfName(String tvfName) {
+            this.tvfName = tvfName;
+            return this;
+        }
+
         public Partition build() {
             Preconditions.checkState(partitionToken != null, "partitionToken");
             Preconditions.checkState(parentTokens != null, "parentTokens");
@@ -147,7 +179,8 @@ public class Partition {
                     startTimestamp,
                     endTimestamp,
                     originPartitionToken,
-                    lastBoundaryRecordSequence);
+                    lastBoundaryRecordSequence,
+                    tvfName);
         }
     }
 }

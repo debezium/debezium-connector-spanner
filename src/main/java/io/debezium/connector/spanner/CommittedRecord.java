@@ -5,5 +5,8 @@
  */
 package io.debezium.connector.spanner;
 
-public record CommittedRecord(String token, String recordUid) {
+public record CommittedRecord(String token, String tvfName, String recordUid) {
+    public CommittedRecord(String token, String recordUid) {
+        this(token, null, recordUid);
+    }
 }

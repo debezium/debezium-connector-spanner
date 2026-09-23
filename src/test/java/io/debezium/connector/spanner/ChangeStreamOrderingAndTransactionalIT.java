@@ -56,6 +56,11 @@ public class ChangeStreamOrderingAndTransactionalIT extends AbstractSpannerConne
     @ParameterizedTest
     @MethodSource("partitionModesAndDialects")
     public void shouldCorrelateChangesAcrossTablesInSameTransaction(PartitionMode partitionMode, Dialect dialect) throws Exception {
+        Assumptions.assumeTrue(Connection.isRealSpanner(),
+                "Skipping: cross-table transaction correlation is unstable on the local emulator, which "
+                        + "recursively splits partitions on its own fixed schedule regardless of load (see "
+                        + "CrossPartitionSplitOrderingTestBase), so table A and table B can end up on different, "
+                        + "independently-polled partitions. Run with -Dspanner.test.real=true to exercise this test.");
         Connection connection = connectionFor(dialect, LOGGER);
         Configuration base = baseConfigFor(dialect);
         String tableA = tableFor(multiTableTxnATableName, partitionMode, dialect);
@@ -129,6 +134,9 @@ public class ChangeStreamOrderingAndTransactionalIT extends AbstractSpannerConne
     @ParameterizedTest
     @MethodSource("partitionModesAndDialects")
     public void shouldPreserveStrictOrderAcrossManyRapidUpdatesToSameRow(PartitionMode partitionMode, Dialect dialect) throws Exception {
+        Assumptions.assumeTrue(Connection.isRealSpanner(),
+                "Skipping: rapid-update ordering assertions are unstable on the local emulator. "
+                        + "Run with -Dspanner.test.real=true to exercise this test.");
         Connection connection = connectionFor(dialect, LOGGER);
         Configuration base = baseConfigFor(dialect);
         String table = tableFor(rapidUpdatesTableName, partitionMode, dialect);

@@ -13,8 +13,10 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 
@@ -183,6 +185,15 @@ public class Connection {
         await().atMost(Duration.ofSeconds(ddlWaitTimeSeconds())).until(() -> isStreamExist(changeStreamName));
     }
 
+    public void createPerPlacementTvfChangeStream(String changeStreamName, String... tables) throws ExecutionException,
+            InterruptedException {
+        String optionsClause = isPostgres() ? " WITH " : " OPTIONS ";
+        this.updateDDL(List.of("create change stream " + changeStreamName + " for " +
+                (tables.length == 0 ? "ALL" : String.join(",", tables)) +
+                optionsClause + "(partition_mode = 'MUTABLE_KEY_RANGE', per_placement_tvf = true)"));
+        await().atMost(Duration.ofSeconds(ddlWaitTimeSeconds())).until(() -> isStreamExist(changeStreamName));
+    }
+
     private static final Duration DEFAULT_SPLIT_EXPIRY = Duration.ofMinutes(30);
 
     public void forceSplit(String tableName, String... keyParts) {
@@ -312,6 +323,34 @@ public class Connection {
     public void createChangeStreamExcludeTtlDeletes(String changeStreamName, PartitionMode partitionMode, String... tables)
             throws ExecutionException, InterruptedException {
         createChangeStreamWithBooleanOption(changeStreamName, "exclude_ttl_deletes", partitionMode, tables);
+    }
+
+    public List<String> readPlacementTvfNames(String changeStreamName) {
+        String prefix = isPostgres()
+                ? "read_proto_bytes_" + changeStreamName.toLowerCase(Locale.ROOT) + "_"
+                : "READ_" + changeStreamName + "_";
+        String sql = "SELECT routine_name FROM information_schema.routines " +
+                "WHERE routine_type LIKE '%FUNCTION' AND routine_name LIKE " + (isPostgres() ? "$1" : "@prefix") +
+                " ORDER BY routine_name";
+        Statement statement = Statement.newBuilder(sql)
+                .bind(isPostgres() ? "p1" : "prefix")
+                .to(prefix + "%")
+                .build();
+        List<String> names = new ArrayList<>();
+        try (ResultSet resultSet = executeSelect(statement)) {
+            while (resultSet.next()) {
+                String routineName = resultSet.getString("routine_name");
+                names.add(isPostgres() ? "\"spanner\".\"" + routineName.replace("\"", "\"\"") + "\"" : routineName);
+            }
+        }
+        return names;
+    }
+
+    public void createPlacementIfMissing(String placementName, String instancePartitionId) throws ExecutionException, InterruptedException {
+        if (placementExists(placementName)) {
+            return;
+        }
+        createPlacement(placementName, instancePartitionId);
     }
 
     public void createPlacement(String placementName, String instancePartitionId) throws ExecutionException, InterruptedException {

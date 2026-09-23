@@ -5,10 +5,14 @@
  */
 package io.debezium.connector.spanner.db;
 
+import java.util.Collections;
+import java.util.List;
+
 import com.google.cloud.spanner.Options;
 
 import io.debezium.connector.spanner.db.dao.ChangeStreamDao;
 import io.debezium.connector.spanner.db.dao.SchemaDao;
+import io.debezium.connector.spanner.db.model.ChangeStreamOptions;
 
 /**
  * Factory for {@code ChangeStreamDao}
@@ -32,9 +36,20 @@ public class DaoFactory {
 
     public ChangeStreamDao getStreamDao(String changeStreamName,
                                         Options.RpcPriority rpcPriority, String jobName) {
+        return getStreamDao(changeStreamName, Collections.emptyList(), rpcPriority, jobName);
+    }
+
+    public ChangeStreamDao getStreamDao(String changeStreamName, List<String> placementTvfNames,
+                                        Options.RpcPriority rpcPriority, String jobName) {
         SchemaDao schemaDao = getSchemaDao();
-        boolean isMutableKeyRange = schemaDao.isMutableKeyRangeChangeStream(changeStreamName);
-        return new ChangeStreamDao(changeStreamName, isMutableKeyRange, this.databaseClientFactory.getDatabaseClient(),
-                rpcPriority, jobName);
+        ChangeStreamOptions streamOptions = schemaDao.getChangeStreamOptions(changeStreamName);
+        boolean isMutableKeyRange = streamOptions.isMutableKeyRange();
+        if (!placementTvfNames.isEmpty() && !isMutableKeyRange) {
+            throw new IllegalArgumentException("gcp.spanner.placement.tvf.names is only supported for change streams "
+                    + "with MUTABLE_KEY_RANGE partition mode; change stream '" + changeStreamName + "' is not one.");
+        }
+        schemaDao.validatePlacementTvfNames(changeStreamName, placementTvfNames, streamOptions);
+        return new ChangeStreamDao(changeStreamName, isMutableKeyRange, placementTvfNames,
+                this.databaseClientFactory.getDatabaseClient(), rpcPriority, jobName);
     }
 }

@@ -52,9 +52,14 @@ class MoveInBufferGateTest {
      * are in {@code FINISHED} state (satisfying {@code MoveInGateChecker.canContinue}).
      */
     private static TaskSyncContext ctxWithFinished(String... finishedTokens) {
+        return ctxWithFinishedTvf(null, finishedTokens);
+    }
+
+    private static TaskSyncContext ctxWithFinishedTvf(String tvfName, String... finishedTokens) {
         List<PartitionState> partitions = Arrays.stream(finishedTokens)
                 .map(token -> PartitionState.builder()
                         .token(token)
+                        .tvfName(tvfName)
                         .state(PartitionStateEnum.FINISHED)
                         .build())
                 .collect(Collectors.toList());
@@ -309,6 +314,25 @@ class MoveInBufferGateTest {
         ctxRef.set(ctxWithFinished("src1", "src2"));
         List<ChangeStreamEvent> ready = gate.drainConfirmedPrefix();
         assertEquals(List.of(mi1, d1, d2), ready);
+        assertTrue(gate.isEmpty());
+    }
+
+    @Test
+    void drainConfirmedPrefix_doesNotReleaseWhenSourceFinishedInDifferentTvf() {
+        AtomicReference<TaskSyncContext> ctxRef = new AtomicReference<>(ctxEmpty());
+        MoveInBufferGate gate = new MoveInBufferGate(DEST, "tvfA", MAX_EVENTS, ctxRef::get);
+
+        PartitionEventEvent mi = moveInEvent();
+        gate.addMoveIn(T1, List.of("src1"), mi, fakeMeta());
+
+        // src1 is FINISHED, but in tvfB, not tvfA -> gate must stay closed.
+        ctxRef.set(ctxWithFinishedTvf("tvfB", "src1"));
+        assertTrue(gate.drainConfirmedPrefix().isEmpty(), "source finished in a different TVF must not satisfy the gate");
+
+        // Same source finished in tvfA -> gate opens.
+        ctxRef.set(ctxWithFinishedTvf("tvfA", "src1"));
+        List<ChangeStreamEvent> ready = gate.drainConfirmedPrefix();
+        assertEquals(List.of(mi), ready);
         assertTrue(gate.isEmpty());
     }
 

@@ -18,6 +18,7 @@ import java.util.function.Consumer;
 import org.slf4j.Logger;
 
 import io.debezium.connector.spanner.db.model.Partition;
+import io.debezium.connector.spanner.db.model.PartitionKey;
 import io.debezium.connector.spanner.metrics.MetricsEventPublisher;
 import io.debezium.connector.spanner.metrics.event.TaskStateChangeQueueUpdateMetricEvent;
 import io.debezium.connector.spanner.task.state.NewPartitionsEvent;
@@ -185,9 +186,9 @@ public class TaskStateChangeEventProcessor {
     }
 
     private List<Partition> removeAlreadyExistingPartitions(List<Partition> partitions) {
-        Set<String> existingPartitions = TaskStateUtil.allPartitionTokens(taskSyncContextHolder.get());
+        Set<PartitionKey> existingPartitions = TaskStateUtil.allPartitionTokens(taskSyncContextHolder.get());
         return partitions.stream()
-                .filter(p -> !existingPartitions.contains(p.getToken()))
+                .filter(p -> !existingPartitions.contains(p.getKey()))
                 .collect(toList());
     }
 

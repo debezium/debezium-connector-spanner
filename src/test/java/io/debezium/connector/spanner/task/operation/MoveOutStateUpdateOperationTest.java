@@ -6,6 +6,8 @@
 package io.debezium.connector.spanner.task.operation;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
 import java.util.Set;
@@ -223,12 +225,60 @@ class MoveOutStateUpdateOperationTest {
                 MoveOutStateUpdateOperation.mergeMoveOutStates(existing, incoming));
     }
 
-    private static PartitionState sourcePartition(String token, List<MoveOutState> moveOutStates) {
+    @Test
+    void tvfScoping_onlyUpdatesPartitionWithMatchingTvfName() {
+        PartitionState srcTvfA = sourcePartitionWithTvf("src", "tvfA", List.of());
+        PartitionState srcTvfB = sourcePartitionWithTvf("src", "tvfB", List.of());
+        TaskSyncContext context = contextWith(srcTvfA, srcTvfB);
+
+        TaskSyncContext result = new MoveOutStateUpdateOperation("src", "tvfA", T1, List.of("dst1"))
+                .doOperation(context);
+
+        PartitionState updatedA = findPartition(result, "src", "tvfA");
+        PartitionState updatedB = findPartition(result, "src", "tvfB");
+
+        assertNotNull(updatedA);
+        assertNotNull(updatedB);
+        assertEquals(List.of(new MoveOutState(T1, List.of("dst1"))), updatedA.getMoveOutStates());
+        assertTrue(updatedB.getMoveOutStates().isEmpty(), "partition in a different TVF must not be updated");
+    }
+
+    @Test
+    void legacyNullTvfName_onlyUpdatesNullTvfPartition() {
+        PartitionState srcLegacy = sourcePartitionWithTvf("src", null, List.of());
+        PartitionState srcTvfA = sourcePartitionWithTvf("src", "tvfA", List.of());
+        TaskSyncContext context = contextWith(srcLegacy, srcTvfA);
+
+        TaskSyncContext result = new MoveOutStateUpdateOperation("src", T1, List.of("dst1"))
+                .doOperation(context);
+
+        PartitionState updatedLegacy = findPartition(result, "src", null);
+        PartitionState updatedTvfA = findPartition(result, "src", "tvfA");
+
+        assertNotNull(updatedLegacy);
+        assertNotNull(updatedTvfA);
+        assertEquals(List.of(new MoveOutState(T1, List.of("dst1"))), updatedLegacy.getMoveOutStates());
+        assertTrue(updatedTvfA.getMoveOutStates().isEmpty(), "per-TVF partition must not be affected by legacy operation");
+    }
+
+    private static PartitionState sourcePartitionWithTvf(String token, String tvfName, List<MoveOutState> moveOutStates) {
         return PartitionState.builder()
                 .token(token)
+                .tvfName(tvfName)
                 .state(PartitionStateEnum.RUNNING)
                 .parents(Set.of())
                 .moveOutStates(moveOutStates)
                 .build();
+    }
+
+    private static PartitionState findPartition(TaskSyncContext ctx, String token, String tvfName) {
+        return ctx.getCurrentTaskState().getPartitions().stream()
+                .filter(p -> p.getToken().equals(token) && (tvfName == null ? p.getTvfName() == null : tvfName.equals(p.getTvfName())))
+                .findFirst()
+                .orElse(null);
+    }
+
+    private static PartitionState sourcePartition(String token, List<MoveOutState> moveOutStates) {
+        return sourcePartitionWithTvf(token, null, moveOutStates);
     }
 }

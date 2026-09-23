@@ -7,9 +7,13 @@ package io.debezium.connector.spanner;
 
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Properties;
+import java.util.stream.Collectors;
 
 import javax.naming.OperationNotSupportedException;
 
@@ -321,6 +325,22 @@ public class SpannerConnectorConfig extends BaseSpannerConnectorConfig {
 
     public int getMutableMoveInGateTimeoutMs() {
         return getConfig().getInteger(MUTABLE_MOVE_IN_GATE_TIMEOUT_MS, (int) MUTABLE_MOVE_IN_GATE_TIMEOUT_MS.defaultValue());
+    }
+
+    /**
+     * Returns the list of per-placement TVF names configured via {@code gcp.spanner.placement.tvf.names}.
+     * An empty list means the change stream is not a per-placement TVF stream and the default
+     * {@code READ_<changeStreamName>} function will be used.
+     */
+    public List<String> placementTvfNames() {
+        String raw = getConfig().getString(GCP_SPANNER_PLACEMENT_TVF_NAMES_PROPERTY_NAME);
+        if (raw == null || raw.isBlank()) {
+            return Collections.emptyList();
+        }
+        return Arrays.stream(raw.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .collect(Collectors.toList());
     }
 
     public int taskStateChangeEventQueueCapacity() {

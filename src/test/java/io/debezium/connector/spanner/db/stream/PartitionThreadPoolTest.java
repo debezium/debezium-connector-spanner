@@ -6,9 +6,12 @@
 package io.debezium.connector.spanner.db.stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
+
+import io.debezium.connector.spanner.db.model.PartitionKey;
 
 class PartitionThreadPoolTest {
 
@@ -18,14 +21,7 @@ class PartitionThreadPoolTest {
 
         assertTrue(new PartitionThreadPool().getActiveThreads().isEmpty());
 
-        Runnable runnable = () -> {
-            try {
-                Thread.sleep(100);
-            }
-            catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
-        };
+        Runnable runnable = blockingRunnable();
         partitionThreadPool.submit("Test token1", runnable);
         partitionThreadPool.submit("Test token2", runnable);
         assertEquals(2, partitionThreadPool.getActiveThreads().size());
@@ -35,5 +31,33 @@ class PartitionThreadPoolTest {
 
         partitionThreadPool.shutdown("taskuid");
         assertEquals(0, partitionThreadPool.getActiveThreads().size());
+    }
+
+    @Test
+    void sameTokenInDifferentTvfsRunsConcurrently() {
+        PartitionThreadPool partitionThreadPool = new PartitionThreadPool();
+        Runnable runnable = blockingRunnable();
+
+        assertTrue(partitionThreadPool.submit("token", "tvfA", runnable));
+        assertTrue(partitionThreadPool.submit("token", "tvfB", runnable));
+        assertFalse(partitionThreadPool.submit("token", "tvfA", runnable));
+        assertEquals(2, partitionThreadPool.getActivePartitions().size());
+
+        partitionThreadPool.stop("token", "tvfA");
+        assertEquals(1, partitionThreadPool.getActivePartitions().size());
+        assertTrue(partitionThreadPool.getActivePartitions().contains(new PartitionKey("token", "tvfB")));
+
+        partitionThreadPool.shutdown("taskuid");
+    }
+
+    private static Runnable blockingRunnable() {
+        return () -> {
+            try {
+                Thread.sleep(10_000);
+            }
+            catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        };
     }
 }

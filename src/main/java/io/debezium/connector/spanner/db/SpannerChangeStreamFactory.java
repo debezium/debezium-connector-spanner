@@ -6,6 +6,8 @@
 package io.debezium.connector.spanner.db;
 
 import java.time.Duration;
+import java.util.Collections;
+import java.util.List;
 import java.util.UUID;
 
 import org.slf4j.Logger;
@@ -45,8 +47,8 @@ public class SpannerChangeStreamFactory {
 
     public SpannerChangeStream getStream(
                                          String changeStreamName, Duration heartbeatMillis, int maxMissedHeartbeats, int windowMinutes) {
-        return getStream(changeStreamName, heartbeatMillis, maxMissedHeartbeats, windowMinutes,
-                MutableStreamOptions.withDefaults());
+        return getStream(changeStreamName, Collections.emptyList(), heartbeatMillis, maxMissedHeartbeats, windowMinutes,
+                MutableStreamOptions.withDefaults(), SpannerChangeStreamService.DEFAULT_HEARTBEAT_LAG_WARN_THRESHOLD);
     }
 
     /**
@@ -70,22 +72,24 @@ public class SpannerChangeStreamFactory {
         MutableStreamOptions options = mutablePartitionOrderingEnabled
                 ? MutableStreamOptions.withDefaults()
                 : MutableStreamOptions.orderingDisabled();
-        return getStream(changeStreamName, heartbeatMillis, maxMissedHeartbeats, windowMinutes, options, heartbeatLagWarnThreshold);
+        return getStream(changeStreamName, Collections.emptyList(), heartbeatMillis, maxMissedHeartbeats, windowMinutes, options,
+                heartbeatLagWarnThreshold);
     }
 
     public SpannerChangeStream getStream(
                                          String changeStreamName, Duration heartbeatMillis, int maxMissedHeartbeats, int windowMinutes,
                                          MutableStreamOptions options) {
-        return getStream(changeStreamName, heartbeatMillis, maxMissedHeartbeats, windowMinutes,
-                options, SpannerChangeStreamService.DEFAULT_HEARTBEAT_LAG_WARN_THRESHOLD);
+        return getStream(changeStreamName, Collections.emptyList(), heartbeatMillis, maxMissedHeartbeats, windowMinutes, options,
+                SpannerChangeStreamService.DEFAULT_HEARTBEAT_LAG_WARN_THRESHOLD);
     }
 
     public SpannerChangeStream getStream(
-                                         String changeStreamName, Duration heartbeatMillis, int maxMissedHeartbeats, int windowMinutes,
-                                         MutableStreamOptions options, Duration heartbeatLagWarnThreshold) {
+                                         String changeStreamName, List<String> placementTvfNames, Duration heartbeatMillis,
+                                         int maxMissedHeartbeats, int windowMinutes, MutableStreamOptions options, Duration heartbeatLagWarnThreshold) {
 
         ChangeStreamDao changeStreamDao = daoFactory.getStreamDao(
                 changeStreamName,
+                placementTvfNames,
                 Options.RpcPriority.MEDIUM,
                 JOB_NAME + "_" + connectorName + "_" + UUID.randomUUID());
 

@@ -20,6 +20,8 @@ import org.slf4j.LoggerFactory;
 import com.google.common.annotations.VisibleForTesting;
 
 import io.debezium.connector.spanner.db.model.InitialPartition;
+import io.debezium.connector.spanner.db.model.PartitionKey;
+import io.debezium.connector.spanner.db.model.StreamEventMetadata;
 import io.debezium.connector.spanner.db.model.event.ChangeStreamEvent;
 import io.debezium.connector.spanner.db.stream.exception.ChangeStreamException;
 import io.debezium.connector.spanner.db.stream.exception.FailureChangeStreamException;
@@ -38,11 +40,11 @@ public class PartitionQueryingMonitor {
     private final long heartBeatIntervalMillis;
     private final Duration timeout;
     private volatile Thread thread;
-    private final Map<String, Instant> lastEventTimestampMap = new ConcurrentHashMap<>();
+    private final Map<PartitionKey, Instant> lastEventTimestampMap = new ConcurrentHashMap<>();
 
     private final Consumer<ChangeStreamException> errorConsumer;
 
-    private final BlockingConsumer<String> onStuckPartitionConsumer;
+    private final StuckPartitionConsumer onStuckPartitionConsumer;
 
     private final MetricsEventPublisher metricsEventPublisher;
 
@@ -50,6 +52,17 @@ public class PartitionQueryingMonitor {
                                     PartitionThreadPool partitionThreadPool,
                                     Duration heartBeatInterval,
                                     BlockingConsumer<String> onStuckPartitionConsumer,
+                                    Consumer<ChangeStreamException> errorConsumer,
+                                    MetricsEventPublisher metricsEventPublisher,
+                                    int maxMissedEvents) {
+        this(partitionThreadPool, heartBeatInterval, (token, tvfName) -> onStuckPartitionConsumer.accept(token),
+                errorConsumer, metricsEventPublisher, maxMissedEvents);
+    }
+
+    public PartitionQueryingMonitor(
+                                    PartitionThreadPool partitionThreadPool,
+                                    Duration heartBeatInterval,
+                                    StuckPartitionConsumer onStuckPartitionConsumer,
                                     Consumer<ChangeStreamException> errorConsumer,
                                     MetricsEventPublisher metricsEventPublisher,
                                     int maxMissedEvents) {
@@ -67,27 +80,27 @@ public class PartitionQueryingMonitor {
 
     public void checkPartitionThreads() throws InterruptedException {
         while (!Thread.currentThread().isInterrupted()) {
-            Set<String> activePartitions = partitionThreadPool.getActiveThreads();
+            Set<PartitionKey> activePartitions = partitionThreadPool.getActivePartitions();
 
-            Set<String> toRemove = lastEventTimestampMap.keySet().stream()
+            Set<PartitionKey> toRemove = lastEventTimestampMap.keySet().stream()
                     .filter(partition -> !activePartitions.contains(partition))
                     .collect(Collectors.toSet());
 
             toRemove.forEach(lastEventTimestampMap::remove);
 
             int maxStuckHeartbeatIntervals = -1;
-            for (String token : activePartitions) {
+            for (PartitionKey partition : activePartitions) {
                 // Only measure stuck heartbeat interval for the partition queries.
-                if (InitialPartition.isInitialPartition(token)) {
+                if (InitialPartition.isInitialPartition(partition.getToken())) {
                     continue;
                 }
 
-                Instant lastEventTimestamp = lastEventTimestampMap.get(token);
+                Instant lastEventTimestamp = lastEventTimestampMap.get(partition);
                 if (lastEventTimestamp == null) {
-                    lastEventTimestampMap.put(token, Instant.now());
+                    lastEventTimestampMap.put(partition, Instant.now());
                     continue;
                 }
-                LOGGER.info("PartitionQueryingMonitor, token {} last received timestamp {}", token, lastEventTimestamp);
+                LOGGER.info("PartitionQueryingMonitor, partition {} last received timestamp {}", partition, lastEventTimestamp);
 
                 int stuckHeartbeatIntervals = stuckHeartbeatIntervals(lastEventTimestamp);
                 if (stuckHeartbeatIntervals > maxStuckHeartbeatIntervals) {
@@ -97,8 +110,8 @@ public class PartitionQueryingMonitor {
                 }
 
                 if (isPartitionStuck(lastEventTimestamp)) {
-                    lastEventTimestampMap.remove(token);
-                    onStuckPartitionConsumer.accept(token);
+                    lastEventTimestampMap.remove(partition);
+                    onStuckPartitionConsumer.accept(partition.getToken(), partition.getTvfName());
                 }
             }
 
@@ -151,7 +164,18 @@ public class PartitionQueryingMonitor {
     }
 
     public void acceptStreamEvent(ChangeStreamEvent changeStreamEvent) {
+        StreamEventMetadata metadata = changeStreamEvent.getMetadata();
         this.lastEventTimestampMap.put(
-                changeStreamEvent.getMetadata().getPartitionToken(), Instant.now());
+                new PartitionKey(metadata.getPartitionToken(), metadata.getTvfName()), Instant.now());
+    }
+
+    @VisibleForTesting
+    boolean hasReceivedEvent(String token, String tvfName) {
+        return lastEventTimestampMap.containsKey(new PartitionKey(token, tvfName));
+    }
+
+    @FunctionalInterface
+    public interface StuckPartitionConsumer {
+        void accept(String token, String tvfName) throws InterruptedException;
     }
 }

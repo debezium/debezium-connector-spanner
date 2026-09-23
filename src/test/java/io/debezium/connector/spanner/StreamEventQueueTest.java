@@ -5,6 +5,7 @@
  */
 package io.debezium.connector.spanner;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doNothing;
@@ -34,11 +35,19 @@ class StreamEventQueueTest {
         HashSet<String> parentTokens = new HashSet<>();
         Timestamp startTimestamp = Timestamp.ofTimeMicroseconds(1L);
 
-        FinishPartitionEvent partitionEvent = new FinishPartitionEvent(
-                new Partition("token", parentTokens, startTimestamp, Timestamp.ofTimeMicroseconds(1L), "parentToken"));
+        Partition partition = Partition.builder()
+                .token("token")
+                .parentTokens(parentTokens)
+                .startTimestamp(startTimestamp)
+                .endTimestamp(Timestamp.ofTimeMicroseconds(1L))
+                .originPartitionToken("parentToken")
+                .tvfName("tvfA")
+                .build();
+        FinishPartitionEvent partitionEvent = new FinishPartitionEvent(partition);
         streamEventQueue.put(partitionEvent);
         ChangeStreamEvent takeEvent = streamEventQueue.take();
         assertSame(partitionEvent, takeEvent);
+        assertEquals("tvfA", takeEvent.getMetadata().getTvfName());
 
         verify(metricsEventPublisher, times(3)).publishMetricEvent(any());
     }

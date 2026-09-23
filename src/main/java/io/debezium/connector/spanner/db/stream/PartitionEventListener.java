@@ -23,6 +23,10 @@ public interface PartitionEventListener {
 
     boolean onStuckPartition(String token) throws InterruptedException;
 
+    default boolean onStuckPartition(String token, String tvfName) throws InterruptedException {
+        return onStuckPartition(token);
+    }
+
     void onWindowAdvanced(Partition partition, Timestamp windowEnd, String lastBoundaryRecordSequence) throws InterruptedException;
 
     void onMoveIn(Partition partition, Timestamp commitTimestamp, String recordSequence, List<String> sourcePartitionTokens) throws InterruptedException;

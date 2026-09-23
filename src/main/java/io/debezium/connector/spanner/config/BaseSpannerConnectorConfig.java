@@ -155,6 +155,8 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
 
     private static final String MUTABLE_MOVE_IN_GATE_TIMEOUT_MS_PROPERTY_NAME = "gcp.spanner.mutable.move.in.gate.timeout.ms";
 
+    protected static final String GCP_SPANNER_PLACEMENT_TVF_NAMES_PROPERTY_NAME = "gcp.spanner.placement.tvf.names";
+
     public static final Field MUTABLE_PARTITION_ORDERING_ENABLED = Field.create(MUTABLE_PARTITION_ORDERING_ENABLED_PROPERTY_NAME)
             .withDisplayName("Mutable partition move-in/move-out ordering enabled")
             .withType(Type.BOOLEAN)
@@ -204,6 +206,16 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
             .withDefault(60000)
             .withDescription("Maximum time (in milliseconds) the streaming thread waits for an active MoveIn gate after "
                     + "the Spanner result-set is exhausted before falling back to the close/reopen path. Default 60000 ms.");
+
+    public static final Field PLACEMENT_TVF_NAMES = Field.create(GCP_SPANNER_PLACEMENT_TVF_NAMES_PROPERTY_NAME)
+            .withDisplayName("Placement TVF names")
+            .withType(Type.LIST)
+            .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR, 0))
+            .withWidth(Width.LONG)
+            .withImportance(Importance.MEDIUM)
+            .withDescription("Comma-separated list of per-placement read table-valued function names (e.g. READ_MyStream_US,READ_MyStream_EU) " +
+                    "for change streams created with per_placement_tvf=true. When non-empty the connector will query each TVF independently " +
+                    "and use the TVF name as part of the partition identity.");
 
     protected static final Field LOW_WATERMARK_ENABLED_FIELD = Field.create(LOW_WATERMARK_ENABLED)
             .withDisplayName(LOW_WATERMARK_ENABLED)
@@ -791,6 +803,7 @@ public abstract class BaseSpannerConnectorConfig extends CommonConnectorConfig {
                     MUTABLE_MOVE_IN_BUFFER_MAX_EVENTS,
                     MUTABLE_MOVE_IN_GATE_CHECK_INTERVAL_MS,
                     MUTABLE_MOVE_IN_GATE_TIMEOUT_MS,
+                    PLACEMENT_TVF_NAMES,
                     TABLE_EXCLUDE_LIST,
                     TABLE_INCLUDE_LIST,
                     CUSTOM_CONVERTERS,

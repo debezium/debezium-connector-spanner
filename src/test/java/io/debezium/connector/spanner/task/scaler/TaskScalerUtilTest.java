@@ -46,6 +46,23 @@ class TaskScalerUtilTest {
     }
 
     @Test
+    void partitionsInWorkCountTreatsSameTokenFromDifferentTvfsAsDistinct() {
+        TaskState task = generateTaskStateWithPartitions(List.of(
+                PartitionState.builder()
+                        .token("token")
+                        .tvfName("tvfA")
+                        .state(PartitionStateEnum.RUNNING)
+                        .build(),
+                PartitionState.builder()
+                        .token("token")
+                        .tvfName("tvfB")
+                        .state(PartitionStateEnum.RUNNING)
+                        .build()));
+
+        assertThat(TaskScalerUtil.partitionsInWorkCount(createTaskSyncEvent(task))).isEqualTo(2);
+    }
+
+    @Test
     void partitionsInWorkCount_nullSyncEventTest() {
         long partitionsInWorkCount = TaskScalerUtil.partitionsInWorkCount(null);
         assertThat(partitionsInWorkCount).isZero();
