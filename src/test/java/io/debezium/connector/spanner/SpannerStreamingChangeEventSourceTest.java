@@ -381,7 +381,53 @@ class SpannerStreamingChangeEventSourceTest {
         eventQueue.put(event);
 
         verify(partitionManager, timeout(3000)).newChildPartitions(argThat(partitions -> partitions.size() == 2
-                && partitions.stream().allMatch(p -> p.getParentTokens().isEmpty())));
+                && partitions.stream().allMatch(p -> p.getParentTokens().isEmpty() && p.getTvfName() == null)));
+
+        execThread.interrupt();
+        execThread.join(3000);
+    }
+
+    @Test
+    void testProcessPartitionStartEventPropagatesPlacementTvfName() throws Exception {
+        PartitionManager partitionManager = mock(PartitionManager.class);
+        SpannerConnectorConfig connectorConfig = mock(SpannerConnectorConfig.class);
+        ChangeStream stream = mock(ChangeStream.class);
+        StreamEventQueue eventQueue = new StreamEventQueue(10, new MetricsEventPublisher());
+        CountDownLatch streamStarted = new CountDownLatch(1);
+
+        SpannerStreamingChangeEventSource source = buildSourceWithMockedStream(
+                partitionManager, connectorConfig, stream, eventQueue, streamStarted);
+
+        ChangeEventSource.ChangeEventSourceContext context = mock(ChangeEventSource.ChangeEventSourceContext.class);
+        when(context.isRunning()).thenReturn(true);
+
+        Thread execThread = new Thread(() -> {
+            try {
+                source.execute(context, SpannerPartition.getInitialSpannerPartition(), null);
+            }
+            catch (Exception e) {
+            }
+        });
+        execThread.start();
+
+        org.junit.jupiter.api.Assertions.assertTrue(
+                streamStarted.await(3, TimeUnit.SECONDS), "stream.run() not called in time");
+
+        String tvfName = "READ_Stream_US";
+        StreamEventMetadata metadata = StreamEventMetadata.newBuilder()
+                .withPartitionToken("sourceToken")
+                .withTvfName(tvfName)
+                .build();
+        PartitionStartEvent event = new PartitionStartEvent(
+                Timestamp.ofTimeMicroseconds(100L),
+                "seq-1",
+                List.of("destToken1", "destToken2"),
+                false,
+                metadata);
+        eventQueue.put(event);
+
+        verify(partitionManager, timeout(3000)).newChildPartitions(argThat(partitions -> partitions.size() == 2
+                && partitions.stream().allMatch(p -> p.getParentTokens().isEmpty() && tvfName.equals(p.getTvfName()))));
 
         execThread.interrupt();
         execThread.join(3000);
@@ -428,6 +474,7 @@ class SpannerStreamingChangeEventSourceTest {
 
         verify(partitionManager, timeout(3000)).notifyMoveOut(
                 org.mockito.ArgumentMatchers.eq("srcPartition"),
+                org.mockito.ArgumentMatchers.eq((String) null),
                 org.mockito.ArgumentMatchers.eq(commitTs),
                 argThat(dests -> dests.size() == 1 && "destPartition1".equals(dests.get(0))));
 

@@ -22,6 +22,7 @@ public class FinishPartitionEvent implements ChangeStreamEvent {
                 .withPartitionToken(partition.getToken())
                 .withPartitionEndTimestamp(partition.getEndTimestamp())
                 .withPartitionStartTimestamp(partition.getStartTimestamp())
+                .withTvfName(partition.getTvfName())
                 .build();
     }
 

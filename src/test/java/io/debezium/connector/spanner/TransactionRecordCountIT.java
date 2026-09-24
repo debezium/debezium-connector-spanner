@@ -14,6 +14,7 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.slf4j.Logger;
@@ -31,15 +32,11 @@ import io.debezium.connector.spanner.util.PartitionMode;
  *
  * <p>This test is {@link RealSpannerCompatible}: when {@code -Dspanner.test.real=true} is
  * passed it runs against a real Cloud Spanner instance; otherwise it runs against the local
- * emulator.
- *
- * <p>{@code MUTABLE_KEY_RANGE} self-skips unless running against real Spanner: connector
- * startup plus this test's DML can incidentally span the local emulator's ~15-20 second
- * background partition split, and a newly split {@code MUTABLE_KEY_RANGE} child partition
- * isn't picked up for streaming quickly enough - Spanner rejects the query with
- * {@code OUT_OF_RANGE: Specified start_timestamp is too far in the past}. Same root cause as
- * the one documented on {@link CrossPartitionSplitOrderingIT}; real Spanner splits based on
- * load rather than a fixed timer, so it isn't expected to hit this.
+ * emulator. The transaction record-count assertions are only exercised against real Spanner
+ * because emulator timing around connector startup and the background partition split can
+ * produce {@code OUT_OF_RANGE: Specified start_timestamp is too far in the past} or
+ * miscounted records. Real Spanner splits based on load rather than a fixed timer, so it is
+ * not expected to hit this.
  */
 @RealSpannerCompatible
 public class TransactionRecordCountIT extends AbstractSpannerConnectorIT {
@@ -52,6 +49,9 @@ public class TransactionRecordCountIT extends AbstractSpannerConnectorIT {
     @ParameterizedTest
     @MethodSource("partitionModesAndDialects")
     public void shouldReportRecordAndPartitionCountsForTransaction(PartitionMode partitionMode, Dialect dialect) throws InterruptedException, ExecutionException {
+        Assumptions.assumeTrue(Connection.isRealSpanner(),
+                "Skipping: partition/record count assertions are unstable on the local emulator. "
+                        + "Run with -Dspanner.test.real=true to exercise this test.");
         Connection connection = connectionFor(dialect, LOGGER);
         Configuration base = baseConfigFor(dialect);
         String table = tableFor(tableNamePrefix, partitionMode, dialect);

@@ -104,6 +104,10 @@ public class SyncEventToProtoMapper {
             builder.setLastBoundaryRecordSequence(partitionState.getLastBoundaryRecordSequence());
         }
 
+        if (partitionState.getTvfName() != null) {
+            builder.setTvfName(partitionState.getTvfName());
+        }
+
         return builder.build();
     }
 }

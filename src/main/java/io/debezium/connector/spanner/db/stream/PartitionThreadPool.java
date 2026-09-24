@@ -10,10 +10,12 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import io.debezium.connector.spanner.db.model.PartitionKey;
 import io.debezium.util.Clock;
 import io.debezium.util.Metronome;
 
@@ -23,37 +25,46 @@ import io.debezium.util.Metronome;
 public class PartitionThreadPool {
     private static final Logger LOGGER = LoggerFactory.getLogger(PartitionThreadPool.class);
 
-    private final ConcurrentMap<String, Thread> threadMap = new ConcurrentHashMap<>();
+    private final ConcurrentMap<PartitionKey, Thread> threadMap = new ConcurrentHashMap<>();
 
     private final Duration sleepInterval = Duration.ofMillis(100);
 
     private final Clock clock = Clock.system();
 
     public boolean submit(String token, Runnable runnable) {
-        clean();
+        return submit(token, null, runnable);
+    }
 
-        if (threadMap.containsKey(token)) {
-            LOGGER.info("Failed to submit token in PartitionThreadPool {} since it is already contained in the map", token);
+    public boolean submit(String token, String tvfName, Runnable runnable) {
+        clean();
+        PartitionKey partitionKey = new PartitionKey(token, tvfName);
+
+        if (threadMap.containsKey(partitionKey)) {
+            LOGGER.info("Failed to submit partition in PartitionThreadPool {} since it is already contained in the map", partitionKey);
             return false;
         }
 
         AtomicBoolean insertedThread = new AtomicBoolean(false);
 
-        threadMap.computeIfAbsent(token, k -> {
+        threadMap.computeIfAbsent(partitionKey, k -> {
             Thread thread = new Thread(runnable, "SpannerConnector-PartitionThreadPool");
             thread.start();
             insertedThread.set(true);
             return thread;
         });
         if (!insertedThread.get()) {
-            LOGGER.info("Failed to submit token in PartitionThreadPool {}", token);
+            LOGGER.info("Failed to submit partition in PartitionThreadPool {}", partitionKey);
         }
 
         return insertedThread.get();
     }
 
     public void stop(String token) {
-        Thread thread = threadMap.remove(token);
+        stop(token, null);
+    }
+
+    public void stop(String token, String tvfName) {
+        Thread thread = threadMap.remove(new PartitionKey(token, tvfName));
         if (thread != null) {
             LOGGER.info("Interrupting SpannerConnector-PartitionThreadPool");
             thread.interrupt();
@@ -90,6 +101,12 @@ public class PartitionThreadPool {
     }
 
     public Set<String> getActiveThreads() {
+        return getActivePartitions().stream()
+                .map(PartitionKey::getToken)
+                .collect(Collectors.toUnmodifiableSet());
+    }
+
+    public Set<PartitionKey> getActivePartitions() {
         clean();
         return Set.copyOf(threadMap.keySet());
     }

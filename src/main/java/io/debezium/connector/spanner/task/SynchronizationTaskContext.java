@@ -123,7 +123,7 @@ public class SynchronizationTaskContext {
 
         final KafkaConsumerAdminService kafkaAdminService = new KafkaConsumerAdminService(adminClientFactory.getAdminClient(), connectorName);
 
-        this.partitionFactory = new PartitionFactory(partitionOffsetProvider, metricsEventPublisher);
+        this.partitionFactory = new PartitionFactory(partitionOffsetProvider, metricsEventPublisher, connectorConfig.placementTvfNames());
 
         final LeaderService leaderService = new LeaderService(taskSyncContextHolder,
                 connectorConfig,

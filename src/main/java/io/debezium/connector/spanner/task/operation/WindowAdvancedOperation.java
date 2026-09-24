@@ -6,6 +6,7 @@
 package io.debezium.connector.spanner.task.operation;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
@@ -28,11 +29,17 @@ public class WindowAdvancedOperation implements Operation {
     private static final Logger LOGGER = LoggerFactory.getLogger(WindowAdvancedOperation.class);
 
     private final String token;
+    private final String tvfName;
     private final Timestamp processedTimestamp;
     private final String lastBoundaryRecordSequence;
 
     public WindowAdvancedOperation(String token, Timestamp processedTimestamp, String lastBoundaryRecordSequence) {
+        this(token, null, processedTimestamp, lastBoundaryRecordSequence);
+    }
+
+    public WindowAdvancedOperation(String token, String tvfName, Timestamp processedTimestamp, String lastBoundaryRecordSequence) {
         this.token = token;
+        this.tvfName = tvfName;
         this.processedTimestamp = processedTimestamp;
         this.lastBoundaryRecordSequence = lastBoundaryRecordSequence;
     }
@@ -48,7 +55,7 @@ public class WindowAdvancedOperation implements Operation {
 
         List<PartitionState> updatedPartitions = currentTaskState.getPartitions().stream()
                 .map(partitionState -> {
-                    if (partitionState.getToken().equals(token)) {
+                    if (partitionState.getToken().equals(token) && Objects.equals(partitionState.getTvfName(), tvfName)) {
                         return partitionState.toBuilder()
                                 .processedTimestamp(processedTimestamp)
                                 .lastBoundaryRecordSequence(lastBoundaryRecordSequence)

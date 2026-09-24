@@ -28,11 +28,19 @@ class ClearSharedPartitionOperationTest {
     // -----------------------------------------------------------------------
 
     private static PartitionState shared(String token) {
-        return PartitionState.builder().token(token).build();
+        return shared(token, null);
+    }
+
+    private static PartitionState shared(String token, String tvfName) {
+        return PartitionState.builder().token(token).tvfName(tvfName).build();
     }
 
     private static PartitionState partition(String token, PartitionStateEnum state) {
-        return PartitionState.builder().token(token).state(state).build();
+        return partition(token, null, state);
+    }
+
+    private static PartitionState partition(String token, String tvfName, PartitionStateEnum state) {
+        return PartitionState.builder().token(token).tvfName(tvfName).state(state).build();
     }
 
     private static TaskState taskState(String uid, List<PartitionState> partitions, List<PartitionState> sharedPartitions) {
@@ -220,6 +228,58 @@ class ClearSharedPartitionOperationTest {
         assertEquals(1, remaining.size());
         assertEquals("token-2", remaining.get(0).getToken(),
                 "token-1 must be removed (owned by other task), token-2 must be kept");
+    }
+
+    @Test
+    void takeSharedPartitionTreatsSameTokenInDifferentTvfAsDistinct() {
+        PartitionState assignedTvfB = PartitionState.builder()
+                .token("token-1")
+                .tvfName("tvfB")
+                .state(PartitionStateEnum.CREATED)
+                .assigneeTaskUid("task-B")
+                .build();
+        TaskState otherTask = taskState("task-A", List.of(), List.of(assignedTvfB));
+        TaskState currentTask = taskState("task-B",
+                List.of(partition("token-1", "tvfA", PartitionStateEnum.RUNNING)),
+                List.of());
+
+        TaskSyncContext result = new TakeSharedPartitionOperation()
+                .doOperation(context(currentTask, otherTask));
+
+        assertEquals(2, partitions(result).size());
+        assertTrue(partitions(result).stream().anyMatch(p -> "tvfA".equals(p.getTvfName())));
+        assertTrue(partitions(result).stream().anyMatch(p -> "tvfB".equals(p.getTvfName())));
+    }
+
+    @Test
+    void sameTokenInDifferentTvfDoesNotRemoveSharedPartition() {
+        TaskState otherTask = taskState("task-A",
+                List.of(partition("token-1", "tvfA", PartitionStateEnum.RUNNING)),
+                List.of());
+        TaskState currentTask = taskState("task-B",
+                List.of(),
+                List.of(shared("token-1", "tvfB")));
+
+        TaskSyncContext result = new ClearSharedPartitionOperation()
+                .doOperation(context(currentTask, otherTask));
+
+        assertEquals(1, sharedPartitions(result).size());
+        assertEquals("tvfB", sharedPartitions(result).get(0).getTvfName());
+    }
+
+    @Test
+    void sameTokenInDifferentTvfDoesNotTriggerDuplicateHealing() {
+        TaskState lowerUidTask = taskState("task-A",
+                List.of(partition("token-1", "tvfA", PartitionStateEnum.RUNNING)),
+                List.of());
+        TaskState currentTask = taskState("task-B",
+                List.of(partition("token-1", "tvfB", PartitionStateEnum.RUNNING)),
+                List.of());
+
+        TaskSyncContext result = new ClearSharedPartitionOperation()
+                .doOperation(context(currentTask, lowerUidTask));
+
+        assertEquals(PartitionStateEnum.RUNNING, partitions(result).get(0).getState());
     }
 
     /** If there are no duplicates, isRequiredPublishSyncEvent must be false. */

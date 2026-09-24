@@ -35,6 +35,8 @@ public class StreamEventMetadata {
     private long totalStreamTimeMillis;
     private long numberOfRecordsRead;
 
+    private String tvfName;
+
     private StreamEventMetadata() {
     }
 
@@ -48,7 +50,8 @@ public class StreamEventMetadata {
                                 Timestamp recordStreamEndedAt,
                                 Timestamp recordReadAt,
                                 long totalStreamTimeMillis,
-                                long numberOfRecordsRead) {
+                                long numberOfRecordsRead,
+                                String tvfName) {
         this.partitionToken = partitionToken;
         this.recordTimestamp = recordTimestamp;
 
@@ -61,6 +64,7 @@ public class StreamEventMetadata {
         this.recordReadAt = recordReadAt;
         this.totalStreamTimeMillis = totalStreamTimeMillis;
         this.numberOfRecordsRead = numberOfRecordsRead;
+        this.tvfName = tvfName;
     }
 
     public static Builder newBuilder() {
@@ -137,6 +141,15 @@ public class StreamEventMetadata {
         return numberOfRecordsRead;
     }
 
+    /**
+     * The name of the placement table-valued function (TVF) the partition that produced this record
+     * was queried against, or null when the change stream is not configured with
+     * {@code gcp.spanner.placement.tvf.names}.
+     */
+    public String getTvfName() {
+        return tvfName;
+    }
+
     @Override
     public boolean equals(@Nullable Object o) {
         if (this == o) {
@@ -155,7 +168,8 @@ public class StreamEventMetadata {
                 && Objects.equals(queryStartedAt, metadata.queryStartedAt)
                 && Objects.equals(recordStreamStartedAt, metadata.recordStreamStartedAt)
                 && Objects.equals(recordStreamEndedAt, metadata.recordStreamEndedAt)
-                && Objects.equals(recordReadAt, metadata.recordReadAt);
+                && Objects.equals(recordReadAt, metadata.recordReadAt)
+                && Objects.equals(tvfName, metadata.tvfName);
     }
 
     @Override
@@ -170,7 +184,8 @@ public class StreamEventMetadata {
                 recordStreamEndedAt,
                 recordReadAt,
                 totalStreamTimeMillis,
-                numberOfRecordsRead);
+                numberOfRecordsRead,
+                tvfName);
     }
 
     @Override
@@ -197,6 +212,8 @@ public class StreamEventMetadata {
                 + totalStreamTimeMillis
                 + ", numberOfRecordsRead="
                 + numberOfRecordsRead
+                + ", tvfName="
+                + tvfName
                 + '}';
     }
 
@@ -211,6 +228,7 @@ public class StreamEventMetadata {
         private Timestamp recordReadAt;
         private long totalStreamTimeMillis;
         private long numberOfRecordsRead;
+        private String tvfName;
 
         /**
          * Sets the partition token where this record originated from.
@@ -324,6 +342,18 @@ public class StreamEventMetadata {
         }
 
         /**
+         * Sets the name of the placement table-valued function (TVF) the partition that produced
+         * this record was queried against.
+         *
+         * @param tvfName the TVF name to be set
+         * @return Builder
+         */
+        public Builder withTvfName(String tvfName) {
+            this.tvfName = tvfName;
+            return this;
+        }
+
+        /**
          * Builds the {@link StreamEventMetadata}.
          *
          * @return ChangeStreamRecordMetadata
@@ -339,7 +369,8 @@ public class StreamEventMetadata {
                     recordStreamEndedAt,
                     recordReadAt,
                     totalStreamTimeMillis,
-                    numberOfRecordsRead);
+                    numberOfRecordsRead,
+                    tvfName);
         }
     }
 }

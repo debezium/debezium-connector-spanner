@@ -187,6 +187,7 @@ public class SpannerConnectorTask extends SpannerBaseSourceTask {
 
         this.changeStream = spannerChangeStreamFactory.getStream(
                 connectorConfig.changeStreamName(),
+                connectorConfig.placementTvfNames(),
                 connectorConfig.getHeartbeatInterval(),
                 connectorConfig.getMaxMissedHeartbeats(),
                 connectorConfig.getMutableWindowMinutes(),

@@ -12,6 +12,7 @@ import static org.mockito.Mockito.mock;
 
 import java.time.Duration;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 
 import org.junit.jupiter.api.Test;
@@ -60,6 +61,11 @@ class RemoveFinishedPartitionOperationTest {
     private boolean isPresent(TaskSyncContext context, String token) {
         return context.getCurrentTaskState().getPartitions().stream()
                 .anyMatch(p -> p.getToken().equals(token));
+    }
+
+    private boolean isPresent(TaskSyncContext context, String token, String tvfName) {
+        return context.getCurrentTaskState().getPartitions().stream()
+                .anyMatch(p -> p.getToken().equals(token) && Objects.equals(p.getTvfName(), tvfName));
     }
 
     /**
@@ -197,6 +203,108 @@ class RemoveFinishedPartitionOperationTest {
 
         assertTrue(isPresent(result, "src"),
                 "source must not be deleted while dst1's earlier move hasn't been resumed, even though dst2's later move has");
+    }
+
+    @Test
+    void childInDifferentTvfDoesNotBlockSourceDeletion() {
+        PartitionState source = PartitionState.builder()
+                .token("src")
+                .tvfName("tvfA")
+                .state(PartitionStateEnum.FINISHED)
+                .parents(Set.of())
+                .finishedTimestamp(FINISHED_LONG_AGO)
+                .build();
+        PartitionState childInOtherTvf = PartitionState.builder()
+                .token("child")
+                .tvfName("tvfB")
+                .state(PartitionStateEnum.RUNNING)
+                .parents(Set.of("src"))
+                .build();
+
+        TaskSyncContext result = newOperation().doOperation(contextWith(source, childInOtherTvf));
+
+        assertFalse(isPresent(result, "src", "tvfA"));
+    }
+
+    @Test
+    void finishedSameTokenChildInDifferentTvfDoesNotHideRunningChild() {
+        PartitionState source = PartitionState.builder()
+                .token("src")
+                .tvfName("tvfA")
+                .state(PartitionStateEnum.FINISHED)
+                .parents(Set.of())
+                .finishedTimestamp(FINISHED_LONG_AGO)
+                .build();
+        PartitionState runningChild = PartitionState.builder()
+                .token("child")
+                .tvfName("tvfA")
+                .state(PartitionStateEnum.RUNNING)
+                .parents(Set.of("src"))
+                .build();
+        PartitionState finishedChildInOtherTvf = PartitionState.builder()
+                .token("child")
+                .tvfName("tvfB")
+                .state(PartitionStateEnum.FINISHED)
+                .parents(Set.of("src"))
+                .finishedTimestamp(FINISHED_LONG_AGO)
+                .build();
+
+        TaskSyncContext result = newOperation().doOperation(contextWith(source, runningChild, finishedChildInOtherTvf));
+
+        assertTrue(isPresent(result, "src", "tvfA"));
+    }
+
+    @Test
+    void moveOutDestinationInDifferentTvfDoesNotBlockSourceDeletion() {
+        PartitionState source = PartitionState.builder()
+                .token("src")
+                .tvfName("tvfA")
+                .state(PartitionStateEnum.FINISHED)
+                .parents(Set.of())
+                .finishedTimestamp(FINISHED_LONG_AGO)
+                .moveOutStates(List.of(new MoveOutState(MOVE_TS, List.of("dst"))))
+                .build();
+        PartitionState destinationInOtherTvf = PartitionState.builder()
+                .token("dst")
+                .tvfName("tvfB")
+                .state(PartitionStateEnum.RUNNING)
+                .parents(Set.of())
+                .processedTimestamp(BEFORE_MOVE)
+                .build();
+
+        TaskSyncContext result = newOperation().doOperation(contextWith(source, destinationInOtherTvf));
+
+        assertFalse(isPresent(result, "src", "tvfA"));
+    }
+
+    @Test
+    void moveOutDestinationLookupUsesMatchingTvf() {
+        PartitionState source = PartitionState.builder()
+                .token("src")
+                .tvfName("tvfA")
+                .state(PartitionStateEnum.FINISHED)
+                .parents(Set.of())
+                .finishedTimestamp(FINISHED_LONG_AGO)
+                .moveOutStates(List.of(new MoveOutState(MOVE_TS, List.of("dst"))))
+                .build();
+        PartitionState destinationInOtherTvf = PartitionState.builder()
+                .token("dst")
+                .tvfName("tvfB")
+                .state(PartitionStateEnum.RUNNING)
+                .parents(Set.of())
+                .processedTimestamp(AFTER_MOVE)
+                .build();
+        PartitionState destinationInSameTvf = PartitionState.builder()
+                .token("dst")
+                .tvfName("tvfA")
+                .state(PartitionStateEnum.RUNNING)
+                .parents(Set.of())
+                .processedTimestamp(BEFORE_MOVE)
+                .build();
+
+        TaskSyncContext result = newOperation().doOperation(contextWith(source, destinationInOtherTvf, destinationInSameTvf));
+
+        assertTrue(isPresent(result, "src", "tvfA"));
     }
 
     @Test

@@ -14,6 +14,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import io.debezium.connector.spanner.db.model.PartitionKey;
 import io.debezium.connector.spanner.kafka.internal.model.PartitionState;
 import io.debezium.connector.spanner.kafka.internal.model.PartitionStateEnum;
 import io.debezium.connector.spanner.kafka.internal.model.TaskState;
@@ -49,14 +50,14 @@ public class TaskPartitionGreedyLeaderRebalancer implements TaskPartitionRebalan
 
     private TaskState movePartitionsFromObsoleteTasks(TaskState leaderTaskState, Map<String, TaskState> obsoleteTasks) {
 
-        Set<String> tokens = collectPartitionTokens(leaderTaskState);
+        Set<PartitionKey> tokens = collectPartitionTokens(leaderTaskState);
 
         List<PartitionState> leaderPartitionList = new ArrayList<>(leaderTaskState.getPartitions());
 
         List<PartitionState> allPartitions = filterDuplications(obsoleteTasks.values().stream()
                 .flatMap(taskState -> taskState.getPartitions().stream()).collect(Collectors.toList()));
 
-        List<PartitionState> partitions = allPartitions.stream().filter(partitionState -> !tokens.contains(partitionState.getToken()))
+        List<PartitionState> partitions = allPartitions.stream().filter(partitionState -> !tokens.contains(partitionState.getKey()))
                 .map(partitionState -> {
                     if (PartitionStateEnum.SCHEDULED.equals(partitionState.getState()) ||
                             PartitionStateEnum.RUNNING.equals(partitionState.getState())) {
@@ -80,7 +81,7 @@ public class TaskPartitionGreedyLeaderRebalancer implements TaskPartitionRebalan
     private TaskState moveSharedPartitionsFromObsoleteTasks(TaskState leaderTaskState, Map<String, TaskState> survivedTasks,
                                                             Map<String, TaskState> obsoleteTasks) {
 
-        Set<String> tokens = collectPartitionTokens(leaderTaskState);
+        Set<PartitionKey> tokens = collectPartitionTokens(leaderTaskState);
         String leaderUid = leaderTaskState.getTaskUid();
 
         List<PartitionState> obsoleteTasksSharedPartitions = filterDuplications(obsoleteTasks.values().stream()
@@ -91,7 +92,7 @@ public class TaskPartitionGreedyLeaderRebalancer implements TaskPartitionRebalan
         List<PartitionState> leaderPartitionList = new ArrayList<>(leaderTaskState.getPartitions());
 
         List<PartitionState> newSharedPartitions = obsoleteTasksSharedPartitions.stream()
-                .filter(partitionState -> !tokens.contains(partitionState.getToken()))
+                .filter(partitionState -> !tokens.contains(partitionState.getKey()))
                 .map(partitionState -> {
                     if (survivedTasks.containsKey(partitionState.getAssigneeTaskUid())
                             && !partitionState.getAssigneeTaskUid().equals(leaderUid)) {
@@ -105,7 +106,7 @@ public class TaskPartitionGreedyLeaderRebalancer implements TaskPartitionRebalan
         leaderSharedPartitionList.addAll(newSharedPartitions);
 
         List<PartitionState> newPartitions = obsoleteTasksSharedPartitions.stream()
-                .filter(partitionState -> !tokens.contains(partitionState.getToken()))
+                .filter(partitionState -> !tokens.contains(partitionState.getKey()))
                 .map(partitionState -> {
                     if (!survivedTasks.containsKey(partitionState.getAssigneeTaskUid())
                             || partitionState.getAssigneeTaskUid().equals(leaderUid)) {
@@ -129,12 +130,12 @@ public class TaskPartitionGreedyLeaderRebalancer implements TaskPartitionRebalan
     private TaskState takeSharedPartitionsFromSurvivedTasks(TaskState leaderTaskState,
                                                             Map<String, TaskState> survivedTasks) {
 
-        Set<String> tokens = collectPartitionTokens(leaderTaskState);
+        Set<PartitionKey> tokens = collectPartitionTokens(leaderTaskState);
 
         List<PartitionState> partitions = filterDuplications(survivedTasks.values().stream()
                 .flatMap(taskState -> taskState.getSharedPartitions().stream()).collect(Collectors.toList()))
                 .stream()
-                .filter(partitionState -> !tokens.contains(partitionState.getToken()))
+                .filter(partitionState -> !tokens.contains(partitionState.getKey()))
                 .filter(partitionState -> !survivedTasks.containsKey(partitionState.getAssigneeTaskUid()))
                 .map(partitionState -> partitionState.toBuilder()
                         .assigneeTaskUid(leaderTaskState.getTaskUid())
@@ -151,7 +152,7 @@ public class TaskPartitionGreedyLeaderRebalancer implements TaskPartitionRebalan
 
     private TaskState moveFinishedPartitionsFromObsoleteTasks(TaskState leaderTaskState, Map<String, TaskState> obsoleteTasks) {
 
-        Set<String> tokens = collectPartitionTokens(leaderTaskState);
+        Set<PartitionKey> tokens = collectPartitionTokens(leaderTaskState);
 
         List<PartitionState> leaderPartitionList = new ArrayList<>(leaderTaskState.getPartitions());
 
@@ -159,7 +160,7 @@ public class TaskPartitionGreedyLeaderRebalancer implements TaskPartitionRebalan
                 .flatMap(taskState -> taskState.getPartitions().stream()).collect(Collectors.toList()));
 
         List<PartitionState> finishedPartitions = allPartitions.stream()
-                .filter(partitionState -> !tokens.contains(partitionState.getToken()))
+                .filter(partitionState -> !tokens.contains(partitionState.getKey()))
                 .map(partitionState -> {
                     if (PartitionStateEnum.FINISHED.equals(partitionState.getState())) {
                         return partitionState.toBuilder()
@@ -179,11 +180,11 @@ public class TaskPartitionGreedyLeaderRebalancer implements TaskPartitionRebalan
     }
 
     private List<PartitionState> filterDuplications(List<PartitionState> partitionStates) {
-        return partitionStates.stream().collect(Collectors.groupingBy(PartitionState::getToken)).values().stream()
+        return partitionStates.stream().collect(Collectors.groupingBy(PartitionState::getKey)).values().stream()
                 .flatMap(list -> list.stream().sorted().limit(1)).collect(Collectors.toList());
     }
 
-    private Set<String> collectPartitionTokens(TaskState taskState) {
+    private Set<PartitionKey> collectPartitionTokens(TaskState taskState) {
         return Stream.concat(
                 taskState.getPartitionsMap().keySet().stream(),
                 taskState.getSharedPartitionsMap().keySet().stream())

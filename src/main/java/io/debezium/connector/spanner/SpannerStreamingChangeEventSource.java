@@ -108,7 +108,8 @@ public class SpannerStreamingChangeEventSource implements CommittingRecordsStrea
         this.partitionManager = partitionManager;
         this.schemaRegistry = schemaRegistry;
         this.spannerEventDispatcher = spannerEventDispatcher;
-        this.finishingPartitionManager = new FinishingPartitionManager(connectorConfig, partitionManager::updateToFinished);
+        this.finishingPartitionManager = new FinishingPartitionManager(connectorConfig,
+                (token, tvfName) -> partitionManager.updateToFinished(token, tvfName));
         this.finishPartitionWatchDog = new FinishPartitionWatchDog(finishingPartitionManager, FINISHING_PARTITION_TIMEOUT, tokens -> {
             processFailure(new FinishingPartitionTimeout(tokens));
         });
@@ -133,8 +134,8 @@ public class SpannerStreamingChangeEventSource implements CommittingRecordsStrea
             stream.run(context::isRunning, eventQueue::put, new PartitionEventListener() {
                 @Override
                 public void onRun(Partition partition) throws InterruptedException {
-                    finishingPartitionManager.registerPartition(partition.getToken());
-                    partitionManager.updateToRunning(partition.getToken());
+                    finishingPartitionManager.registerPartition(partition.getToken(), partition.getTvfName());
+                    partitionManager.updateToRunning(partition.getToken(), partition.getTvfName());
                 }
 
                 @Override
@@ -147,14 +148,19 @@ public class SpannerStreamingChangeEventSource implements CommittingRecordsStrea
                     LOGGER.error("Try to stream again from partition {} after exception {}", partition.getToken(),
                             exception.getMessage());
 
-                    partitionManager.updateToReadyForStreaming(partition.getToken());
+                    partitionManager.updateToReadyForStreaming(partition.getToken(), partition.getTvfName());
                 }
 
                 @Override
                 public boolean onStuckPartition(String token) throws InterruptedException {
+                    return onStuckPartition(token, null);
+                }
+
+                @Override
+                public boolean onStuckPartition(String token, String tvfName) throws InterruptedException {
                     if (STUCK_PARTITION_STRATEGY.equals(StuckPartitionStrategy.REPEAT_STREAMING)) {
                         LOGGER.warn("Try to requery partition {}", token);
-                        partitionManager.updateToReadyForStreaming(token);
+                        partitionManager.updateToReadyForStreaming(token, tvfName);
                     }
                     else if (STUCK_PARTITION_STRATEGY.equals(StuckPartitionStrategy.ESCALATE)) {
                         return true;
@@ -164,7 +170,7 @@ public class SpannerStreamingChangeEventSource implements CommittingRecordsStrea
 
                 @Override
                 public void onWindowAdvanced(Partition partition, Timestamp windowEnd, String lastBoundaryRecordSequence) throws InterruptedException {
-                    partitionManager.updateProcessedTimestamp(partition.getToken(), windowEnd, lastBoundaryRecordSequence);
+                    partitionManager.updateProcessedTimestamp(partition.getToken(), partition.getTvfName(), windowEnd, lastBoundaryRecordSequence);
                 }
 
                 @Override
@@ -174,9 +180,9 @@ public class SpannerStreamingChangeEventSource implements CommittingRecordsStrea
                         LOGGER.debug("Mutable ordering disabled; ignoring MoveIn pause for partition {}", partition.getToken());
                         return;
                     }
-                    LOGGER.info("Partition onMoveIn: {}, commitTimestamp={}, recordSequence={}, sources={}",
-                            partition.getToken(), commitTimestamp, recordSequence, sourcePartitionTokens);
-                    partitionManager.notifyMoveIn(partition.getToken(), commitTimestamp, recordSequence, sourcePartitionTokens);
+                    LOGGER.info("Partition onMoveIn: {}, tvfName={}, commitTimestamp={}, recordSequence={}, sources={}",
+                            partition.getToken(), partition.getTvfName(), commitTimestamp, recordSequence, sourcePartitionTokens);
+                    partitionManager.notifyMoveIn(partition.getToken(), partition.getTvfName(), commitTimestamp, recordSequence, sourcePartitionTokens);
                 }
 
                 @Override
@@ -186,10 +192,10 @@ public class SpannerStreamingChangeEventSource implements CommittingRecordsStrea
                     if (!connectorConfig.isMutablePartitionOrderingEnabled()) {
                         return;
                     }
-                    LOGGER.info("Partition onMoveInPublishOnly (buffer-gate): {}, commitTimestamp={}, recordSequence={}, sources={}, isFirst={}",
-                            partition.getToken(), commitTimestamp, recordSequence, sourcePartitionTokens, isFirstMoveIn);
+                    LOGGER.info("Partition onMoveInPublishOnly (buffer-gate): {}, tvfName={}, commitTimestamp={}, recordSequence={}, sources={}, isFirst={}",
+                            partition.getToken(), partition.getTvfName(), commitTimestamp, recordSequence, sourcePartitionTokens, isFirstMoveIn);
                     partitionManager.publishMoveInStateOnly(
-                            partition.getToken(), commitTimestamp, recordSequence, sourcePartitionTokens, isFirstMoveIn);
+                            partition.getToken(), partition.getTvfName(), commitTimestamp, recordSequence, sourcePartitionTokens, isFirstMoveIn);
                 }
             });
 
@@ -273,10 +279,12 @@ public class SpannerStreamingChangeEventSource implements CommittingRecordsStrea
                         LOGGER.info("Received FinishPartitionEvent for partition {}", event.getMetadata().getPartitionToken());
 
                         if (finishPartitionStrategy.equals(FinishPartitionStrategy.AFTER_COMMIT)) {
-                            this.finishingPartitionManager.onPartitionFinishEvent(event.getMetadata().getPartitionToken());
+                            this.finishingPartitionManager.onPartitionFinishEvent(
+                                    event.getMetadata().getPartitionToken(), event.getMetadata().getTvfName());
                         }
                         else if (finishPartitionStrategy.equals(FinishPartitionStrategy.AFTER_STREAMING_FINISH)) {
-                            finishingPartitionManager.forceFinish(event.getMetadata().getPartitionToken());
+                            finishingPartitionManager.forceFinish(
+                                    event.getMetadata().getPartitionToken(), event.getMetadata().getTvfName());
                         }
                     }
                     else if (event instanceof PartitionStartEvent) {
@@ -316,12 +324,13 @@ public class SpannerStreamingChangeEventSource implements CommittingRecordsStrea
 
         schemaRegistry.checkSchema(tableId, event.getCommitTimestamp(), event.getRowType());
 
-        SpannerPartition partition = new SpannerPartition(event.getPartitionToken());
+        SpannerPartition partition = new SpannerPartition(event.getPartitionToken(), event.getMetadata().getTvfName());
 
         for (Mod mod : event.getMods()) {
             SpannerOffsetContext offsetContext = offsetContextFactory.getOffsetContextFromDataChangeEvent(mod.getModNumber(), event);
 
-            String recordUid = this.finishingPartitionManager.newRecord(event.getPartitionToken());
+            String recordUid = this.finishingPartitionManager.newRecord(
+                    event.getPartitionToken(), event.getMetadata().getTvfName());
 
             boolean dispatched = spannerEventDispatcher.dispatchDataChangeEvent(partition, tableId,
                     new SpannerChangeRecordEmitter(recordUid, event.getModType(), mod, partition, offsetContext,
@@ -343,7 +352,7 @@ public class SpannerStreamingChangeEventSource implements CommittingRecordsStrea
     private void processHeartBeatEvent(HeartbeatEvent event) throws InterruptedException {
         SpannerOffsetContext offsetContext = offsetContextFactory.getOffsetContextFromHeartbeatEvent(event);
 
-        SpannerPartition partition = new SpannerPartition(event.getMetadata().getPartitionToken());
+        SpannerPartition partition = new SpannerPartition(event.getMetadata().getPartitionToken(), event.getMetadata().getTvfName());
 
         spannerEventDispatcher.alwaysDispatchHeartbeatEvent(partition, offsetContext);
 
@@ -371,6 +380,10 @@ public class SpannerStreamingChangeEventSource implements CommittingRecordsStrea
                         .startTimestamp(startTimeStamp)
                         .endTimestamp(event.getMetadata().getPartitionEndTimestamp())
                         .originPartitionToken(event.getMetadata().getPartitionToken())
+                        // Per-placement TVF change streams: each placement TVF has its own independent
+                        // partition token space, so a child/destination partition must be queried using
+                        // the same TVF as the parent partition that discovered it.
+                        .tvfName(event.getMetadata().getTvfName())
                         .build();
             }).collect(Collectors.toList());
             childPartitionsToSend.addAll(partitions);
@@ -424,6 +437,7 @@ public class SpannerStreamingChangeEventSource implements CommittingRecordsStrea
         }
         partitionManager.notifyMoveOut(
                 event.getPartitionToken(),
+                event.getMetadata().getTvfName(),
                 event.getCommitTimestamp(),
                 event.getDestinationPartitions());
 
@@ -436,7 +450,7 @@ public class SpannerStreamingChangeEventSource implements CommittingRecordsStrea
         // mutable.window.minutes late). Dispatch the MoveOut event's own commit timestamp the same
         // way a heartbeat is dispatched so this progress is reflected immediately.
         SpannerOffsetContext offsetContext = offsetContextFactory.getOffsetContextFromPartitionEventEvent(event);
-        SpannerPartition partition = new SpannerPartition(event.getPartitionToken());
+        SpannerPartition partition = new SpannerPartition(event.getPartitionToken(), event.getMetadata().getTvfName());
         spannerEventDispatcher.alwaysDispatchHeartbeatEvent(partition, offsetContext);
     }
 
@@ -460,7 +474,7 @@ public class SpannerStreamingChangeEventSource implements CommittingRecordsStrea
         }
 
         for (CommittedRecord record : records) {
-            this.finishingPartitionManager.commitRecord(record.token(), record.recordUid());
+            this.finishingPartitionManager.commitRecord(record.token(), record.tvfName(), record.recordUid());
         }
     }
 

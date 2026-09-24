@@ -13,6 +13,30 @@ import io.debezium.function.BlockingConsumer;
 class FinishingPartitionManagerTest {
 
     @Test
+    void sameTokenInDifferentTvfsFinishesIndependently() throws InterruptedException {
+        FinishingPartitionManager.FinishedPartitionConsumer consumer = Mockito.mock(FinishingPartitionManager.FinishedPartitionConsumer.class);
+        SpannerConnectorConfig config = Mockito.mock(SpannerConnectorConfig.class);
+        FinishingPartitionManager finishingPartitionManager = new FinishingPartitionManager(config, consumer);
+
+        finishingPartitionManager.registerPartition("testToken", "tvfA");
+        finishingPartitionManager.registerPartition("testToken", "tvfB");
+
+        String tvfARecord = finishingPartitionManager.newRecord("testToken", "tvfA");
+        finishingPartitionManager.newRecord("testToken", "tvfB");
+        finishingPartitionManager.newRecord("testToken", "tvfB");
+
+        finishingPartitionManager.onPartitionFinishEvent("testToken", "tvfA");
+        finishingPartitionManager.onPartitionFinishEvent("testToken", "tvfB");
+        finishingPartitionManager.commitRecord("testToken", "tvfA", tvfARecord);
+
+        Mockito.verify(consumer).accept("testToken", "tvfA");
+        Mockito.verify(consumer, Mockito.never()).accept("testToken", "tvfB");
+
+        finishingPartitionManager.commitRecord("testToken", "tvfB", "aaaaaaab");
+        Mockito.verify(consumer).accept("testToken", "tvfB");
+    }
+
+    @Test
     void commitRecord() throws InterruptedException {
         BlockingConsumer<String> consumer = Mockito.mock(BlockingConsumer.class);
         SpannerConnectorConfig config = Mockito.mock(SpannerConnectorConfig.class);

@@ -12,6 +12,8 @@ import java.util.stream.Collectors;
 
 import com.google.cloud.Timestamp;
 
+import io.debezium.connector.spanner.db.model.PartitionKey;
+
 /**
  * Tasks are exchanging information about their internal states,
  * using TaskSyncEvent published to  the Sync topic.
@@ -160,32 +162,32 @@ public class TaskSyncEvent {
     }
 
     public int getNumPartitions() {
-        Map<String, List<PartitionState>> partitionsMap = getTaskStates().values().stream()
+        Map<PartitionKey, List<PartitionState>> partitionsMap = getTaskStates().values().stream()
                 .flatMap(taskState -> taskState.getPartitions().stream())
                 .filter(
                         partitionState -> !partitionState.getState().equals(PartitionStateEnum.FINISHED)
                                 && !partitionState.getState().equals(PartitionStateEnum.REMOVED))
-                .collect(Collectors.groupingBy(PartitionState::getToken));
+                .collect(Collectors.groupingBy(PartitionState::getKey));
 
         return partitionsMap.size();
     }
 
     public int getNumSharedPartitions() {
-        Map<String, List<PartitionState>> partitionsMap = getTaskStates().values().stream()
+        Map<PartitionKey, List<PartitionState>> partitionsMap = getTaskStates().values().stream()
                 .flatMap(taskState -> taskState.getPartitions().stream())
                 .filter(
                         partitionState -> !partitionState.getState().equals(PartitionStateEnum.FINISHED)
                                 && !partitionState.getState().equals(PartitionStateEnum.REMOVED))
-                .collect(Collectors.groupingBy(PartitionState::getToken));
+                .collect(Collectors.groupingBy(PartitionState::getKey));
 
-        Map<String, PartitionState> partitions = partitionsMap.entrySet().stream()
+        Map<PartitionKey, PartitionState> partitions = partitionsMap.entrySet().stream()
                 .map(entry -> new AbstractMap.SimpleEntry<>(entry.getKey(), entry.getValue().get(0)))
                 .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
 
-        Map<String, List<PartitionState>> sharedPartitionsMap = getTaskStates().values().stream()
+        Map<PartitionKey, List<PartitionState>> sharedPartitionsMap = getTaskStates().values().stream()
                 .flatMap(taskState -> taskState.getSharedPartitions().stream())
-                .filter(partitionState -> !partitions.containsKey(partitionState.getToken()))
-                .collect(Collectors.groupingBy(PartitionState::getToken));
+                .filter(partitionState -> !partitions.containsKey(partitionState.getKey()))
+                .collect(Collectors.groupingBy(PartitionState::getKey));
 
         return sharedPartitionsMap.size();
     }

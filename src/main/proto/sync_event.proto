@@ -64,6 +64,8 @@ message PartitionState {
   string processedTimestamp = 11;
 
   string lastBoundaryRecordSequence = 12;
+
+  string tvfName = 13;
 }
 
 enum State {

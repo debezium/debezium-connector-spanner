@@ -23,6 +23,7 @@ import org.junit.jupiter.api.Test;
 import com.google.cloud.Timestamp;
 
 import io.debezium.connector.spanner.db.model.Partition;
+import io.debezium.connector.spanner.db.model.PartitionKey;
 import io.debezium.connector.spanner.db.stream.ChangeStream;
 import io.debezium.connector.spanner.kafka.internal.TaskSyncPublisher;
 import io.debezium.connector.spanner.kafka.internal.model.MoveInState;
@@ -118,7 +119,7 @@ class TaskStateChangeEventHandlerTest {
                 .parentTokens(Set.of("src"))
                 .build();
         PartitionFactory partitionFactory = mock(PartitionFactory.class);
-        when(partitionFactory.getPartitions(any())).thenReturn(Map.of("dst", destStreamingPartition));
+        when(partitionFactory.getPartitions(any())).thenReturn(Map.of(new PartitionKey("dst", null), destStreamingPartition));
 
         ChangeStream changeStream = mock(ChangeStream.class);
         when(changeStream.submitPartition(any())).thenReturn(true);

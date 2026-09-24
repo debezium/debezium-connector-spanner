@@ -6,7 +6,6 @@
 package io.debezium.connector.spanner.db;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
@@ -17,6 +16,7 @@ import java.time.Duration;
 import org.junit.jupiter.api.Test;
 
 import io.debezium.connector.spanner.db.dao.SchemaDao;
+import io.debezium.connector.spanner.db.model.ChangeStreamOptions;
 import io.debezium.connector.spanner.db.stream.SpannerChangeStream;
 import io.debezium.connector.spanner.metrics.MetricsEventPublisher;
 
@@ -26,7 +26,7 @@ class SpannerChangeStreamFactoryTest {
     void testGetStream() {
         DatabaseClientFactory databaseClientFactory = mock(DatabaseClientFactory.class);
         SchemaDao mockSchema = mock(SchemaDao.class);
-        when(mockSchema.isMutableKeyRangeChangeStream(any())).thenReturn(true);
+        when(mockSchema.getChangeStreamOptions("stream1")).thenReturn(new ChangeStreamOptions(true, false));
 
         // use a spy so we can stub getSchemaDao() to return our mockSchema
         DaoFactory daoFactory = spy(new DaoFactory(databaseClientFactory));
