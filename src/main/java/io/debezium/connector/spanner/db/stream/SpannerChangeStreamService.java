@@ -352,7 +352,7 @@ public class SpannerChangeStreamService {
                                     // Drain confirmed prefix immediately: this MoveIn's source might already be confirmed.
                                     List<ChangeStreamEvent> readyAfterMoveIn = gate.drainConfirmedPrefix();
                                     if (!readyAfterMoveIn.isEmpty()) {
-                                        LOGGER.info("Task {}, MoveIn gate prefix flushed immediately for partition {} ({}), flushed={}, remaining={}",
+                                        LOGGER.debug("Task {}, MoveIn gate prefix flushed immediately for partition {} ({}), flushed={}, remaining={}",
                                                 taskUid, token, gate.getSourcesByTimestamp(), readyAfterMoveIn.size(), gate.size());
                                         for (ChangeStreamEvent e : readyAfterMoveIn) {
                                             changeStreamEventConsumer.acceptChangeStreamEvent(e);
@@ -406,7 +406,7 @@ public class SpannerChangeStreamService {
                             // Drain confirmed prefix after each event — AtomicReference read is wait-free.
                             List<ChangeStreamEvent> readyInline = gate.drainConfirmedPrefix();
                             if (!readyInline.isEmpty()) {
-                                LOGGER.info("Task {}, MoveIn gate prefix flushed inline for partition {} ({}), flushed={}, remaining={}",
+                                LOGGER.debug("Task {}, MoveIn gate prefix flushed inline for partition {} ({}), flushed={}, remaining={}",
                                         taskUid, token, gate.getSourcesByTimestamp(), readyInline.size(), gate.size());
                                 for (ChangeStreamEvent e : readyInline) {
                                     changeStreamEventConsumer.acceptChangeStreamEvent(e);
@@ -499,7 +499,7 @@ public class SpannerChangeStreamService {
             // try-with-resources above.
             if (gate != null) {
                 Instant waitStart = Instant.now();
-                LOGGER.info("Task {}, Window ended with active MoveIn gate for partition {} ({}), draining incrementally, buffered={}",
+                LOGGER.debug("Task {}, Window ended with active MoveIn gate for partition {} ({}), draining incrementally, buffered={}",
                         taskUid, token, gate.getSourcesByTimestamp(), gate.size());
                 boolean interrupted = false;
                 boolean timedOut = false;
@@ -507,7 +507,7 @@ public class SpannerChangeStreamService {
                     List<ChangeStreamEvent> readySpinWait = gate.drainConfirmedPrefix();
                     if (!readySpinWait.isEmpty()) {
                         long elapsedMs = Duration.between(waitStart, Instant.now()).toMillis();
-                        LOGGER.info("Task {}, MoveIn gate prefix flushed after {}ms for partition {} ({}), flushed={}, remaining={}",
+                        LOGGER.debug("Task {}, MoveIn gate prefix flushed after {}ms for partition {} ({}), flushed={}, remaining={}",
                                 taskUid, elapsedMs, token, gate.getSourcesByTimestamp(), readySpinWait.size(), gate.size());
                         for (ChangeStreamEvent e : readySpinWait) {
                             changeStreamEventConsumer.acceptChangeStreamEvent(e);
@@ -551,7 +551,7 @@ public class SpannerChangeStreamService {
                     break;
                 }
                 long waitMs = Duration.between(waitStart, Instant.now()).toMillis();
-                LOGGER.info("Task {}, MoveIn gate fully drained after {}ms for partition {}",
+                LOGGER.debug("Task {}, MoveIn gate fully drained after {}ms for partition {}",
                         taskUid, waitMs, token);
                 gate = null;
                 gateIsFirst = true;

@@ -186,7 +186,7 @@ public class SpannerStreamingChangeEventSource implements CommittingRecordsStrea
                     if (!connectorConfig.isMutablePartitionOrderingEnabled()) {
                         return;
                     }
-                    LOGGER.info("Partition onMoveInPublishOnly (buffer-gate): {}, commitTimestamp={}, recordSequence={}, sources={}, isFirst={}",
+                    LOGGER.debug("Partition onMoveInPublishOnly (buffer-gate): {}, commitTimestamp={}, recordSequence={}, sources={}, isFirst={}",
                             partition.getToken(), commitTimestamp, recordSequence, sourcePartitionTokens, isFirstMoveIn);
                     partitionManager.publishMoveInStateOnly(
                             partition.getToken(), commitTimestamp, recordSequence, sourcePartitionTokens, isFirstMoveIn);
@@ -407,7 +407,7 @@ public class SpannerStreamingChangeEventSource implements CommittingRecordsStrea
     }
 
     private void processPartitionEventEvent(PartitionEventEvent event) throws InterruptedException {
-        LOGGER.info("Received PartitionEventEvent: token={}, sources={}, destinations={}",
+        LOGGER.debug("Received PartitionEventEvent: token={}, sources={}, destinations={}",
                 event.getPartitionToken(), event.getSourcePartitions(), event.getDestinationPartitions());
         if (!event.getDestinationPartitions().isEmpty()) {
             processMoveOutEvent(event); // MoveOut side — gated
