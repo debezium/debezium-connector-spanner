@@ -177,7 +177,7 @@ public class RebalancingEventListener {
             this.thread.interrupt();
 
             while (!this.thread.getState().equals(Thread.State.TERMINATED)) {
-                LOGGER.info("Task {} - shutting down rebalancing event listener with state {}", task.getTaskUid(), this.thread.getState());
+                LOGGER.debug("Task {} - shutting down rebalancing event listener with state {}", task.getTaskUid(), this.thread.getState());
                 this.thread.interrupt();
             }
             LOGGER.info("Task {} - finished shutting down rebalancing event listener", task.getTaskUid());
