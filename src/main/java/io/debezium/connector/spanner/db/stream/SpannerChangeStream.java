@@ -16,6 +16,7 @@ import java.util.function.BooleanSupplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.google.cloud.Timestamp;
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.SpannerException;
 import com.google.common.annotations.VisibleForTesting;
@@ -196,6 +197,11 @@ public class SpannerChangeStream implements ChangeStream {
     @Override
     public boolean isMutableKeyRange() {
         return streamService.isMutableKeyRange();
+    }
+
+    @Override
+    public boolean isExternalPlacementToken(String partitionToken, Timestamp probeTimestamp) {
+        return streamService.isExternalPlacementToken(partitionToken, probeTimestamp);
     }
 
     @Override

@@ -20,6 +20,7 @@ import org.junit.jupiter.api.Test;
 import com.google.cloud.Timestamp;
 
 import io.debezium.connector.spanner.db.model.PartitionKey;
+import io.debezium.connector.spanner.kafka.internal.model.MoveInState;
 import io.debezium.connector.spanner.kafka.internal.model.MoveOutState;
 import io.debezium.connector.spanner.kafka.internal.model.PartitionState;
 import io.debezium.connector.spanner.kafka.internal.model.PartitionStateEnum;
@@ -83,14 +84,14 @@ class MoveInGateCheckerTest {
     }
 
     @Test
-    void canContinue_sourceFinishedInDifferentTvf_returnsFalse() {
+    void canContinue_sourceFinishedInCoLocatedTvf_returnsTrue() {
         PartitionState sourceOtherTvf = partition("src", "tvfB", PartitionStateEnum.FINISHED);
         TaskSyncContext ctx = contextWithCurrent(sourceOtherTvf);
 
         Set<PartitionKey> finished = MoveInGateChecker.getFinishedPartitions(ctx);
 
-        assertFalse(MoveInGateChecker.canContinue(ctx, "dst", "tvfA", T1, List.of("src"), finished),
-                "source finished in a different TVF must not satisfy the gate for destination in tvfA");
+        assertTrue(MoveInGateChecker.canContinue(ctx, "dst", "tvfA", T1, List.of("src"), finished),
+                "cross-placement source finished in co-located tvfB must satisfy the gate for destination in tvfA");
     }
 
     @Test
@@ -110,15 +111,56 @@ class MoveInGateCheckerTest {
     }
 
     @Test
-    void canContinue_moveOutStateInDifferentTvfIgnored() {
+    void canContinue_crossTvfMoveOutStateInCoLocatedTvf_returnsTrueWithoutProbing() {
         PartitionState sourceTvfB = partition("src", "tvfB", PartitionStateEnum.RUNNING,
                 List.of(new MoveOutState(T1, List.of("dst"))));
         TaskSyncContext ctx = contextWithCurrent(sourceTvfB);
 
         Set<PartitionKey> finished = MoveInGateChecker.getFinishedPartitions(ctx);
 
-        assertFalse(MoveInGateChecker.canContinue(ctx, "dst", "tvfA", T1, List.of("src"), finished),
-                "MoveOut state from a different TVF must not satisfy the gate for destination in tvfA");
+        MoveInGateChecker.PlacementTokenProbe probeShouldNotBeCalled = (token, ts) -> {
+            throw new AssertionError("Probe must not be invoked when source is found in co-located TaskSyncContext");
+        };
+        assertTrue(MoveInGateChecker.canContinue(ctx, "dst", "tvfA", T1, List.of("src"), finished, probeShouldNotBeCalled),
+                "MoveOut state from co-located tvfB must satisfy the gate for destination in tvfA without probing");
+        assertFalse(MoveInGateChecker.canContinue(ctx, "dst", "tvfA", T2, List.of("src"), finished, probeShouldNotBeCalled),
+                "Co-located cross-TVF source in tvfB that has not yet reached T2 must block without probing");
+    }
+
+    @Test
+    void canContinue_externalPlacementSourceRejectedByProbe_returnsTrue() {
+        TaskSyncContext ctx = contextWithCurrent();
+        Set<PartitionKey> finished = MoveInGateChecker.getFinishedPartitions(ctx);
+
+        assertTrue(MoveInGateChecker.canContinue(ctx, "dst", "tvfA", T1, List.of("ext-src"), finished,
+                (token, ts) -> "ext-src".equals(token) && T1.equals(ts)),
+                "external placement source confirmed by probe must satisfy the gate");
+        assertFalse(MoveInGateChecker.canContinue(ctx, "dst", "tvfA", T1, List.of("same-placement-unregistered"), finished,
+                (token, ts) -> false),
+                "unregistered source accepted by a configured TVF must remain blocked until MoveOut arrives");
+    }
+
+    @Test
+    void shouldAdvanceProcessedTimestampForMoveIn_advancesUntilMoveInSatisfied() {
+        Timestamp tMoveIn = Timestamp.ofTimeSecondsAndNanos(150, 0);
+        Timestamp tAfter = Timestamp.ofTimeSecondsAndNanos(160, 0);
+        PartitionState source = partition("src", "tvfB", PartitionStateEnum.RUNNING);
+        PartitionState dest = PartitionState.builder()
+                .token("dst")
+                .tvfName("tvfA")
+                .state(PartitionStateEnum.RUNNING)
+                .parents(Set.of())
+                .moveInState(new MoveInState(tMoveIn, "0001", List.of("src")))
+                .startTimestamp(T1)
+                .build();
+        TaskSyncContext ctx = contextWithCurrent(source, dest);
+
+        assertTrue(MoveInGateChecker.shouldAdvanceProcessedTimestampForMoveIn(
+                ctx, "src", "tvfB", tAfter, T1),
+                "source with unresolved MoveInState and lastPublishedProcessedTs <= moveInTs should advance");
+        assertFalse(MoveInGateChecker.shouldAdvanceProcessedTimestampForMoveIn(
+                ctx, "src", "tvfB", tAfter, tAfter),
+                "once lastPublishedProcessedTs > moveInTs, should not advance again");
     }
 
     private static TaskSyncContext contextWithCurrent(PartitionState... partitions) {

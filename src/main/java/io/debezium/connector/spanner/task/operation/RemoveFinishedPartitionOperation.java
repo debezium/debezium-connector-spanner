@@ -22,6 +22,7 @@ import io.debezium.connector.spanner.SpannerConnectorConfig;
 import io.debezium.connector.spanner.SpannerPartition;
 import io.debezium.connector.spanner.context.offset.PartitionOffset;
 import io.debezium.connector.spanner.context.offset.SpannerOffsetContext;
+import io.debezium.connector.spanner.db.model.InitialPartition;
 import io.debezium.connector.spanner.db.model.PartitionKey;
 import io.debezium.connector.spanner.kafka.internal.model.MoveOutState;
 import io.debezium.connector.spanner.kafka.internal.model.PartitionState;
@@ -123,8 +124,12 @@ public class RemoveFinishedPartitionOperation implements Operation {
     }
 
     private static boolean allChildrenFinished(List<PartitionState> allPartitionStates, PartitionState source) {
+        Set<String> moveOutDestTokens = source.getMoveOutStates().stream()
+                .flatMap(mos -> mos.getDestPartitionTokens().stream())
+                .collect(Collectors.toSet());
         Set<PartitionKey> children = allPartitionStates.stream()
-                .filter(partitionState -> Objects.equals(source.getTvfName(), partitionState.getTvfName()))
+                .filter(partitionState -> Objects.equals(source.getTvfName(), partitionState.getTvfName())
+                        || moveOutDestTokens.contains(partitionState.getToken()))
                 .filter(partitionState -> partitionState.getParents().contains(source.getToken()))
                 .map(PartitionState::getKey)
                 .collect(Collectors.toSet());
@@ -171,7 +176,12 @@ public class RemoveFinishedPartitionOperation implements Operation {
                         .filter(p -> destToken.equals(p.getToken()))
                         .filter(p -> Objects.equals(partitionState.getTvfName(), p.getTvfName()))
                         .findFirst()
-                        .orElse(null);
+                        .orElseGet(() -> partitionState.getTvfName() == null || InitialPartition.isInitialPartition(destToken)
+                                ? null
+                                : allPartitionStates.stream()
+                                        .filter(p -> destToken.equals(p.getToken()))
+                                        .findFirst()
+                                        .orElse(null));
                 if (dest == null) {
                     // Destination not tracked anywhere - nothing left depending on this source.
                     continue;

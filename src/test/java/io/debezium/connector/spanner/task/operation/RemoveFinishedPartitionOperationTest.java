@@ -255,7 +255,7 @@ class RemoveFinishedPartitionOperationTest {
     }
 
     @Test
-    void moveOutDestinationInDifferentTvfDoesNotBlockSourceDeletion() {
+    void moveOutDestinationInCoLocatedTvfBlocksSourceDeletionUntilCaughtUp() {
         PartitionState source = PartitionState.builder()
                 .token("src")
                 .tvfName("tvfA")
@@ -274,7 +274,8 @@ class RemoveFinishedPartitionOperationTest {
 
         TaskSyncContext result = newOperation().doOperation(contextWith(source, destinationInOtherTvf));
 
-        assertFalse(isPresent(result, "src", "tvfA"));
+        assertTrue(isPresent(result, "src", "tvfA"),
+                "source must not be deleted while its co-located cross-TVF destination has not reached the move timestamp");
     }
 
     @Test
