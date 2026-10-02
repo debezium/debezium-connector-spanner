@@ -194,7 +194,7 @@ public class TaskStateChangeEventHandler {
         performOperation(
                 new PartitionStatusUpdateOperation(event.getToken(), event.getTvfName(), event.getState()),
                 new ClearSharedPartitionOperation(),
-                new FindPartitionForStreamingOperation(changeStream.isMutableKeyRange()));
+                new FindPartitionForStreamingOperation(changeStream.isMutableKeyRange(), changeStream::isExternalPlacementToken));
         // Blocking offset-fetch + stream-submission phase: offloaded to dedicated executor.
         schedulePendingPartitionsAsync();
     }
@@ -204,7 +204,7 @@ public class TaskStateChangeEventHandler {
         performOperation(
                 new ChildPartitionOperation(newPartitionsEvent.getPartitions()),
                 new ClearSharedPartitionOperation(),
-                new FindPartitionForStreamingOperation(changeStream.isMutableKeyRange()),
+                new FindPartitionForStreamingOperation(changeStream.isMutableKeyRange(), changeStream::isExternalPlacementToken),
                 new RemoveFinishedPartitionOperation(spannerEventDispatcher, connectorConfig));
         // Blocking offset-fetch + stream-submission phase: offloaded to dedicated executor.
         schedulePendingPartitionsAsync();
@@ -215,7 +215,7 @@ public class TaskStateChangeEventHandler {
         performOperation(
                 new MoveOutStateUpdateOperation(
                         event.getToken(), event.getTvfName(), event.getCommitTimestamp(), event.getDestinationTokens()),
-                new FindPartitionForStreamingOperation(changeStream.isMutableKeyRange()));
+                new FindPartitionForStreamingOperation(changeStream.isMutableKeyRange(), changeStream::isExternalPlacementToken));
         // Blocking offset-fetch + stream-submission phase: offloaded to dedicated executor.
         schedulePendingPartitionsAsync();
     }
@@ -225,7 +225,7 @@ public class TaskStateChangeEventHandler {
         performOperation(
                 new MoveInStateUpdateOperation(
                         event.getToken(), event.getTvfName(), event.getCommitTimestamp(), event.getRecordSequence(), event.getSourcePartitionTokens()),
-                new FindPartitionForStreamingOperation(changeStream.isMutableKeyRange()));
+                new FindPartitionForStreamingOperation(changeStream.isMutableKeyRange(), changeStream::isExternalPlacementToken));
         // Blocking offset-fetch + stream-submission phase: offloaded to dedicated executor.
         schedulePendingPartitionsAsync();
     }
@@ -251,7 +251,7 @@ public class TaskStateChangeEventHandler {
         TaskSyncContext taskSyncContext = performOperation(
                 new ClearSharedPartitionOperation(),
                 new TakeSharedPartitionOperation(),
-                new FindPartitionForStreamingOperation(changeStream.isMutableKeyRange()),
+                new FindPartitionForStreamingOperation(changeStream.isMutableKeyRange(), changeStream::isExternalPlacementToken),
                 new RemoveFinishedPartitionOperation(spannerEventDispatcher, connectorConfig),
                 new ConnectorEndDetectionOperation(finishingHandler, connectorConfig.endTime()));
 

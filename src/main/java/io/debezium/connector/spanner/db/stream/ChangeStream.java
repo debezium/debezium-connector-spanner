@@ -7,6 +7,8 @@ package io.debezium.connector.spanner.db.stream;
 
 import java.util.function.BooleanSupplier;
 
+import com.google.cloud.Timestamp;
+
 import io.debezium.connector.spanner.db.model.Partition;
 import io.debezium.connector.spanner.db.stream.exception.ChangeStreamException;
 
@@ -24,6 +26,10 @@ public interface ChangeStream {
             throws ChangeStreamException, InterruptedException;
 
     default boolean isMutableKeyRange() {
+        return false;
+    }
+
+    default boolean isExternalPlacementToken(String partitionToken, Timestamp probeTimestamp) {
         return false;
     }
 }
