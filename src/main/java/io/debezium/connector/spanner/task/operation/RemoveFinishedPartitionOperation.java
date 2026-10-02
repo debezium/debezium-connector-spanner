@@ -172,23 +172,25 @@ public class RemoveFinishedPartitionOperation implements Operation {
         for (MoveOutState moveOutState : partitionState.getMoveOutStates()) {
             Timestamp moveOutTimestamp = moveOutState.getTimestamp();
             for (String destToken : moveOutState.getDestPartitionTokens()) {
-                PartitionState dest = allPartitionStates.stream()
+                List<PartitionState> destCandidates = allPartitionStates.stream()
                         .filter(p -> destToken.equals(p.getToken()))
                         .filter(p -> Objects.equals(partitionState.getTvfName(), p.getTvfName()))
-                        .findFirst()
-                        .orElseGet(() -> partitionState.getTvfName() == null || InitialPartition.isInitialPartition(destToken)
-                                ? null
-                                : allPartitionStates.stream()
-                                        .filter(p -> destToken.equals(p.getToken()))
-                                        .findFirst()
-                                        .orElse(null));
-                if (dest == null) {
+                        .collect(Collectors.toList());
+                if (destCandidates.isEmpty()
+                        && partitionState.getTvfName() != null
+                        && !InitialPartition.isInitialPartition(destToken)) {
+                    destCandidates = allPartitionStates.stream()
+                            .filter(p -> destToken.equals(p.getToken()))
+                            .collect(Collectors.toList());
+                }
+                if (destCandidates.isEmpty()) {
                     // Destination not tracked anywhere - nothing left depending on this source.
                     continue;
                 }
-                boolean destHasReachedThisMove = dest.getProcessedTimestamp() != null
-                        && dest.getProcessedTimestamp().compareTo(moveOutTimestamp) >= 0;
-                if (!destHasReachedThisMove) {
+                boolean allCandidatesReachedMove = destCandidates.stream()
+                        .allMatch(dest -> dest.getProcessedTimestamp() != null
+                                && dest.getProcessedTimestamp().compareTo(moveOutTimestamp) >= 0);
+                if (!allCandidatesReachedMove) {
                     return false;
                 }
             }

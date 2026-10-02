@@ -163,6 +163,78 @@ class MoveInGateCheckerTest {
                 "once lastPublishedProcessedTs > moveInTs, should not advance again");
     }
 
+    @Test
+    void canContinue_sameTvfSourceUnsatisfied_doesNotFallThroughToOtherTvfCopy() {
+        Timestamp tBefore = Timestamp.ofTimeSecondsAndNanos(50, 0);
+        PartitionState sameTvfLagging = PartitionState.builder()
+                .token("rangemap0")
+                .tvfName("tvfA")
+                .state(PartitionStateEnum.RUNNING)
+                .parents(Set.of())
+                .processedTimestamp(tBefore)
+                .moveOutStates(List.of())
+                .startTimestamp(tBefore)
+                .build();
+        PartitionState otherTvfHeartbeatAdvanced = PartitionState.builder()
+                .token("rangemap0")
+                .tvfName("tvfB")
+                .state(PartitionStateEnum.RUNNING)
+                .parents(Set.of())
+                .processedTimestamp(T2)
+                .moveOutStates(List.of())
+                .startTimestamp(tBefore)
+                .build();
+        TaskSyncContext ctx = contextWithCurrent(sameTvfLagging, otherTvfHeartbeatAdvanced);
+        Set<PartitionKey> finished = MoveInGateChecker.getFinishedPartitions(ctx);
+
+        assertFalse(MoveInGateChecker.canContinue(ctx, "dst", "tvfA", T1, List.of("rangemap0"), finished),
+                "when source exists in destination's own TVF and has not satisfied MoveOut, another TVF's copy must not open the gate");
+        assertFalse(MoveInGateChecker.shouldAdvanceProcessedTimestampForMoveIn(
+                ctx.toBuilder().currentTaskState(ctx.getCurrentTaskState().toBuilder()
+                        .partitions(List.of(
+                                sameTvfLagging,
+                                otherTvfHeartbeatAdvanced,
+                                PartitionState.builder()
+                                        .token("dst")
+                                        .tvfName("tvfA")
+                                        .state(PartitionStateEnum.RUNNING)
+                                        .parents(Set.of())
+                                        .moveInState(new MoveInState(T1, "0001", List.of("rangemap0")))
+                                        .startTimestamp(tBefore)
+                                        .build()))
+                        .build()).build(),
+                "rangemap0", "tvfB", T2, tBefore),
+                "other TVF copy of a shared default partition must not advance processedTimestamp for a destination that has its own same-TVF source copy");
+    }
+
+    @Test
+    void canContinue_multipleCrossTvfCopies_requiresAllToSatisfyMoveOut() {
+        Timestamp tBefore = Timestamp.ofTimeSecondsAndNanos(50, 0);
+        PartitionState crossTvfBAdvanced = PartitionState.builder()
+                .token("src")
+                .tvfName("tvfB")
+                .state(PartitionStateEnum.RUNNING)
+                .parents(Set.of())
+                .processedTimestamp(T2)
+                .moveOutStates(List.of())
+                .startTimestamp(tBefore)
+                .build();
+        PartitionState crossTvfCLagging = PartitionState.builder()
+                .token("src")
+                .tvfName("tvfC")
+                .state(PartitionStateEnum.RUNNING)
+                .parents(Set.of())
+                .processedTimestamp(tBefore)
+                .moveOutStates(List.of())
+                .startTimestamp(tBefore)
+                .build();
+        TaskSyncContext ctx = contextWithCurrent(crossTvfBAdvanced, crossTvfCLagging);
+        Set<PartitionKey> finished = MoveInGateChecker.getFinishedPartitions(ctx);
+
+        assertFalse(MoveInGateChecker.canContinue(ctx, "dst", "tvfA", T1, List.of("src"), finished),
+                "all tracked cross-TVF copies of source must satisfy MoveOut before destination can continue");
+    }
+
     private static TaskSyncContext contextWithCurrent(PartitionState... partitions) {
         return TaskSyncContext.builder()
                 .taskUid("task0")

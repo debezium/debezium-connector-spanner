@@ -6,6 +6,7 @@
 package io.debezium.connector.spanner.task;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -146,25 +147,29 @@ public final class MoveInGateChecker {
         PartitionKey sameTvfIdentity = new PartitionKey(sourceToken, tvfName);
         PartitionState sameTvfState = findPartitionState(taskSyncContext, sourceToken, tvfName);
         if (sameTvfState != null || finishedPartitions.contains(sameTvfIdentity)) {
-            if (isMoveOutSatisfied(sameTvfState, sameTvfIdentity, moveInTimestamp, destToken, finishedPartitions)) {
-                return true;
-            }
+            return isMoveOutSatisfied(sameTvfState, sameTvfIdentity, moveInTimestamp, destToken, finishedPartitions);
         }
 
         if (tvfName != null && !InitialPartition.isInitialPartition(sourceToken)) {
             List<PartitionState> crossTvfStates = findPartitionStatesAnyTvf(taskSyncContext, sourceToken);
-            PartitionKey crossTvfFinishedKey = findFinishedPartitionAnyTvf(finishedPartitions, sourceToken);
-            if (sameTvfState != null || !crossTvfStates.isEmpty() || crossTvfFinishedKey != null) {
-                for (PartitionState crossTvfState : crossTvfStates) {
-                    if (isMoveOutSatisfied(crossTvfState, crossTvfState.getKey(), moveInTimestamp, destToken, finishedPartitions)) {
-                        return true;
+            Set<PartitionKey> crossTvfIdentities = new HashSet<>();
+            for (PartitionState crossTvfState : crossTvfStates) {
+                crossTvfIdentities.add(crossTvfState.getKey());
+            }
+            for (PartitionKey finishedKey : finishedPartitions) {
+                if (finishedKey.getToken().equals(sourceToken)) {
+                    crossTvfIdentities.add(finishedKey);
+                }
+            }
+            if (!crossTvfIdentities.isEmpty()) {
+                for (PartitionKey crossTvfKey : crossTvfIdentities) {
+                    PartitionState crossTvfState = findPartitionState(
+                            taskSyncContext, crossTvfKey.getToken(), crossTvfKey.getTvfName());
+                    if (!isMoveOutSatisfied(crossTvfState, crossTvfKey, moveInTimestamp, destToken, finishedPartitions)) {
+                        return false;
                     }
                 }
-                if (crossTvfFinishedKey != null
-                        && isMoveOutSatisfied(null, crossTvfFinishedKey, moveInTimestamp, destToken, finishedPartitions)) {
-                    return true;
-                }
-                return false;
+                return true;
             }
 
             if (placementTokenProbe != null
@@ -215,6 +220,13 @@ public final class MoveInGateChecker {
             }
             if (finished == null) {
                 finished = getFinishedPartitions(taskSyncContext);
+            }
+            if (!Objects.equals(sourceTvfName, candidate.getTvfName())) {
+                PartitionKey candidateSameTvfSource = new PartitionKey(sourceToken, candidate.getTvfName());
+                if (findPartitionState(taskSyncContext, sourceToken, candidate.getTvfName()) != null
+                        || finished.contains(candidateSameTvfSource)) {
+                    continue;
+                }
             }
             if (!sourceStateResolved) {
                 sourceState = findPartitionState(taskSyncContext, sourceToken, sourceTvfName);
@@ -327,15 +339,6 @@ public final class MoveInGateChecker {
             }
         }
         return result;
-    }
-
-    private static PartitionKey findFinishedPartitionAnyTvf(Set<PartitionKey> finishedPartitions, String token) {
-        for (PartitionKey key : finishedPartitions) {
-            if (key.getToken().equals(token)) {
-                return key;
-            }
-        }
-        return null;
     }
 
     private static boolean matches(PartitionState partition, String token, String tvfName) {

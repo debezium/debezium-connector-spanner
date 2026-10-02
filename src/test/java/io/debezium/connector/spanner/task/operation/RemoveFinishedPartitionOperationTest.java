@@ -309,6 +309,39 @@ class RemoveFinishedPartitionOperationTest {
     }
 
     @Test
+    void moveOutDestinationInMultipleCrossTvfs_allMustReachMoveTimestampBeforeDeletion() {
+        PartitionState source = PartitionState.builder()
+                .token("src")
+                .tvfName("tvfA")
+                .state(PartitionStateEnum.FINISHED)
+                .parents(Set.of())
+                .finishedTimestamp(FINISHED_LONG_AGO)
+                .moveOutStates(List.of(new MoveOutState(MOVE_TS, List.of("dst"))))
+                .build();
+        PartitionState destinationInTvfBAdvanced = PartitionState.builder()
+                .token("dst")
+                .tvfName("tvfB")
+                .state(PartitionStateEnum.FINISHED)
+                .parents(Set.of("src"))
+                .processedTimestamp(AFTER_MOVE)
+                .finishedTimestamp(FINISHED_LONG_AGO)
+                .build();
+        PartitionState destinationInTvfCLagging = PartitionState.builder()
+                .token("dst")
+                .tvfName("tvfC")
+                .state(PartitionStateEnum.RUNNING)
+                .parents(Set.of())
+                .processedTimestamp(BEFORE_MOVE)
+                .build();
+
+        TaskSyncContext result = newOperation().doOperation(
+                contextWith(source, destinationInTvfBAdvanced, destinationInTvfCLagging));
+
+        assertTrue(isPresent(result, "src", "tvfA"),
+                "source must not be deleted while any cross-TVF copy of its MoveOut destination has not reached the move timestamp");
+    }
+
+    @Test
     void immutableKeyRangePartition_deletionUnaffectedByNewCheck() {
         // No moveOutState at all (the immutable key range path never sets one) - deletion
         // behaves exactly as it did before mutable key range support was introduced.
