@@ -5,6 +5,9 @@
  */
 package io.debezium.connector.spanner;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 
 import java.util.HashMap;
@@ -14,6 +17,7 @@ import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.junit.jupiter.api.Test;
 
+import io.debezium.connector.spanner.processor.SourceRecordUtils;
 import io.debezium.pipeline.DataChangeEvent;
 
 class SpannerChangeEventCreatorTest {
@@ -27,6 +31,12 @@ class SpannerChangeEventCreatorTest {
                 new ConnectSchema(Schema.Type.INT8), "Value");
 
         DataChangeEvent dataChangeEvent = spannerChangeEventCreator.createDataChangeEvent(sourceRecord);
-        assertSame(sourceRecord, dataChangeEvent.getRecord());
+        SourceRecord record = dataChangeEvent.getRecord();
+        assertSame(sourcePartition, record.sourcePartition());
+        assertSame(sourceOffset, record.sourceOffset());
+        assertEquals("Topic", record.topic());
+        assertEquals("Value", record.value());
+        assertNotNull(SourceRecordUtils.extractEmitTimestamp(record));
+        assertNull(SourceRecordUtils.extractEmitTimestamp(sourceRecord));
     }
 }
