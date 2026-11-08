@@ -33,13 +33,20 @@ public class FindPartitionForStreamingOperation implements Operation {
 
     private boolean isRequiredPublishSyncEvent = false;
     private final boolean isMutableKeyRange;
+    private final MoveInGateChecker.PlacementTokenProbe placementTokenProbe;
 
     public FindPartitionForStreamingOperation() {
-        this(false);
+        this(false, null);
     }
 
     public FindPartitionForStreamingOperation(boolean isMutableKeyRange) {
+        this(isMutableKeyRange, null);
+    }
+
+    public FindPartitionForStreamingOperation(boolean isMutableKeyRange,
+                                              MoveInGateChecker.PlacementTokenProbe placementTokenProbe) {
         this.isMutableKeyRange = isMutableKeyRange;
+        this.placementTokenProbe = placementTokenProbe;
     }
 
     private TaskSyncContext takePartitionForStreaming(TaskSyncContext taskSyncContext) {
@@ -132,7 +139,8 @@ public class FindPartitionForStreamingOperation implements Operation {
                 destPartition.getTvfName(),
                 moveInState.getTimestamp(),
                 moveInState.getSourcePartitionTokens(),
-                finishedPartitions);
+                finishedPartitions,
+                placementTokenProbe);
     }
 
     private boolean atLeastOneParentExists(TaskSyncContext taskSyncContext, Set<String> parents, String tvfName) {

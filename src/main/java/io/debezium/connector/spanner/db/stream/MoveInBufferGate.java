@@ -20,6 +20,7 @@ import com.google.cloud.Timestamp;
 import io.debezium.connector.spanner.db.dao.ChangeStreamResultSetMetadata;
 import io.debezium.connector.spanner.db.model.PartitionKey;
 import io.debezium.connector.spanner.db.model.event.ChangeStreamEvent;
+import io.debezium.connector.spanner.db.model.event.DataChangeEvent;
 import io.debezium.connector.spanner.db.model.event.PartitionEventEvent;
 import io.debezium.connector.spanner.task.MoveInGateChecker;
 import io.debezium.connector.spanner.task.TaskSyncContext;
@@ -96,18 +97,26 @@ public class MoveInBufferGate {
     private final String destTvfName;
     private final int maxBufferEvents;
     private final Supplier<TaskSyncContext> taskSyncContextSupplier;
+    private final MoveInGateChecker.PlacementTokenProbe placementTokenProbe;
 
     public MoveInBufferGate(String destToken, int maxBufferEvents,
                             Supplier<TaskSyncContext> taskSyncContextSupplier) {
-        this(destToken, null, maxBufferEvents, taskSyncContextSupplier);
+        this(destToken, null, maxBufferEvents, taskSyncContextSupplier, null);
     }
 
     public MoveInBufferGate(String destToken, String destTvfName, int maxBufferEvents,
                             Supplier<TaskSyncContext> taskSyncContextSupplier) {
+        this(destToken, destTvfName, maxBufferEvents, taskSyncContextSupplier, null);
+    }
+
+    public MoveInBufferGate(String destToken, String destTvfName, int maxBufferEvents,
+                            Supplier<TaskSyncContext> taskSyncContextSupplier,
+                            MoveInGateChecker.PlacementTokenProbe placementTokenProbe) {
         this.destToken = destToken;
         this.destTvfName = destTvfName;
         this.maxBufferEvents = maxBufferEvents;
         this.taskSyncContextSupplier = taskSyncContextSupplier;
+        this.placementTokenProbe = placementTokenProbe;
     }
 
     /**
@@ -195,7 +204,7 @@ public class MoveInBufferGate {
         while (!segments.isEmpty()) {
             Segment seg = segments.peekFirst();
             if (!MoveInGateChecker.canContinue(ctx, destToken, destTvfName, seg.moveInTs,
-                    new ArrayList<>(seg.sources), finished)) {
+                    new ArrayList<>(seg.sources), finished, placementTokenProbe)) {
                 break; // oldest segment not yet confirmed — stop here
             }
             segments.pollFirst(); // remove confirmed head
@@ -240,5 +249,22 @@ public class MoveInBufferGate {
                 .flatMap(seg -> seg.sources.stream())
                 .distinct()
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * Returns {@code true} if no segment in this gate holds a {@link DataChangeEvent}
+     * with a record timestamp at or before {@code moveOutTs}. When true, a MoveOut
+     * event at {@code moveOutTs} can be forwarded immediately without violating per-key
+     * ordering, preventing mutual MoveIn/MoveOut stalls in same-timestamp transactions.
+     */
+    public boolean canForwardMoveOutImmediately(Timestamp moveOutTs) {
+        for (Segment seg : segments) {
+            for (ChangeStreamEvent e : seg.dataEvents) {
+                if (e instanceof DataChangeEvent && e.getRecordTimestamp().compareTo(moveOutTs) <= 0) {
+                    return false;
+                }
+            }
+        }
+        return true;
     }
 }

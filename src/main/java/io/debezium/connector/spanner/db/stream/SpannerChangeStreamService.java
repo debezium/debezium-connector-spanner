@@ -34,6 +34,7 @@ import io.debezium.connector.spanner.db.stream.exception.ChangeStreamException;
 import io.debezium.connector.spanner.metrics.MetricsEventPublisher;
 import io.debezium.connector.spanner.metrics.event.DelayChangeStreamEventsMetricEvent;
 import io.debezium.connector.spanner.metrics.event.MoveInLatencyMetricEvent;
+import io.debezium.connector.spanner.task.MoveInGateChecker;
 import io.debezium.connector.spanner.task.TaskSyncContext;
 
 /**
@@ -133,6 +134,10 @@ public class SpannerChangeStreamService {
         return changeStreamDao.isMutableKeyRange();
     }
 
+    public boolean isExternalPlacementToken(String partitionToken, Timestamp probeTimestamp) {
+        return changeStreamDao.isExternalPlacementToken(partitionToken, probeTimestamp);
+    }
+
     public void getEvents(Partition partition, ChangeStreamEventConsumer changeStreamEventConsumer,
                           PartitionEventListener partitionEventListener)
             throws InterruptedException, Exception {
@@ -225,6 +230,7 @@ public class SpannerChangeStreamService {
         Timestamp partitionEndTimestamp = partition.getEndTimestamp();
 
         Timestamp processedTimestamp = partition.getStartTimestamp();
+        Timestamp lastPublishedProcessedTs = processedTimestamp;
         String lastBoundaryRecordSequence = partition.getLastBoundaryRecordSequence();
         boolean isPartitionEnded = false;
 
@@ -331,23 +337,12 @@ public class SpannerChangeStreamService {
                             if (!pee.getSourcePartitions().isEmpty()) {
                                 if (taskSyncContextSupplier != null) {
                                     // Buffer-gate path: keep the gRPC connection alive.
-                                    boolean isFirst;
                                     if (gate == null) {
-                                        gate = new MoveInBufferGate(token, partition.getTvfName(), moveInBufferMaxEvents, taskSyncContextSupplier);
+                                        gate = new MoveInBufferGate(token, partition.getTvfName(), moveInBufferMaxEvents,
+                                                taskSyncContextSupplier, changeStreamDao::isExternalPlacementToken);
                                         gateIsFirst = true;
-                                        isFirst = true;
-                                    }
-                                    else {
-                                        isFirst = false;
                                     }
                                     gate.addMoveIn(pee.getCommitTimestamp(), pee.getSourcePartitions(), pee, metadata);
-                                    partitionEventListener.onMoveInPublishOnly(
-                                            partition, pee.getCommitTimestamp(), pee.getRecordSequence(),
-                                            pee.getSourcePartitions(), gateIsFirst && isFirst);
-                                    if (!isFirst) {
-                                        // All subsequent MoveIn events on the same gate are not first.
-                                        gateIsFirst = false;
-                                    }
 
                                     // Drain confirmed prefix immediately: this MoveIn's source might already be confirmed.
                                     List<ChangeStreamEvent> readyAfterMoveIn = gate.drainConfirmedPrefix();
@@ -362,20 +357,26 @@ public class SpannerChangeStreamService {
                                         gate = null;
                                         gateIsFirst = true;
                                     }
-                                    else if (gate.isFull()) {
-                                        // Overflow: fall back to existing close/reopen path.
-                                        // Capture ALL accumulated sources (not just the first
-                                        // MoveIn's sources) so MoveInStateUpdateOperation waits
-                                        // for every source to confirm MoveOut.
-                                        LOGGER.warn(
-                                                "Task {}, MoveIn buffer overflow ({} events) for partition {}, falling back to close/reopen path",
-                                                taskUid, gate.size(), token);
-                                        isPartitionMoveInEvent = true;
-                                        moveInEvent = gate.getFirstMoveInEvent();
-                                        moveInMetadata = gate.getFirstMoveInMetadata();
-                                        moveInAllSources = gate.getAllSources();
-                                        gate = null;
-                                        innerBreak = true;
+                                    else {
+                                        partitionEventListener.onMoveInPublishOnly(
+                                                partition, pee.getCommitTimestamp(), pee.getRecordSequence(),
+                                                gate.getAllSources(), gateIsFirst);
+                                        gateIsFirst = false;
+                                        if (gate.isFull()) {
+                                            // Overflow: fall back to existing close/reopen path.
+                                            // Capture ALL accumulated sources (not just the first
+                                            // MoveIn's sources) so MoveInStateUpdateOperation waits
+                                            // for every source to confirm MoveOut.
+                                            LOGGER.warn(
+                                                    "Task {}, MoveIn buffer overflow ({} events) for partition {}, falling back to close/reopen path",
+                                                    taskUid, gate.size(), token);
+                                            isPartitionMoveInEvent = true;
+                                            moveInEvent = gate.getFirstMoveInEvent();
+                                            moveInMetadata = gate.getFirstMoveInMetadata();
+                                            moveInAllSources = gate.getAllSources();
+                                            gate = null;
+                                            innerBreak = true;
+                                        }
                                     }
                                     continue; // Don't forward MoveIn event to consumer now; gate handles it.
                                 }
@@ -400,8 +401,15 @@ public class SpannerChangeStreamService {
                         }
 
                         if (gate != null) {
-                            // Gate is active: add this non-MoveIn event to the current segment.
-                            gate.addDataEvent(event);
+                            if (event instanceof PartitionEventEvent
+                                    && !((PartitionEventEvent) event).getDestinationPartitions().isEmpty()
+                                    && gate.canForwardMoveOutImmediately(event.getRecordTimestamp())) {
+                                processEvents(partition, List.of(event), changeStreamEventConsumer);
+                            }
+                            else {
+                                // Gate is active: add this non-MoveIn event to the current segment.
+                                gate.addDataEvent(event);
+                            }
 
                             // Drain confirmed prefix after each event — AtomicReference read is wait-free.
                             List<ChangeStreamEvent> readyInline = gate.drainConfirmedPrefix();
@@ -433,6 +441,13 @@ public class SpannerChangeStreamService {
                         else {
                             // No active gate: forward immediately.
                             processEvents(partition, List.of(event), changeStreamEventConsumer);
+                            if (mutablePartitionOrderingEnabled && taskSyncContextSupplier != null
+                                    && MoveInGateChecker.shouldAdvanceProcessedTimestampForMoveIn(
+                                            taskSyncContextSupplier.get(), token, partition.getTvfName(),
+                                            event.getRecordTimestamp(), lastPublishedProcessedTs)) {
+                                lastPublishedProcessedTs = event.getRecordTimestamp();
+                                partitionEventListener.onWindowAdvanced(partition, lastPublishedProcessedTs, event.getRecordSequence());
+                            }
                         }
 
                         if (isPartitionEnded) {
@@ -578,6 +593,7 @@ public class SpannerChangeStreamService {
                 lastBoundaryRecordSequence = newBoundaryRecordSequence;
             }
             processedTimestamp = endTimestamp;
+            lastPublishedProcessedTs = processedTimestamp;
             partitionEventListener.onWindowAdvanced(partition, processedTimestamp, lastBoundaryRecordSequence);
         }
 

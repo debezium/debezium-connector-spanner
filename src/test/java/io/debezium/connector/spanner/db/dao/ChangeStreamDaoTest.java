@@ -6,9 +6,12 @@
 package io.debezium.connector.spanner.db.dao;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -21,10 +24,14 @@ import com.google.cloud.Timestamp;
 import com.google.cloud.spanner.AsyncResultSet;
 import com.google.cloud.spanner.DatabaseClient;
 import com.google.cloud.spanner.Dialect;
+import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.ForwardingAsyncResultSet;
 import com.google.cloud.spanner.Options;
 import com.google.cloud.spanner.ReadContext;
+import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Statement;
+
+import io.debezium.connector.spanner.db.model.InitialPartition;
 
 class ChangeStreamDaoTest {
 
@@ -116,6 +123,81 @@ class ChangeStreamDaoTest {
 
         assertEquals("SELECT * FROM \"spanner\".\"read_json_changestream\"($1, $2, $3, $4, null)",
                 executedStatement(readContext).getSql());
+    }
+
+    @Test
+    void testIsExternalPlacementTokenRejectedByAllConfiguredTvfsAndCached() {
+        AsyncResultSet rs = mock(AsyncResultSet.class);
+        when(rs.next()).thenThrow(SpannerExceptionFactory.newSpannerException(
+                ErrorCode.INVALID_ARGUMENT,
+                "Partition token ext-token does not belong to the placement TVF"));
+        ReadContext readContext = mock(ReadContext.class);
+        when(readContext.executeQuery(any(), any(), any())).thenReturn(new ForwardingAsyncResultSet(rs));
+        DatabaseClient databaseClient = mock(DatabaseClient.class);
+        when(databaseClient.singleUse()).thenReturn(readContext);
+
+        ChangeStreamDao changeStreamDao = new ChangeStreamDao("ChangeStream", true,
+                List.of("READ_cs_p1", "READ_cs_p2"), databaseClient, Options.RpcPriority.LOW, "Job Name");
+
+        Timestamp probeTs = Timestamp.ofTimeMicroseconds(100L);
+        assertTrue(changeStreamDao.isExternalPlacementToken("ext-token", probeTs));
+        // Second call must hit cache without issuing additional queries
+        assertTrue(changeStreamDao.isExternalPlacementToken("ext-token", probeTs));
+        verify(readContext, times(2)).executeQuery(any(), any(), any());
+    }
+
+    @Test
+    void testIsExternalPlacementTokenAcceptedByConfiguredTvfReturnsFalseAndCaches() {
+        AsyncResultSet rs1 = mock(AsyncResultSet.class);
+        when(rs1.next()).thenThrow(SpannerExceptionFactory.newSpannerException(
+                ErrorCode.INVALID_ARGUMENT,
+                "Partition token p2-token does not belong to the placement TVF"));
+        AsyncResultSet rs2 = mock(AsyncResultSet.class);
+        when(rs2.next()).thenReturn(false);
+
+        ReadContext readContext = mock(ReadContext.class);
+        when(readContext.executeQuery(any(), any(), any()))
+                .thenReturn(new ForwardingAsyncResultSet(rs1))
+                .thenReturn(new ForwardingAsyncResultSet(rs2));
+        DatabaseClient databaseClient = mock(DatabaseClient.class);
+        when(databaseClient.singleUse()).thenReturn(readContext);
+
+        ChangeStreamDao changeStreamDao = new ChangeStreamDao("ChangeStream", true,
+                List.of("READ_cs_p1", "READ_cs_p2"), databaseClient, Options.RpcPriority.LOW, "Job Name");
+
+        Timestamp probeTs = Timestamp.ofTimeMicroseconds(100L);
+        assertFalse(changeStreamDao.isExternalPlacementToken("p2-token", probeTs));
+        // Second call must hit cache without issuing additional queries
+        assertFalse(changeStreamDao.isExternalPlacementToken("p2-token", probeTs));
+        verify(readContext, times(2)).executeQuery(any(), any(), any());
+    }
+
+    @Test
+    void testIsExternalPlacementTokenTransientErrorReturnsFalseWithoutCaching() {
+        AsyncResultSet rs1 = mock(AsyncResultSet.class);
+        when(rs1.next()).thenThrow(SpannerExceptionFactory.newSpannerException(
+                ErrorCode.UNAVAILABLE, "Transient network error"));
+        AsyncResultSet rs2 = mock(AsyncResultSet.class);
+        when(rs2.next()).thenThrow(SpannerExceptionFactory.newSpannerException(
+                ErrorCode.INVALID_ARGUMENT,
+                "Partition token ext-token does not belong to the placement TVF"));
+
+        ReadContext readContext = mock(ReadContext.class);
+        when(readContext.executeQuery(any(), any(), any()))
+                .thenReturn(new ForwardingAsyncResultSet(rs1))
+                .thenReturn(new ForwardingAsyncResultSet(rs2));
+        DatabaseClient databaseClient = mock(DatabaseClient.class);
+        when(databaseClient.singleUse()).thenReturn(readContext);
+
+        ChangeStreamDao changeStreamDao = new ChangeStreamDao("ChangeStream", true,
+                List.of("READ_cs_p1"), databaseClient, Options.RpcPriority.LOW, "Job Name");
+
+        Timestamp probeTs = Timestamp.ofTimeMicroseconds(100L);
+        assertFalse(changeStreamDao.isExternalPlacementToken("ext-token", probeTs));
+        // Because transient error was not cached, retry probes again and succeeds
+        assertTrue(changeStreamDao.isExternalPlacementToken("ext-token", probeTs));
+        assertFalse(changeStreamDao.isExternalPlacementToken(InitialPartition.PARTITION_TOKEN, probeTs));
+        verify(readContext, times(2)).executeQuery(any(), any(), any());
     }
 
     private static ReadContext readContext() {
