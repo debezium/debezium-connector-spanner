@@ -12,8 +12,10 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Stream;
 
+import org.apache.kafka.connect.source.SourceRecord;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.params.provider.Arguments;
 import org.slf4j.Logger;
 
@@ -25,7 +27,10 @@ import io.debezium.connector.spanner.util.Connection;
 import io.debezium.connector.spanner.util.Database;
 import io.debezium.connector.spanner.util.KafkaEnvironment;
 import io.debezium.connector.spanner.util.PartitionMode;
+import io.debezium.embedded.EmbeddedEngineConfig;
+import io.debezium.embedded.TestingDebeziumEngine;
 import io.debezium.embedded.async.AbstractAsyncEngineConnectorTest;
+import io.debezium.engine.DebeziumEngine;
 import io.debezium.util.Testing;
 
 /**
@@ -181,9 +186,25 @@ public class AbstractSpannerConnectorIT extends AbstractAsyncEngineConnectorTest
         return Integer.parseInt(System.getProperty(TEST_PROPERTY_PREFIX + "records.waittime", "30"));
     }
 
+    private static final AtomicInteger CONNECTOR_COUNTER = new AtomicInteger(0);
+    private String currentConnectorName = "testing-connector";
+
+    @BeforeEach
+    void isolateConnectorName() {
+        currentConnectorName = "testing-connector-" + CONNECTOR_COUNTER.incrementAndGet() + "-" + System.currentTimeMillis();
+    }
+
+    @Override
+    protected TestingDebeziumEngine<SourceRecord> createEngine(DebeziumEngine.Builder<SourceRecord> builder) {
+        this.config = Configuration.copy(this.config)
+                .with(EmbeddedEngineConfig.ENGINE_NAME, currentConnectorName)
+                .build();
+        builder.using(this.config.asProperties());
+        return super.createEngine(builder);
+    }
+
     protected String getTopicName(Configuration config, String tableName) {
-        String debeziumConnectorName = "testing-connector";
-        return debeziumConnectorName + "." + tableName;
+        return currentConnectorName + "." + tableName;
     }
 
     /**
