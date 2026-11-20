@@ -318,21 +318,25 @@ class MoveInBufferGateTest {
     }
 
     @Test
-    void drainConfirmedPrefix_doesNotReleaseWhenSourceFinishedInDifferentTvf() {
+    void drainConfirmedPrefix_releasesWhenSourceFinishedInCoLocatedTvfOrExternalProbe() {
         AtomicReference<TaskSyncContext> ctxRef = new AtomicReference<>(ctxEmpty());
-        MoveInBufferGate gate = new MoveInBufferGate(DEST, "tvfA", MAX_EVENTS, ctxRef::get);
+        MoveInBufferGate gate = new MoveInBufferGate(DEST, "tvfA", MAX_EVENTS, ctxRef::get,
+                (token, ts) -> "ext-src".equals(token));
 
-        PartitionEventEvent mi = moveInEvent();
-        gate.addMoveIn(T1, List.of("src1"), mi, fakeMeta());
+        PartitionEventEvent mi1 = moveInEvent();
+        PartitionEventEvent mi2 = moveInEvent();
+        gate.addMoveIn(T1, List.of("ext-src"), mi1, fakeMeta());
+        gate.addMoveIn(T2, List.of("src1"), mi2, fakeMeta());
 
-        // src1 is FINISHED, but in tvfB, not tvfA -> gate must stay closed.
+        // Segment 1 (ext-src) is immediately released via external placement probe;
+        // Segment 2 (src1) remains gated until src1 finishes in co-located tvfB.
+        assertEquals(List.of(mi1), gate.drainConfirmedPrefix());
+        assertFalse(gate.isEmpty());
+
+        // Once src1 finishes in co-located tvfB, Segment 2 opens.
         ctxRef.set(ctxWithFinishedTvf("tvfB", "src1"));
-        assertTrue(gate.drainConfirmedPrefix().isEmpty(), "source finished in a different TVF must not satisfy the gate");
-
-        // Same source finished in tvfA -> gate opens.
-        ctxRef.set(ctxWithFinishedTvf("tvfA", "src1"));
         List<ChangeStreamEvent> ready = gate.drainConfirmedPrefix();
-        assertEquals(List.of(mi), ready);
+        assertEquals(List.of(mi2), ready);
         assertTrue(gate.isEmpty());
     }
 

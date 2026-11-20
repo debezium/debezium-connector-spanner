@@ -22,6 +22,7 @@ import io.debezium.connector.spanner.SpannerConnectorConfig;
 import io.debezium.connector.spanner.SpannerPartition;
 import io.debezium.connector.spanner.context.offset.PartitionOffset;
 import io.debezium.connector.spanner.context.offset.SpannerOffsetContext;
+import io.debezium.connector.spanner.db.model.InitialPartition;
 import io.debezium.connector.spanner.db.model.PartitionKey;
 import io.debezium.connector.spanner.kafka.internal.model.MoveOutState;
 import io.debezium.connector.spanner.kafka.internal.model.PartitionState;
@@ -123,8 +124,12 @@ public class RemoveFinishedPartitionOperation implements Operation {
     }
 
     private static boolean allChildrenFinished(List<PartitionState> allPartitionStates, PartitionState source) {
+        Set<String> moveOutDestTokens = source.getMoveOutStates().stream()
+                .flatMap(mos -> mos.getDestPartitionTokens().stream())
+                .collect(Collectors.toSet());
         Set<PartitionKey> children = allPartitionStates.stream()
-                .filter(partitionState -> Objects.equals(source.getTvfName(), partitionState.getTvfName()))
+                .filter(partitionState -> Objects.equals(source.getTvfName(), partitionState.getTvfName())
+                        || moveOutDestTokens.contains(partitionState.getToken()))
                 .filter(partitionState -> partitionState.getParents().contains(source.getToken()))
                 .map(PartitionState::getKey)
                 .collect(Collectors.toSet());
@@ -167,18 +172,25 @@ public class RemoveFinishedPartitionOperation implements Operation {
         for (MoveOutState moveOutState : partitionState.getMoveOutStates()) {
             Timestamp moveOutTimestamp = moveOutState.getTimestamp();
             for (String destToken : moveOutState.getDestPartitionTokens()) {
-                PartitionState dest = allPartitionStates.stream()
+                List<PartitionState> destCandidates = allPartitionStates.stream()
                         .filter(p -> destToken.equals(p.getToken()))
                         .filter(p -> Objects.equals(partitionState.getTvfName(), p.getTvfName()))
-                        .findFirst()
-                        .orElse(null);
-                if (dest == null) {
+                        .collect(Collectors.toList());
+                if (destCandidates.isEmpty()
+                        && partitionState.getTvfName() != null
+                        && !InitialPartition.isInitialPartition(destToken)) {
+                    destCandidates = allPartitionStates.stream()
+                            .filter(p -> destToken.equals(p.getToken()))
+                            .collect(Collectors.toList());
+                }
+                if (destCandidates.isEmpty()) {
                     // Destination not tracked anywhere - nothing left depending on this source.
                     continue;
                 }
-                boolean destHasReachedThisMove = dest.getProcessedTimestamp() != null
-                        && dest.getProcessedTimestamp().compareTo(moveOutTimestamp) >= 0;
-                if (!destHasReachedThisMove) {
+                boolean allCandidatesReachedMove = destCandidates.stream()
+                        .allMatch(dest -> dest.getProcessedTimestamp() != null
+                                && dest.getProcessedTimestamp().compareTo(moveOutTimestamp) >= 0);
+                if (!allCandidatesReachedMove) {
                     return false;
                 }
             }

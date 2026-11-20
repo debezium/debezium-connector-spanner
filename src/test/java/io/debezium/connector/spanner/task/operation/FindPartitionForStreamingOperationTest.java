@@ -320,7 +320,7 @@ class FindPartitionForStreamingOperationTest {
     }
 
     @Test
-    void sourceMoveOutInDifferentTvf_destPartitionBlocked() {
+    void sourceMoveOutInCoLocatedTvf_destPartitionReady() {
         PartitionState dest = destPartitionWithTvf("dst", "tvfA", "src");
         PartitionState source = PartitionState.builder()
                 .token("src")
@@ -333,12 +333,12 @@ class FindPartitionForStreamingOperationTest {
 
         TaskSyncContext result = new FindPartitionForStreamingOperation().doOperation(context);
 
-        assertEquals(PartitionStateEnum.CREATED, partitionState(result, "dst", "tvfA").getState(),
-                "MoveOut state from a different TVF must not satisfy the gate");
+        assertEquals(PartitionStateEnum.READY_FOR_STREAMING, partitionState(result, "dst", "tvfA").getState(),
+                "MoveOut state from co-located tvfB must satisfy the gate for cross-placement MoveIn");
     }
 
     @Test
-    void sourceFinishedInDifferentTvf_destPartitionBlocked() {
+    void sourceFinishedInCoLocatedTvf_destPartitionReady() {
         PartitionState dest = destPartitionWithTvf("dst", "tvfA", "src");
         PartitionState finishedSource = PartitionState.builder()
                 .token("src")
@@ -351,8 +351,20 @@ class FindPartitionForStreamingOperationTest {
 
         TaskSyncContext result = new FindPartitionForStreamingOperation().doOperation(context);
 
-        assertEquals(PartitionStateEnum.CREATED, partitionState(result, "dst", "tvfA").getState(),
-                "source finished in a different TVF must not satisfy the gate");
+        assertEquals(PartitionStateEnum.READY_FOR_STREAMING, partitionState(result, "dst", "tvfA").getState(),
+                "source finished in co-located tvfB must satisfy the gate for cross-placement MoveIn");
+    }
+
+    @Test
+    void externalPlacementSourceConfirmedByProbe_destPartitionReady() {
+        PartitionState dest = destPartitionWithTvf("dst", "tvfA", "ext-src");
+        TaskSyncContext context = contextWith(dest);
+
+        TaskSyncContext result = new FindPartitionForStreamingOperation(
+                true, (token, ts) -> "ext-src".equals(token)).doOperation(context);
+
+        assertEquals(PartitionStateEnum.READY_FOR_STREAMING, partitionState(result, "dst", "tvfA").getState(),
+                "external placement source confirmed by probe must unblock destination partition");
     }
 
     @Test
